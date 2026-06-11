@@ -1,0 +1,25 @@
+# dependencies
+node_modules/
+
+# Next.js build output
+.next/
+out/
+
+# environment variables (NEVER commit these)
+.env
+.env.local
+.env.*.local
+
+# TypeScript build cache
+tsconfig.tsbuildinfo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# editor
+.vscode/
+*.swp
+
+# Claude Code local settings (per-machine permissions)
+.claude/settings.local.json

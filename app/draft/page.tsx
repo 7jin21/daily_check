@@ -1,0 +1,366 @@
+'use client'
+
+import { useEffect, useRef, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import Link from 'next/link'
+import Confetti from '@/components/ui/Confetti'
+import { useCheckinStore } from '@/stores/checkin'
+import { getSupabaseClient } from '@/lib/supabase'
+import { apiPost } from '@/lib/api-client'
+import { generateOfflineDraft } from '@/lib/offline-draft'
+import type { DraftResult } from '@/lib/offline-draft'
+
+type RewriteInstruction = 'emotional' | 'shorter' | 'positive' | 'formal'
+
+const REWRITE_BUTTONS: { key: RewriteInstruction; label: string }[] = [
+  { key: 'emotional', label: '感情豊かに ✨' },
+  { key: 'shorter',  label: '短くして 📝' },
+  { key: 'positive', label: 'ポジティブに 🌟' },
+  { key: 'formal',   label: '丁寧な文体に 📖' },
+]
+
+function getTodayJST() {
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Tokyo' })
+}
+
+function classifyError(err: unknown): string {
+  if (err instanceof DOMException && err.name === 'AbortError') return 'cancelled'
+  if (err instanceof TypeError && err.message.includes('fetch')) {
+    return 'ネットワークに接続できません。Wi-Fiやモバイルデータ通信を確認してください。'
+  }
+  if (err instanceof Error) {
+    if (err.message.includes('401') || err.message.includes('Unauthorized')) {
+      return 'セッションが切れました。再ログインしてください。'
+    }
+    if (err.message.includes('500') || err.message.includes('Server error')) {
+      return 'サーバーで問題が発生しました。時間をおいて再試行してください。'
+    }
+    return err.message
+  }
+  return '保存に失敗しました。時間をおいて再試行してください。'
+}
+
+export default function DraftPage() {
+  const router = useRouter()
+  const {
+    getInput,
+    checkinDate,
+    draftResult,
+    editedDraft,
+    setDraftResult,
+    setEditedDraft,
+    setIsGenerating,
+    isGenerating,
+    reset,
+  } = useCheckinStore()
+
+  const [isSaving, setIsSaving] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
+  const [savedEntryDate, setSavedEntryDate] = useState<string | null>(null)
+  const [isOffline, setIsOffline] = useState(false)
+  const [rewritingKey, setRewritingKey] = useState<RewriteInstruction | null>(null)
+  const [rewriteError, setRewriteError] = useState<string | null>(null)
+  const abortRef = useRef<AbortController | null>(null)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  useEffect(() => {
+    const today = getTodayJST()
+
+    // 前日以前のデータでドラフトページに来た場合はチェックインへ戻す
+    if (checkinDate && checkinDate !== today) {
+      reset()
+      router.replace('/checkin')
+      return
+    }
+
+    const input = getInput()
+    if (!input.mood && !input.energy) {
+      router.replace('/checkin')
+      return
+    }
+
+    // editedDraft が空の場合のみ生成/初期化（編集済みなら保持）
+    if (!editedDraft) {
+      if (draftResult) {
+        setEditedDraft(draftResult.draft)
+      } else {
+        generateDraft()
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  useEffect(() => {
+    return () => { abortRef.current?.abort() }
+  }, [])
+
+  useEffect(() => {
+    const el = textareaRef.current
+    if (!el) return
+    el.style.height = 'auto'
+    el.style.height = `${el.scrollHeight}px`
+  }, [editedDraft])
+
+  const generateDraft = async () => {
+    abortRef.current?.abort()
+    abortRef.current = new AbortController()
+    setIsGenerating(true)
+    setIsOffline(false)
+
+    const input = getInput()
+    try {
+      const result = await apiPost<DraftResult>(
+        '/api/generate-draft',
+        input,
+        { signal: abortRef.current.signal }
+      )
+      setDraftResult(result)
+      setEditedDraft(result.draft)
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') return
+      console.warn('AI生成失敗、オフラインドラフトを使用します:', err)
+      const offlineResult = generateOfflineDraft(input)
+      setDraftResult(offlineResult)
+      setEditedDraft(offlineResult.draft)
+      setIsOffline(true)
+    } finally {
+      setIsGenerating(false)
+    }
+  }
+
+  const handleCancel = () => {
+    abortRef.current?.abort()
+    router.push('/checkin')
+  }
+
+  const handleRewrite = async (instruction: RewriteInstruction) => {
+    if (!editedDraft.trim() || rewritingKey) return
+    setRewritingKey(instruction)
+    setRewriteError(null)
+    try {
+      const result = await apiPost<{ draft: string }>('/api/rewrite-draft', {
+        draft: editedDraft,
+        instruction,
+      })
+      setEditedDraft(result.draft)
+    } catch {
+      setRewriteError('AIの書き直しに失敗しました。しばらくしてから再試行してください。')
+    } finally {
+      setRewritingKey(null)
+    }
+  }
+
+  const handleSave = async () => {
+    if (!editedDraft.trim()) return
+    setIsSaving(true)
+    setSaveError(null)
+
+    const input = getInput()
+    const entryDate = getTodayJST()
+
+    try {
+      const supabase = getSupabaseClient()
+      const { data: { user } } = await supabase.auth.getUser()
+
+      if (!user) {
+        router.push('/login')
+        return
+      }
+
+      const { data: savedEntry, error: saveDbError } = await supabase
+        .from('diary_entries')
+        .upsert(
+          {
+            user_id: user.id,
+            entry_date: entryDate,
+            mood: input.mood,
+            energy: input.energy,
+            events: input.events,
+            challenges: input.challenges,
+            gratitude: input.gratitude,
+            freeform: input.freeform,
+            ai_draft: draftResult?.draft ?? editedDraft,
+            edited_draft: editedDraft,
+            tags: draftResult?.tags ?? [],
+            summary: draftResult?.summary ?? '',
+            dominant_emotion: draftResult?.dominantEmotion ?? '',
+          },
+          // PKのidは渡していないため、user_id + entry_date で競合判定しないと
+          // 同日2回目の保存が unique 制約違反になる
+          { onConflict: 'user_id,entry_date' }
+        )
+        .select('id')
+        .single()
+
+      if (saveDbError) throw new Error(saveDbError.message)
+
+      if (savedEntry) {
+        apiPost('/api/notion-sync', {
+          entryId: savedEntry.id,
+          entryDate,
+          draft: editedDraft,
+          tags: draftResult?.tags ?? [],
+          mood: input.mood,
+          energy: input.energy,
+        }, { retry: false }).catch((err) => console.warn('Notion同期失敗（無視）:', err))
+      }
+
+      reset()
+      setSavedEntryDate(entryDate)
+    } catch (err) {
+      console.error('保存エラー:', err)
+      const classified = classifyError(err)
+      if (classified === 'cancelled') return
+      if (classified.includes('セッション')) {
+        router.push('/login')
+        return
+      }
+      setSaveError(classified)
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  if (isGenerating) {
+    return (
+      <div className="min-h-dvh flex flex-col items-center justify-center px-4 gap-6">
+        <div className="spinner" style={{ width: 48, height: 48, borderWidth: 3 }} />
+        <div className="text-center">
+          <p className="font-semibold text-slate-700 dark:text-slate-300 text-lg">AIが日記を書いています...</p>
+          <p className="text-slate-400 text-sm mt-1">少々お待ちください ✨</p>
+        </div>
+        <button
+          onClick={handleCancel}
+          className="px-6 py-3 rounded-2xl border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 text-sm"
+        >
+          キャンセルして入力に戻る
+        </button>
+      </div>
+    )
+  }
+
+  if (savedEntryDate) {
+    return (
+      <>
+        <Confetti />
+        <div className="min-h-dvh flex flex-col items-center justify-center px-4 gap-6 animate-fade-in">
+          <div className="text-7xl animate-float">✨</div>
+          <div className="text-center">
+            <p className="font-bold text-slate-800 dark:text-white text-2xl">保存しました！</p>
+            <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">今日も記録できました</p>
+          </div>
+          <div className="w-full space-y-3">
+            <Link
+              href={`/entries/${savedEntryDate}`}
+              className="block w-full py-4 text-center rounded-2xl animated-gradient text-white font-bold text-lg active:scale-95 transition-transform glow-sky"
+            >
+              今日の日記を見る
+            </Link>
+            <Link
+              href="/"
+              className="block w-full py-3 text-center rounded-2xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 text-base active:scale-95 transition-transform"
+            >
+              ホームに戻る
+            </Link>
+          </div>
+        </div>
+      </>
+    )
+  }
+
+  if (!editedDraft && !draftResult) return null
+
+  return (
+    <div className="min-h-dvh flex flex-col px-4 pt-6">
+      <div className="flex items-center gap-3 mb-6">
+        <button
+          onClick={() => router.push('/checkin')}
+          className="w-11 h-11 rounded-full bg-slate-100 dark:bg-slate-700 flex items-center justify-center text-xl text-slate-600 dark:text-slate-300"
+          aria-label="入力に戻る"
+        >
+          ‹
+        </button>
+        <h1 className="text-xl font-bold text-slate-900 dark:text-white">日記のドラフト</h1>
+      </div>
+
+      {isOffline && (
+        <div className="mb-4 p-3 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-400 text-sm">
+          <p className="font-semibold">⚠️ AI生成に失敗しました</p>
+          <p className="mt-0.5 text-xs">ネットワーク接続を確認のうえ「書き直す」を試してください。以下はオフライン生成のドラフトです。</p>
+        </div>
+      )}
+
+      {draftResult && (
+        <div className="mb-4">
+          <p className="text-sm text-slate-500 dark:text-slate-400 mb-2">{draftResult.summary}</p>
+          <div className="flex flex-wrap gap-2">
+            {draftResult.tags.map((tag) => (
+              <span
+                key={tag}
+                className="px-3 py-1 rounded-full bg-sky-100 dark:bg-sky-900/30 text-sky-700 dark:text-sky-400 text-xs font-medium"
+              >
+                #{tag}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="flex-1 mb-4">
+        <label className="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-2">
+          編集して保存できます
+        </label>
+        <textarea
+          ref={textareaRef}
+          value={editedDraft}
+          onChange={(e) => setEditedDraft(e.target.value)}
+          className="w-full min-h-40 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 text-base resize-none overflow-hidden focus:outline-none focus:ring-2 focus:ring-sky-400"
+        />
+
+        {/* AI書き直しボタン */}
+        <div className="mt-3">
+          <p className="text-xs text-slate-400 dark:text-slate-500 mb-2">AIに書き直してもらう</p>
+          <div className="flex flex-wrap gap-2">
+            {REWRITE_BUTTONS.map(({ key, label }) => (
+              <button
+                key={key}
+                onClick={() => handleRewrite(key)}
+                disabled={!!rewritingKey || isSaving}
+                className="px-3 py-1.5 rounded-full text-xs font-medium border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-400 bg-white dark:bg-slate-800 disabled:opacity-40 active:scale-95 transition-transform"
+              >
+                {rewritingKey === key ? '書き直し中...' : label}
+              </button>
+            ))}
+          </div>
+          {rewriteError && (
+            <p className="mt-2 text-xs text-red-500">{rewriteError}</p>
+          )}
+        </div>
+      </div>
+
+      {saveError && (
+        <div className="mb-4 p-3 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 text-sm">
+          <p className="font-semibold">保存できませんでした</p>
+          <p className="mt-0.5 text-xs">{saveError}</p>
+        </div>
+      )}
+
+      <div className="pb-6 space-y-3">
+        <button
+          onClick={handleSave}
+          disabled={isSaving || !editedDraft.trim()}
+          className="w-full py-4 rounded-2xl bg-gradient-to-r from-sky-400 to-violet-500 text-white font-bold text-lg disabled:opacity-40 active:scale-95 transition-transform"
+        >
+          {isSaving ? '保存中...' : '保存する 💾'}
+        </button>
+        <button
+          onClick={generateDraft}
+          disabled={isGenerating || isSaving}
+          className="w-full py-3 rounded-2xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 text-base disabled:opacity-40"
+        >
+          🔄 AIに書き直してもらう
+        </button>
+      </div>
+    </div>
+  )
+}

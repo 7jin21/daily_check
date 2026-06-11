@@ -1,0 +1,193 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { createReadonlyServerClient } from '@/lib/supabase-server'
+import { createServerSupabaseClient } from '@/lib/supabase-server'
+import { decryptSecret } from '@/lib/crypto'
+
+interface NotionSyncBody {
+  entryId: string
+  entryDate: string
+  draft: string
+  tags: string[]
+  mood: number
+  energy: number
+}
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
+
+function validateBody(body: Partial<NotionSyncBody>): string | null {
+  if (typeof body.entryId !== 'string' || !UUID_RE.test(body.entryId)) return 'entryId が不正です'
+  if (typeof body.entryDate !== 'string' || !DATE_RE.test(body.entryDate)) return 'entryDate が不正です'
+  if (typeof body.draft !== 'string' || !body.draft.trim()) return 'draft は必須です'
+  if (body.tags != null && (!Array.isArray(body.tags) || body.tags.some((t) => typeof t !== 'string'))) {
+    return 'tags は文字列の配列で指定してください'
+  }
+  if (!Number.isInteger(body.mood) || (body.mood as number) < 1 || (body.mood as number) > 5) return 'mood が不正です'
+  if (!Number.isInteger(body.energy) || (body.energy as number) < 1 || (body.energy as number) > 5) return 'energy が不正です'
+  return null
+}
+
+export async function POST(req: NextRequest) {
+  // セッション確認
+  const supabase = await createReadonlyServerClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  // リクエストボディ検証
+  let body: NotionSyncBody
+  try {
+    body = await req.json()
+  } catch {
+    return NextResponse.json({ error: 'Invalid request body' }, { status: 400 })
+  }
+
+  const validationError = validateBody(body)
+  if (validationError) {
+    return NextResponse.json({ error: validationError }, { status: 400 })
+  }
+  const tags = body.tags ?? []
+
+  const serverSupabase = await createServerSupabaseClient()
+
+  // エントリーの存在・所有権・同期済みかを確認（再送による重複ページ作成を防ぐ）
+  const { data: entry, error: entryError } = await serverSupabase
+    .from('diary_entries')
+    .select('id, notion_page_id')
+    .eq('id', body.entryId)
+    .eq('user_id', user.id)
+    .single()
+
+  if (entryError || !entry) {
+    return NextResponse.json({ error: 'Entry not found' }, { status: 404 })
+  }
+
+  if (entry.notion_page_id) {
+    return NextResponse.json({ success: true, notionPageId: entry.notion_page_id, alreadySynced: true })
+  }
+
+  // ユーザーのNotion設定を取得
+  const { data: profile, error: profileError } = await serverSupabase
+    .from('profiles')
+    .select('notion_token, notion_database_id')
+    .eq('id', user.id)
+    .single()
+
+  if (profileError || !profile) {
+    return NextResponse.json({ error: 'Profile not found' }, { status: 404 })
+  }
+
+  // DB のトークンは暗号化されている場合があるため復号する（平文ならそのまま返る）
+  let storedToken = ''
+  try {
+    storedToken = profile.notion_token ? decryptSecret(profile.notion_token) : ''
+  } catch (err) {
+    console.error('Notion token decryption error:', err)
+  }
+
+  // || を使う: 空文字の場合も環境変数にフォールバックさせる
+  const notionToken = storedToken || process.env.NOTION_API_KEY
+  const notionDatabaseId = profile.notion_database_id || process.env.NOTION_DATABASE_ID
+
+  if (!notionToken || !notionDatabaseId) {
+    return NextResponse.json({ error: 'Notion設定が未設定です', skipped: true }, { status: 200 })
+  }
+
+  // Notion API呼び出し
+  try {
+    const moodEmoji: Record<number, string> = {
+      1: '😞', 2: '😕', 3: '😐', 4: '🙂', 5: '😄',
+    }
+
+    const notionPage = {
+      parent: { database_id: notionDatabaseId },
+      icon: { emoji: moodEmoji[body.mood] ?? '📓' },
+      properties: {
+        title: {
+          title: [
+            {
+              text: {
+                content: new Date(`${body.entryDate}T12:00:00+09:00`).toLocaleDateString('ja-JP', {
+                  timeZone: 'Asia/Tokyo',
+                  year: 'numeric',
+                  month: 'long',
+                  day: 'numeric',
+                  weekday: 'long',
+                }),
+              },
+            },
+          ],
+        },
+        '日付': {
+          date: { start: body.entryDate },
+        },
+        '気分': {
+          number: body.mood,
+        },
+        'エネルギー': {
+          number: body.energy,
+        },
+        'タグ': {
+          multi_select: tags.map((tag) => ({ name: tag })),
+        },
+      },
+      children: [
+        {
+          object: 'block',
+          type: 'paragraph',
+          paragraph: {
+            rich_text: [
+              {
+                type: 'text',
+                text: {
+                  content: body.draft.substring(0, 2000), // Notionの制限
+                },
+              },
+            ],
+          },
+        },
+      ],
+    }
+
+    const response = await fetch('https://api.notion.com/v1/pages', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${notionToken}`,
+        'Content-Type': 'application/json',
+        'Notion-Version': '2022-06-28',
+      },
+      body: JSON.stringify(notionPage),
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({})) as { message?: string }
+      throw new Error(errorData.message ?? `Notion API error: ${response.status}`)
+    }
+
+    const data = await response.json() as { id: string }
+    const notionPageId = data.id
+
+    // Supabaseにページ IDを保存
+    await serverSupabase
+      .from('diary_entries')
+      .update({
+        notion_page_id: notionPageId,
+        notion_synced_at: new Date().toISOString(),
+      })
+      .eq('id', body.entryId)
+      .eq('user_id', user.id)
+
+    return NextResponse.json({ success: true, notionPageId })
+  } catch (err) {
+    console.error('Notion sync error:', err)
+    // Notion同期失敗はSupabase保存に影響しない
+    return NextResponse.json(
+      { error: 'Notion同期に失敗しました', details: err instanceof Error ? err.message : 'Unknown error' },
+      { status: 500 }
+    )
+  }
+}
