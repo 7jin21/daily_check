@@ -96,6 +96,11 @@ export default async function HomePage() {
 
   const { entries, stats } = await getHomeData(user.id)
 
+  // 初回ユーザー: 空のホームではなくオンボーディングを表示
+  if (!stats || stats.total === 0) {
+    return <Onboarding />
+  }
+
   // Asia/Tokyo 基準で今日の日付を判定
   const today = getTodayJST()
   const todayEntry = entries.find((e) => e.entry_date === today)
@@ -223,14 +228,76 @@ export default async function HomePage() {
         </div>
       )}
 
-      {/* エントリがない場合 */}
-      {entries.length === 0 && (
-        <div className="text-center py-12 text-slate-400">
-          <p className="text-5xl mb-4">📓</p>
-          <p className="font-medium">まだ記録がありません</p>
-          <p className="text-sm mt-1">最初のチェックインをしてみましょう</p>
+    </div>
+  )
+}
+
+/** 初回ユーザー向けオンボーディング（記録が1件もない場合のみ表示） */
+function Onboarding() {
+  const steps = [
+    {
+      icon: '👆',
+      title: '気分をタップするだけ',
+      description: '必須は気分とエネルギーの2つだけ。30秒で終わります',
+    },
+    {
+      icon: '✨',
+      title: 'AIがあなたの日記を代筆',
+      description: '入力したキーワードから、自然な文章の日記を自動生成',
+    },
+    {
+      icon: '📊',
+      title: '続けるほど自分がわかる',
+      description: '気分の推移・感情パターンをAIが分析してくれます',
+    },
+  ]
+
+  return (
+    <div className="min-h-dvh flex flex-col px-6 pt-12 pb-8">
+      {/* ヒーロー */}
+      <div className="text-center mb-10 animate-slide-up">
+        <div className="w-20 h-20 mx-auto mb-5 rounded-3xl animated-gradient flex items-center justify-center shadow-xl shadow-sky-500/25">
+          <span className="text-4xl">🪞</span>
         </div>
-      )}
+        <h1 className="text-2xl font-bold text-slate-900 dark:text-white">
+          ようこそ、<span className="gradient-text">Inner Mirror</span> へ
+        </h1>
+        <p className="text-slate-500 dark:text-slate-400 text-sm mt-2">
+          毎日30秒で、AIがあなたの日記を書きます
+        </p>
+      </div>
+
+      {/* 3ステップ説明 */}
+      <div className="space-y-3 mb-10">
+        {steps.map((step, i) => (
+          <div
+            key={step.title}
+            className="card flex items-start gap-4 animate-slide-up"
+            style={{ animationDelay: `${0.08 * (i + 1)}s`, animationFillMode: 'backwards' }}
+          >
+            <span className="text-3xl flex-shrink-0">{step.icon}</span>
+            <div>
+              <p className="font-bold text-slate-800 dark:text-slate-200 text-sm">{step.title}</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
+                {step.description}
+              </p>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* CTA */}
+      <div className="mt-auto animate-slide-up" style={{ animationDelay: '0.35s', animationFillMode: 'backwards' }}>
+        <Link
+          href="/checkin"
+          className="block w-full py-4 text-center rounded-2xl animated-gradient text-white font-bold text-lg active:scale-95 transition-transform glow-sky"
+        >
+          最初のチェックインを始める ✍️
+        </Link>
+        <p className="text-center text-xs text-slate-400 mt-3">
+          途中でやめてもOK。入力は自動保存されます
+        </p>
+      </div>
     </div>
   )
 }

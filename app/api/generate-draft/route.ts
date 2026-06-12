@@ -4,8 +4,14 @@ import { generateOfflineDraft } from '@/lib/offline-draft'
 import { getGroqClient, GROQ_MODELS } from '@/lib/groq'
 import type { CheckinInput } from '@/stores/checkin'
 
+// 日記本文を text/plain でストリーミング返却する。
+// タグ・サマリー等のメタ情報は本文確定後に /api/draft-meta で取得する（クライアント側）。
+// オフラインフォールバック時は X-Draft-Fallback: 1 ヘッダーを付けて全文を一括返却。
+
 const MAX_TEXT_LENGTH = 1000
 const TEXT_FIELDS = ['events', 'challenges', 'gratitude', 'freeform'] as const
+
+const PLAIN_HEADERS = { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-cache' }
 
 export async function POST(req: NextRequest) {
   // 1. セッション確認
@@ -48,62 +54,81 @@ export async function POST(req: NextRequest) {
   if (!process.env.GROQ_API_KEY) {
     console.warn('GROQ_API_KEY未設定 - オフラインフォールバックを使用')
     const result = generateOfflineDraft(input)
-    return NextResponse.json(result)
+    return new NextResponse(result.draft, {
+      headers: { ...PLAIN_HEADERS, 'X-Draft-Fallback': '1' },
+    })
   }
 
-  // 4. GROQ API 呼び出し
+  // 4. 文体学習: 直近の日記2件を文体サンプルとしてプロンプトに含める
+  let styleSamples = ''
+  try {
+    const { data: recent } = await supabase
+      .from('diary_entries')
+      .select('edited_draft, ai_draft')
+      .eq('user_id', user.id)
+      .order('entry_date', { ascending: false })
+      .limit(2)
+
+    const samples = (recent ?? [])
+      .map((r) => (r.edited_draft || r.ai_draft || '').trim().slice(0, 300))
+      .filter(Boolean)
+
+    if (samples.length > 0) {
+      styleSamples = `\n\n【参考: 過去の日記の文体サンプル】\n（口調・文体・リズムだけ真似てください。内容や出来事は絶対に流用しないこと）\n\n${samples.join('\n---\n')}`
+    }
+  } catch {
+    // 文体サンプル取得失敗は無視（通常生成にフォールバック）
+  }
+
+  // 5. GROQ API ストリーミング呼び出し
   try {
     const groq = getGroqClient()
-    const completion = await groq.chat.completions.create({
+    const stream = await groq.chat.completions.create({
       model: GROQ_MODELS.quality,
       max_tokens: 1024,
-      response_format: { type: 'json_object' },
+      stream: true,
       messages: [
         {
           role: 'system',
           content: `あなたは共感的な日記ライターです。ユーザーが提供した情報をもとに、
 一人称（私は）の自然な日本語の日記を書いてください。
 感情に寄り添いながら、その日の経験を豊かに表現してください。
-また、タグ、サマリー、主要感情も生成してください。
 
-必ずJSON形式で以下のフィールドを返してください:
-{
-  "draft": "日記本文（500文字程度）",
-  "tags": ["タグ1", "タグ2", "タグ3"],
-  "summary": "一行サマリー（50文字以内）",
-  "dominantEmotion": "主要感情"
-}`,
+ルール:
+- 500文字程度
+- 日記の本文のみを出力する（前置き・見出し・記号・JSONは一切付けない）
+- 過去の日記サンプルがあれば、その口調と文体を真似る（内容は使わない）`,
         },
         {
           role: 'user',
-          content: buildPrompt(input),
+          content: buildPrompt(input) + styleSamples,
         },
       ],
     })
 
-    const text = completion.choices[0].message.content ?? ''
-    const parsed = JSON.parse(text) as {
-      draft?: string
-      tags?: string[]
-      summary?: string
-      dominantEmotion?: string
-    }
-
-    if (!parsed.draft?.trim()) {
-      throw new Error('draft field missing in AI response')
-    }
-
-    return NextResponse.json({
-      draft: parsed.draft,
-      tags: Array.isArray(parsed.tags) ? parsed.tags.filter((t) => typeof t === 'string') : [],
-      summary: parsed.summary ?? '',
-      dominantEmotion: parsed.dominantEmotion ?? '',
+    const encoder = new TextEncoder()
+    const readable = new ReadableStream({
+      async start(controller) {
+        try {
+          for await (const chunk of stream) {
+            const delta = chunk.choices[0]?.delta?.content ?? ''
+            if (delta) controller.enqueue(encoder.encode(delta))
+          }
+        } catch (err) {
+          console.error('GROQ stream error:', err)
+        }
+        controller.close()
+      },
     })
+
+    return new NextResponse(readable, { headers: PLAIN_HEADERS })
   } catch (err) {
     console.error('GROQ draft generation error:', err)
     // フォールバック
     const result = generateOfflineDraft(input)
-    return NextResponse.json({ ...result, _fallback: true })
+    return new NextResponse(result.draft, {
+      headers: { ...PLAIN_HEADERS, 'X-Draft-Fallback': '1' },
+    })
   }
 }
 

@@ -7,7 +7,7 @@ iPhone のホーム画面から使える AI 日記アプリ（PWA）。気分と
 ## できること
 
 - **30 秒チェックイン** — 気分・エネルギーを選ぶだけで記録完了（テキスト・音声入力も可）
-- **AI 日記生成** — チェックイン内容から日記文・タグ・感情を自動生成（Llama 3.3 / GROQ）
+- **AI 日記生成** — チェックイン内容から日記文・タグ・感情を自動生成（Llama 3.3 / GROQ）。文章はリアルタイムにストリーミング表示され、過去の日記から文体を学習します
 - **AI 書き直し** — 「感情豊かに」「短くして」などワンタップで文体変更
 - **Notion 自動同期** — 保存と同時に Notion データベースへ書き出し
 - **インサイト分析** — 過去の記録から傾向・パーソナリティ・感情トリガーを AI 分析
@@ -59,7 +59,8 @@ iPhone Safari（PWA）
  │  App Router（React）                 │  ← 画面
  │  ┌──────────────────────────────┐   │
  │  │  API Routes（BFF）           │   │  ← サーバー処理
- │  │  POST /api/generate-draft    │───┼──→  GROQ API（日記生成）
+ │  │  POST /api/generate-draft    │───┼──→  GROQ API（日記生成・ストリーミング）
+ │  │  POST /api/draft-meta        │───┼──→  GROQ API（タグ・サマリー抽出）
  │  │  POST /api/rewrite-draft     │───┼──→  GROQ API（書き直し）
  │  │  POST /api/analyze           │───┼──→  GROQ API（パーソナリティ分析）
  │  │  POST /api/weekly-report     │───┼──→  GROQ API（週次レポート）
@@ -390,7 +391,8 @@ create policy "entries: own rows only"
 │   ├── login/page.tsx           # ログイン
 │   ├── auth/callback/route.ts   # OAuth コールバック（Google トークン保存）
 │   └── api/
-│       ├── generate-draft/      # AI 日記生成（GROQ）
+│       ├── generate-draft/      # AI 日記生成（GROQ・ストリーミング・文体学習）
+│       ├── draft-meta/          # タグ・サマリー・感情の抽出（GROQ）
 │       ├── rewrite-draft/       # AI 書き直し（GROQ）
 │       ├── analyze/             # パーソナリティ分析（GROQ）
 │       ├── weekly-report/       # 週次レポート（GROQ）

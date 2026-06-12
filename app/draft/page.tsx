@@ -8,7 +8,6 @@ import { useCheckinStore } from '@/stores/checkin'
 import { getSupabaseClient } from '@/lib/supabase'
 import { apiPost } from '@/lib/api-client'
 import { generateOfflineDraft } from '@/lib/offline-draft'
-import type { DraftResult } from '@/lib/offline-draft'
 
 type RewriteInstruction = 'emotional' | 'shorter' | 'positive' | 'formal'
 
@@ -106,16 +105,57 @@ export default function DraftPage() {
     abortRef.current = new AbortController()
     setIsGenerating(true)
     setIsOffline(false)
+    setEditedDraft('')
 
     const input = getInput()
     try {
-      const result = await apiPost<DraftResult>(
-        '/api/generate-draft',
-        input,
-        { signal: abortRef.current.signal }
+      // 日記本文は text/plain でストリーミングされる
+      const res = await fetch('/api/generate-draft', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(input),
+        signal: abortRef.current.signal,
+      })
+      if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`)
+
+      const isFallback = res.headers.get('X-Draft-Fallback') === '1'
+      const reader = res.body.getReader()
+      const decoder = new TextDecoder()
+      let text = ''
+      for (;;) {
+        const { done, value } = await reader.read()
+        if (done) break
+        text += decoder.decode(value, { stream: true })
+        setEditedDraft(text)
+      }
+      text = text.trim()
+      if (!text) throw new Error('empty draft')
+      setEditedDraft(text)
+
+      if (isFallback) {
+        // サーバー側でオフラインテンプレートが使われた
+        const offline = generateOfflineDraft(input)
+        setDraftResult({ ...offline, draft: text })
+        setIsOffline(true)
+        return
+      }
+
+      // メタ情報（タグ・サマリー・感情）は本文確定後にバックグラウンドで取得。
+      // 失敗時はローカル生成のメタにフォールバック
+      const offlineMeta = generateOfflineDraft(input)
+      setDraftResult({
+        draft: text,
+        tags: offlineMeta.tags,
+        summary: offlineMeta.summary,
+        dominantEmotion: offlineMeta.dominantEmotion,
+      })
+      apiPost<{ tags: string[]; summary: string; dominantEmotion: string }>(
+        '/api/draft-meta',
+        { draft: text },
+        { retry: false }
       )
-      setDraftResult(result)
-      setEditedDraft(result.draft)
+        .then((meta) => setDraftResult({ draft: text, ...meta }))
+        .catch(() => { /* オフラインメタのまま */ })
     } catch (err) {
       if (err instanceof DOMException && err.name === 'AbortError') return
       console.warn('AI生成失敗、オフラインドラフトを使用します:', err)
@@ -232,6 +272,33 @@ export default function DraftPage() {
   }
 
   if (isGenerating) {
+    // ストリーミング中: 文字が書かれていく様子をリアルタイム表示
+    if (editedDraft) {
+      return (
+        <div className="min-h-dvh flex flex-col px-4 pt-6">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="spinner" style={{ width: 20, height: 20 }} />
+            <h1 className="text-lg font-bold text-slate-900 dark:text-white">AIが日記を書いています…</h1>
+          </div>
+          <div className="card flex-1 mb-4 overflow-y-auto">
+            <p className="text-base text-slate-800 dark:text-slate-200 whitespace-pre-wrap leading-relaxed">
+              {editedDraft}
+              <span className="typing-cursor" aria-hidden="true" />
+            </p>
+          </div>
+          <div className="pb-6">
+            <button
+              onClick={handleCancel}
+              className="w-full py-3 rounded-2xl border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 text-sm"
+            >
+              キャンセルして入力に戻る
+            </button>
+          </div>
+        </div>
+      )
+    }
+
+    // 最初のトークンが届くまでの待機画面
     return (
       <div className="min-h-dvh flex flex-col items-center justify-center px-4 gap-6">
         <div className="spinner" style={{ width: 48, height: 48, borderWidth: 3 }} />

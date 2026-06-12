@@ -7,6 +7,7 @@ import { STEPS, getDailyDescription } from '@/lib/constants'
 import MoodStep from '@/components/checkin/MoodStep'
 import EnergyStep from '@/components/checkin/EnergyStep'
 import TextStep from '@/components/checkin/TextStep'
+import { hapticTap } from '@/lib/haptics'
 
 function getTodayJST() {
   return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Tokyo' })
@@ -55,6 +56,7 @@ export default function CheckinPage() {
   const progress = ((currentStep + 1) / totalSteps) * 100
 
   const handleNext = () => {
+    hapticTap()
     setDirection('forward')
     if (currentStep < totalSteps - 1) {
       nextStep()
