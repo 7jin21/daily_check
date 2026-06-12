@@ -101,7 +101,14 @@ export default async function EntryDetailPage({ params }: Props) {
 
       {/* 日記本文（編集可能） */}
       {displayContent && (
-        <EditableContent entryId={entry.id as string} initialContent={displayContent} />
+        <EditableContent
+          entryId={entry.id as string}
+          initialContent={displayContent}
+          entryDate={date}
+          mood={entry.mood as number | null}
+          energy={entry.energy as number | null}
+          tags={Array.isArray(entry.tags) ? (entry.tags as string[]) : []}
+        />
       )}
 
       {/* 入力内容 */}

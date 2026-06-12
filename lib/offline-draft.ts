@@ -14,7 +14,9 @@ export function generateOfflineDraft(input: CheckinInput): DraftResult {
   const moodInfo = MOODS.find((m) => m.value === input.mood)
   const energyInfo = ENERGY.find((e) => e.value === input.energy)
 
+  // API ルートのフォールバックとしてサーバー(UTC)でも実行されるため timeZone 指定は必須
   const today = new Date().toLocaleDateString('ja-JP', {
+    timeZone: 'Asia/Tokyo',
     year: 'numeric',
     month: 'long',
     day: 'numeric',

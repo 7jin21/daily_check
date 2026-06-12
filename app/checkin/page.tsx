@@ -22,27 +22,32 @@ export default function CheckinPage() {
     challenges,
     gratitude,
     freeform,
-    checkinDate,
     setEvents,
     setChallenges,
     setGratitude,
     setFreeform,
-    setCheckinDate,
     nextStep,
     prevStep,
-    reset,
   } = useCheckinStore()
 
   const [direction, setDirection] = useState<'forward' | 'back'>('forward')
 
   // 前日以前のデータが残っていたら自動クリア
+  // PWA は何日もバックグラウンドに残るため、マウント時だけでなく
+  // visibilitychange（スリープ復帰・アプリ切り替え）でも日付またぎを検知する
   useEffect(() => {
-    const today = getTodayJST()
-    if (checkinDate && checkinDate !== today) {
-      reset()
+    const checkDateRollover = () => {
+      if (document.visibilityState === 'hidden') return
+      const today = getTodayJST()
+      const state = useCheckinStore.getState()
+      if (state.checkinDate && state.checkinDate !== today) {
+        state.reset()
+      }
+      state.setCheckinDate(today)
     }
-    setCheckinDate(today)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    checkDateRollover()
+    document.addEventListener('visibilitychange', checkDateRollover)
+    return () => document.removeEventListener('visibilitychange', checkDateRollover)
   }, [])
 
   const step = STEPS[currentStep]

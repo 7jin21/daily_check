@@ -100,4 +100,25 @@ export function getDailyDescription(stepId: string): string {
 export const STORAGE_KEYS = {
   CHECKIN_DRAFT: 'inner-mirror-checkin-draft',
   SETTINGS: 'inner-mirror-settings',
+  INSIGHTS_CACHE: 'insights-analysis-cache',
+  WEEKLY_REPORT_CACHE: 'insights-weekly-report-cache',
+  MILESTONE_PREFIX: 'inner-mirror-milestone-',
 } as const
+
+/**
+ * サインアウト時にユーザー固有のローカルデータを削除する（共有端末対策）。
+ * テーマ・PWAバナーの非表示フラグは端末の設定なので残す。
+ */
+export function clearUserLocalData() {
+  try {
+    localStorage.removeItem(STORAGE_KEYS.CHECKIN_DRAFT)
+    localStorage.removeItem(STORAGE_KEYS.SETTINGS)
+    localStorage.removeItem(STORAGE_KEYS.INSIGHTS_CACHE)
+    localStorage.removeItem(STORAGE_KEYS.WEEKLY_REPORT_CACHE)
+    Object.keys(localStorage)
+      .filter((key) => key.startsWith(STORAGE_KEYS.MILESTONE_PREFIX))
+      .forEach((key) => localStorage.removeItem(key))
+  } catch {
+    // localStorage が使えない環境では何もしない
+  }
+}

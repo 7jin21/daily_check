@@ -54,7 +54,8 @@ export async function POST(req: NextRequest) {
 
   const serverSupabase = await createServerSupabaseClient()
 
-  // エントリーの存在・所有権・同期済みかを確認（再送による重複ページ作成を防ぐ）
+  // エントリーの存在・所有権・同期済みかを確認
+  // 同期済みなら既存ページを更新する（再送やリトライでも重複ページは作られない）
   const { data: entry, error: entryError } = await serverSupabase
     .from('diary_entries')
     .select('id, notion_page_id')
@@ -64,10 +65,6 @@ export async function POST(req: NextRequest) {
 
   if (entryError || !entry) {
     return NextResponse.json({ error: 'Entry not found' }, { status: 404 })
-  }
-
-  if (entry.notion_page_id) {
-    return NextResponse.json({ success: true, notionPageId: entry.notion_page_id, alreadySynced: true })
   }
 
   // ユーザーのNotion設定を取得
@@ -103,73 +100,54 @@ export async function POST(req: NextRequest) {
       1: '😞', 2: '😕', 3: '😐', 4: '🙂', 5: '😄',
     }
 
-    const notionPage = {
-      parent: { database_id: notionDatabaseId },
-      icon: { emoji: moodEmoji[body.mood] ?? '📓' },
-      properties: {
-        title: {
-          title: [
-            {
-              text: {
-                content: new Date(`${body.entryDate}T12:00:00+09:00`).toLocaleDateString('ja-JP', {
-                  timeZone: 'Asia/Tokyo',
-                  year: 'numeric',
-                  month: 'long',
-                  day: 'numeric',
-                  weekday: 'long',
-                }),
-              },
+    const icon = { emoji: moodEmoji[body.mood] ?? '📓' }
+    const properties = {
+      title: {
+        title: [
+          {
+            text: {
+              content: new Date(`${body.entryDate}T12:00:00+09:00`).toLocaleDateString('ja-JP', {
+                timeZone: 'Asia/Tokyo',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+                weekday: 'long',
+              }),
             },
-          ],
-        },
-        '日付': {
-          date: { start: body.entryDate },
-        },
-        '気分': {
-          number: body.mood,
-        },
-        'エネルギー': {
-          number: body.energy,
-        },
-        'タグ': {
-          multi_select: tags.map((tag) => ({ name: tag })),
-        },
-      },
-      children: [
-        {
-          object: 'block',
-          type: 'paragraph',
-          paragraph: {
-            rich_text: [
-              {
-                type: 'text',
-                text: {
-                  content: body.draft.substring(0, 2000), // Notionの制限
-                },
-              },
-            ],
           },
-        },
-      ],
-    }
-
-    const response = await fetch('https://api.notion.com/v1/pages', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${notionToken}`,
-        'Content-Type': 'application/json',
-        'Notion-Version': '2022-06-28',
+        ],
       },
-      body: JSON.stringify(notionPage),
-    })
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({})) as { message?: string }
-      throw new Error(errorData.message ?? `Notion API error: ${response.status}`)
+      '日付': {
+        date: { start: body.entryDate },
+      },
+      '気分': {
+        number: body.mood,
+      },
+      'エネルギー': {
+        number: body.energy,
+      },
+      'タグ': {
+        multi_select: tags.map((tag) => ({ name: tag })),
+      },
+    }
+    const bodyBlock = {
+      object: 'block',
+      type: 'paragraph',
+      paragraph: {
+        rich_text: [
+          {
+            type: 'text',
+            text: {
+              content: body.draft.substring(0, 2000), // Notionの制限
+            },
+          },
+        ],
+      },
     }
 
-    const data = await response.json() as { id: string }
-    const notionPageId = data.id
+    const notionPageId = entry.notion_page_id
+      ? await updateNotionPage(notionToken, entry.notion_page_id, icon, properties, bodyBlock)
+      : await createNotionPage(notionToken, notionDatabaseId, icon, properties, bodyBlock)
 
     // Supabaseにページ IDを保存
     await serverSupabase
@@ -190,4 +168,70 @@ export async function POST(req: NextRequest) {
       { status: 500 }
     )
   }
+}
+
+const NOTION_HEADERS = (token: string) => ({
+  Authorization: `Bearer ${token}`,
+  'Content-Type': 'application/json',
+  'Notion-Version': '2022-06-28',
+})
+
+async function notionFetch(token: string, url: string, method: string, payload?: unknown) {
+  const response = await fetch(url, {
+    method,
+    headers: NOTION_HEADERS(token),
+    body: payload !== undefined ? JSON.stringify(payload) : undefined,
+  })
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({})) as { message?: string }
+    throw new Error(errorData.message ?? `Notion API error: ${response.status}`)
+  }
+  return response.json()
+}
+
+async function createNotionPage(
+  token: string,
+  databaseId: string,
+  icon: unknown,
+  properties: unknown,
+  bodyBlock: unknown
+): Promise<string> {
+  const data = await notionFetch(token, 'https://api.notion.com/v1/pages', 'POST', {
+    parent: { database_id: databaseId },
+    icon,
+    properties,
+    children: [bodyBlock],
+  }) as { id: string }
+  return data.id
+}
+
+// 既存ページのプロパティ・アイコンを更新し、本文ブロックを差し替える
+async function updateNotionPage(
+  token: string,
+  pageId: string,
+  icon: unknown,
+  properties: unknown,
+  bodyBlock: unknown
+): Promise<string> {
+  await notionFetch(token, `https://api.notion.com/v1/pages/${pageId}`, 'PATCH', {
+    icon,
+    properties,
+  })
+
+  // 本文の差し替え: 既存ブロックを削除して新しい本文を追加
+  const children = await notionFetch(
+    token,
+    `https://api.notion.com/v1/blocks/${pageId}/children?page_size=100`,
+    'GET'
+  ) as { results: Array<{ id: string }> }
+
+  for (const block of children.results ?? []) {
+    await notionFetch(token, `https://api.notion.com/v1/blocks/${block.id}`, 'DELETE')
+  }
+
+  await notionFetch(token, `https://api.notion.com/v1/blocks/${pageId}/children`, 'PATCH', {
+    children: [bodyBlock],
+  })
+
+  return pageId
 }

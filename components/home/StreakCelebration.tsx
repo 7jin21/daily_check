@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { STORAGE_KEYS } from '@/lib/constants'
 
 const MILESTONES: Record<number, string> = {
   3:   '3日連続！いいペースです 🔥',
@@ -17,7 +18,7 @@ export default function StreakCelebration({ streak }: { streak: number }) {
   useEffect(() => {
     const msg = MILESTONES[streak]
     if (!msg) return
-    const key = `inner-mirror-milestone-${streak}`
+    const key = `${STORAGE_KEYS.MILESTONE_PREFIX}${streak}`
     if (localStorage.getItem(key)) return
     localStorage.setItem(key, '1')
     setMessage(msg)

@@ -8,10 +8,9 @@ interface TextStepProps {
   value: string
   onChange: (value: string) => void
   placeholder?: string
-  required?: boolean
 }
 
-export default function TextStep({ value, onChange, placeholder, required }: TextStepProps) {
+export default function TextStep({ value, onChange, placeholder }: TextStepProps) {
   const handleVoiceResult = (transcript: string) => {
     const next = value ? `${value} ${transcript}` : transcript
     onChange(next.slice(0, MAX_CHARS))
@@ -38,7 +37,6 @@ export default function TextStep({ value, onChange, placeholder, required }: Tex
             placeholder-slate-400 text-base resize-none
             focus:outline-none focus:border-sky-400 transition-colors
           "
-          aria-required={required}
         />
         {/* 文字数カウンター */}
         <span

@@ -2,13 +2,19 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { getSupabaseClient } from '@/lib/supabase'
+import { apiPost } from '@/lib/api-client'
 
 interface Props {
   entryId: string
   initialContent: string
+  // Notion 再同期用のメタデータ（編集内容を Notion ページにも反映する）
+  entryDate: string
+  mood: number | null
+  energy: number | null
+  tags: string[]
 }
 
-export default function EditableContent({ entryId, initialContent }: Props) {
+export default function EditableContent({ entryId, initialContent, entryDate, mood, energy, tags }: Props) {
   const [isEditing, setIsEditing] = useState(false)
   const [saved, setSaved] = useState(initialContent)
   const [draft, setDraft] = useState(initialContent)
@@ -42,6 +48,18 @@ export default function EditableContent({ entryId, initialContent }: Props) {
       if (dbErr) throw dbErr
       setSaved(draft)
       setIsEditing(false)
+
+      // Notion にも編集内容を反映（同期済みページは更新される。失敗しても保存には影響しない）
+      if (mood != null && energy != null) {
+        apiPost('/api/notion-sync', {
+          entryId,
+          entryDate,
+          draft,
+          tags,
+          mood,
+          energy,
+        }, { retry: false }).catch((syncErr) => console.warn('Notion再同期失敗（無視）:', syncErr))
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : '保存に失敗しました')
     } finally {

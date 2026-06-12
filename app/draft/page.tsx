@@ -133,6 +133,16 @@ export default function DraftPage() {
     router.push('/checkin')
   }
 
+  // ユーザーが手で編集した内容を無確認で破棄しない
+  const handleRegenerate = () => {
+    const hasEdits =
+      draftResult && editedDraft.trim() && editedDraft !== draftResult.draft
+    if (hasEdits && !window.confirm('編集した内容は破棄されます。AIに最初から書き直してもらいますか？')) {
+      return
+    }
+    generateDraft()
+  }
+
   const handleRewrite = async (instruction: RewriteInstruction) => {
     if (!editedDraft.trim() || rewritingKey) return
     setRewritingKey(instruction)
@@ -354,7 +364,7 @@ export default function DraftPage() {
           {isSaving ? '保存中...' : '保存する 💾'}
         </button>
         <button
-          onClick={generateDraft}
+          onClick={handleRegenerate}
           disabled={isGenerating || isSaving}
           className="w-full py-3 rounded-2xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 text-base disabled:opacity-40"
         >

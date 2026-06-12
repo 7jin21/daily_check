@@ -3,8 +3,10 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useSettingsStore } from '@/stores/settings'
+import { useCheckinStore } from '@/stores/checkin'
 import { getSupabaseClient } from '@/lib/supabase'
 import { apiGet, apiPost } from '@/lib/api-client'
+import { clearUserLocalData } from '@/lib/constants'
 
 interface ServerSettings {
   hasNotionToken: boolean
@@ -89,6 +91,10 @@ export default function SettingsPage() {
   const handleSignOut = async () => {
     const supabase = getSupabaseClient()
     await supabase.auth.signOut()
+    // 共有端末対策: 前ユーザーの下書き・AI分析キャッシュ等を残さない
+    useCheckinStore.getState().reset()
+    useSettingsStore.getState().reset()
+    clearUserLocalData()
     router.push('/login')
   }
 

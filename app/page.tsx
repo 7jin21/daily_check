@@ -31,14 +31,24 @@ function subtractDays(dateStr: string, n: number): string {
 
 async function getHomeData(userId: string) {
   const supabase = await createServerSupabaseClient()
+  const todayJST = getTodayJST()
 
-  // 最近30件のエントリを取得
-  const { data: entries, error } = await supabase
-    .from('diary_entries')
-    .select('id, entry_date, mood, energy, summary, dominant_emotion, tags')
-    .eq('user_id', userId)
-    .order('entry_date', { ascending: false })
-    .limit(100)
+  // 直近365日分を日付範囲で取得
+  // （件数 limit だと毎日記録するユーザーでヒートマップ・ストリークにデータ欠けが出る）
+  const [entriesResult, countResult] = await Promise.all([
+    supabase
+      .from('diary_entries')
+      .select('id, entry_date, mood, energy, summary, dominant_emotion, tags')
+      .eq('user_id', userId)
+      .gte('entry_date', subtractDays(todayJST, 365))
+      .order('entry_date', { ascending: false }),
+    supabase
+      .from('diary_entries')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', userId),
+  ])
+
+  const { data: entries, error } = entriesResult
 
   if (error) {
     console.error('Failed to fetch entries:', error)
@@ -47,16 +57,15 @@ async function getHomeData(userId: string) {
 
   const safeEntries: DiaryEntry[] = (entries ?? []) as DiaryEntry[]
 
-  // 統計計算
-  const total = safeEntries.length
+  // 統計計算（総記録数は全期間、平均気分は直近365日）
+  const total = countResult.count ?? safeEntries.length
   const avgMood =
-    total > 0
-      ? Math.round((safeEntries.reduce((sum, e) => sum + (e.mood ?? 0), 0) / total) * 10) / 10
+    safeEntries.length > 0
+      ? Math.round((safeEntries.reduce((sum, e) => sum + (e.mood ?? 0), 0) / safeEntries.length) * 10) / 10
       : 0
 
   // 連続記録日数（Asia/Tokyo 基準）
   // 今日の記録がなくても昨日から連続していれば streak を維持する
-  const todayJST = getTodayJST()
   const todayHasEntry = safeEntries[0]?.entry_date === todayJST
   let streak = 0
   for (let i = 0; i < safeEntries.length; i++) {

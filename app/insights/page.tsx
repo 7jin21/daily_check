@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { getSupabaseClient } from '@/lib/supabase'
 import { apiPost } from '@/lib/api-client'
+import { STORAGE_KEYS } from '@/lib/constants'
 import PersonalityCard from '@/components/insights/PersonalityCard'
 
 interface EmotionTrigger {
@@ -52,8 +53,8 @@ interface LocalStats {
   recentMoods: { date: string; mood: number }[]
 }
 
-const CACHE_KEY = 'insights-analysis-cache'
-const WEEKLY_CACHE_KEY = 'insights-weekly-report-cache'
+const CACHE_KEY = STORAGE_KEYS.INSIGHTS_CACHE
+const WEEKLY_CACHE_KEY = STORAGE_KEYS.WEEKLY_REPORT_CACHE
 const CACHE_TTL = 24 * 60 * 60 * 1000
 const WEEKLY_CACHE_TTL = 6 * 60 * 60 * 1000
 
