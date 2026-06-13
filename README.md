@@ -40,7 +40,7 @@ npm run dev
 | フレームワーク | Next.js 15 (App Router) |
 | ホスティング | Vercel |
 | 認証・DB | Supabase Auth + PostgreSQL（RLS でユーザーごとにデータ分離） |
-| AI | GROQ API（Llama 3.3 70B / Llama 3.1 8B） |
+| AI | GROQ API（Kimi K2 / GPT-OSS、日本語特化で選定） |
 | 外部同期 | Notion API / Google Calendar API |
 | 状態管理 | Zustand |
 | スタイリング | Tailwind CSS |

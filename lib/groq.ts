@@ -6,7 +6,13 @@ export function getGroqClient(): Groq {
   return new Groq({ apiKey })
 }
 
+// モデル選定の方針:
+// - quality: 日本語の自然さ最優先。Kimi K2 は CJK に非常に強く、日記・分析・書き直しの
+//   日本語品質が Llama 系より大きく上。instruct 型なので JSON 出力も安定。
+// - fast: タグ・サマリー抽出のような軽量 JSON タスク用。速度重視。
+//
+// 環境変数 GROQ_MODEL_QUALITY / GROQ_MODEL_FAST で上書き可能（モデル入れ替えに追従しやすく）
 export const GROQ_MODELS = {
-  fast: 'llama-3.1-8b-instant',      // 高速・小タスク向け（書き直し）
-  quality: 'llama-3.3-70b-versatile', // 高品質（日記生成・分析・週次レポート）
+  fast: process.env.GROQ_MODEL_FAST || 'openai/gpt-oss-20b',
+  quality: process.env.GROQ_MODEL_QUALITY || 'moonshotai/kimi-k2-instruct-0905',
 } as const

@@ -36,7 +36,8 @@ export async function POST(req: NextRequest) {
   try {
     const groq = getGroqClient()
     const completion = await groq.chat.completions.create({
-      model: GROQ_MODELS.fast,
+      // 日本語の文体変換は品質重視モデルを使う
+      model: GROQ_MODELS.quality,
       max_tokens: 1024,
       response_format: { type: 'json_object' },
       messages: [

@@ -85,7 +85,7 @@ export async function POST(req: NextRequest) {
     const groq = getGroqClient()
     const stream = await groq.chat.completions.create({
       model: GROQ_MODELS.quality,
-      max_tokens: 1024,
+      max_tokens: 1536, // 日本語はトークン消費が多いため余裕を持たせる
       stream: true,
       messages: [
         {
