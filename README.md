@@ -7,7 +7,7 @@ iPhone のホーム画面から使える AI 日記アプリ（PWA）。気分と
 ## できること
 
 - **30 秒チェックイン** — 気分・エネルギーを選ぶだけで記録完了（テキスト・音声入力も可）
-- **AI 日記生成** — チェックイン内容から日記文・タグ・感情を自動生成（Llama 3.3 / GROQ）。文章はリアルタイムにストリーミング表示され、過去の日記から文体を学習します
+- **AI 日記生成** — チェックイン内容から日記文・タグ・感情を自動生成（GROQ / Kimi K2、日本語特化）。文章はリアルタイムにストリーミング表示され、過去の日記から文体を学習します
 - **AI 書き直し** — 「感情豊かに」「短くして」などワンタップで文体変更
 - **Notion 自動同期** — 保存と同時に Notion データベースへ書き出し
 - **インサイト分析** — 過去の記録から傾向・パーソナリティ・感情トリガーを AI 分析
@@ -313,6 +313,121 @@ https://<your-vercel-domain>.vercel.app
 
 ---
 
+## ローカルで動作確認する（手動テスト）
+
+`npm run dev` のあと、以下を上から順に試すと主要フローを一通り確認できます。チェックが全部通れば本番デプロイして問題ありません。
+
+### 1. 起動とログイン
+
+```bash
+npm run dev          # http://localhost:3000
+npm run build        # 本番ビルドが通るか（型エラー・lint も同時に検査）
+npm run lint         # lint だけ単独で
+```
+
+- [ ] `/` を開く → 未ログインなら `/login` にリダイレクトされる
+- [ ] Google でサインインできる（→ ログインが弾かれる場合は[トラブルシューティング](#トラブルシューティング)の「Unsupported provider」へ）
+- [ ] 初回ログイン直後はオンボーディング画面（3 ステップ説明）が出る
+
+### 2. チェックイン → AI 生成 → 保存
+
+- [ ] 気分・エネルギーをタップすると絵文字がポップする
+- [ ] 「AI に日記を書いてもらう」で**文章が 1 文字ずつ流れて表示**される（ストリーミング）
+- [ ] 生成後にタグ・サマリーが表示される
+- [ ] 「保存する」で紙吹雪が出て保存完了 → 日記詳細が開ける
+- [ ] 同じ日にもう一度チェックイン → 保存しても**エラーにならず上書き**される（2 回目保存の確認）
+
+### 3. 一覧・分析・編集
+
+- [ ] ホームに統計・週間ストリップ・ヒートマップ・気分チャートが出る
+- [ ] `/entries` に月別で一覧が出る
+- [ ] `/insights` で「分析する」→ AI パーソナル分析（5 件以上の記録が必要）
+- [ ] 日記詳細で本文を編集して保存できる
+
+### 4. 異常系（壊れないことの確認）
+
+- [ ] `.env.local` の `GROQ_API_KEY` を一時的にコメントアウト → AI 生成が**オフラインテンプレート**になる（クラッシュしない）
+- [ ] 存在しない URL（例 `/xxxx`）→ ブランドの「ページが見つかりません」画面が出る
+
+> 💡 Notion 同期は実際の Notion 連携が必要です。設定画面でトークンと DB ID を入れてから保存すると、数秒後に `diary_entries.notion_page_id` が埋まります（Supabase の Table Editor で確認可能）。
+
+---
+
+## 運用・保守
+
+日常的に発生する作業をまとめます。「こうしたい時はどこを触る？」の早見表です。
+
+### AI モデルを差し替えたい（日本語品質・速度・コスト調整）
+
+モデル ID は `lib/groq.ts` の `GROQ_MODELS` で一元管理しています。コードを変えずに**環境変数で上書き**もできます。
+
+```env
+# .env.local（または Vercel の環境変数）
+GROQ_MODEL_QUALITY=moonshotai/kimi-k2-instruct-0905   # 日記生成・分析・書き直し
+GROQ_MODEL_FAST=openai/gpt-oss-20b                     # タグ抽出など軽量タスク
+```
+
+| 目的 | おすすめ `GROQ_MODEL_QUALITY` |
+|------|------|
+| 日本語の自然さ最優先 | `moonshotai/kimi-k2-instruct-0905`（既定） |
+| 速度・無料枠の制限がきつい時 | `qwen/qwen3-32b`（日本語も比較的強く軽い） |
+
+- 最新の利用可能モデルは [console.groq.com/docs/models](https://console.groq.com/docs/models) で確認（モデルは頻繁に入れ替わります）
+- JSON モード（`response_format`）は Groq の全モデルで使えるため、分析・週次レポート等のルートはモデルを変えても壊れません
+- **モデル ID を間違えても安全**: 生成はオフラインテンプレートに、JSON 系は各フォールバックに自動で切り替わります（白画面にはならない）
+
+### ログイン方法を追加・変更したい
+
+- **メール+パスワード**を足したい → Supabase の **Authentication → Providers → Email** を有効化（外部設定が不要で一番手軽）
+- **Apple サインイン**を有効化 → Apple Developer Program（年 99 USD）が必要。未契約なら `app/login/page.tsx` の Apple ボタンを隠すのが無難
+- いずれも Supabase 側でプロバイダを Enable にしないと「Unsupported provider」エラーになります
+
+### DB スキーマを変更したい
+
+1. `supabase/migrations/` に連番で新しい `.sql` を追加（例 `003_xxx.sql`）
+2. Supabase の **SQL Editor** で実行
+3. RLS が必要なテーブルは必ず `enable row level security` とポリシーをセットで書く（既存マイグレーションが手本）
+
+### 依存パッケージを更新したい
+
+```bash
+npm outdated          # 古いパッケージを確認
+npm update            # マイナー/パッチ更新
+npm run build         # 更新後に必ずビルドが通るか確認
+```
+
+メジャーバージョン更新（Next.js など）は破壊的変更があり得るので、`npm run build` と[手動テスト](#ローカルで動作確認する手動テスト)を必ず通してからデプロイしてください。
+
+### ログ・障害調査
+
+- **ローカル**: `npm run dev` のターミナルに `console.error` が出ます（`GROQ ... error` / `Notion sync error` など）
+- **本番**: Vercel ダッシュボード → **プロジェクト → Logs**（または該当 Deployment → Functions）で API ルートのログを確認
+- AI が急にテンプレ調になった/同期されない時は、まずここで該当ルートのエラーを見るのが最短です
+
+### コスト・レート制限
+
+- GROQ には無料枠があり、超えると **429（レート制限）** が返ります → アプリ側はフォールバックするので壊れませんが、生成品質が落ちます
+- 連続で 429 が出るなら、`GROQ_MODEL_QUALITY` を軽いモデルに切り替えるか、有料プランを検討
+- Supabase・Vercel も無料枠があり、個人利用なら通常は収まります
+
+### データのバックアップ
+
+- 日記データは Supabase の `diary_entries` テーブルにあります
+- Supabase ダッシュボード → **Database → Backups**（有料プランは自動バックアップ）
+- 手動エクスポートは **Table Editor → Export to CSV**、または SQL Editor で `select * from diary_entries`
+
+### 本番リリースの流れ
+
+```bash
+git add -A
+git commit -m "..."
+git push origin main      # GitHub 連携済みなら Vercel が自動デプロイ
+```
+
+環境変数を追加・変更した時は、Vercel に登録したうえで **Redeploy** が必要です（`.env.local` はローカル専用で、本番には反映されません）。
+
+---
+
 ## 環境変数なしでの動作
 
 | 機能 | 環境変数なし | 環境変数あり |
@@ -425,11 +540,17 @@ create policy "entries: own rows only"
 
 ## トラブルシューティング
 
+**ログインで `Unsupported provider: provider is not enabled` が出る**
+→ Supabase 側でそのログイン方法が有効化されていません。**Authentication → Providers** で使いたいプロバイダ（Google など）を Enable にし、Client ID / Secret を保存してください。Apple は Apple Developer Program への加入が必要です。
+
 **ログイン後に `/auth/callback` でエラーになる**
 → Supabase **Authentication → URL Configuration → Redirect URLs** にローカル / 本番の URL が登録されているか確認。
 
-**AI 日記生成がテンプレートになる**
-→ `GROQ_API_KEY` が正しく設定されているか確認。Vercel の場合は環境変数を登録後に **Redeploy** が必要。
+**AI 日記生成がテンプレートになる / 急に品質が落ちた**
+→ ① `GROQ_API_KEY` が正しく設定されているか確認（Vercel の場合は環境変数登録後に **Redeploy** が必要）。② Vercel/ターミナルのログに `GROQ ... error` が出ていないか確認。`429` ならレート制限なので[運用・保守のコスト項](#コストレート制限)へ。③ モデル ID が無効だと毎回フォールバックします → `GROQ_MODEL_QUALITY` を見直す。
+
+**日本語が不自然・硬い**
+→ モデルを日本語に強いものへ差し替え。既定は Kimi K2 ですが、[AI モデルを差し替えたい](#ai-モデルを差し替えたい日本語品質速度コスト調整)を参照。
 
 **Notion 同期されない（`notion_page_id` が null のまま）**
 → 設定画面または `.env.local` で Notion トークンと DB ID が設定されているか確認。Notion DB にインテグレーションが接続されているかも確認（DB の **...** → **接続先を追加**）。
