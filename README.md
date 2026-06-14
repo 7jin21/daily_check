@@ -6,7 +6,8 @@ iPhone のホーム画面から使える AI 日記アプリ（PWA）。気分と
 
 ## できること
 
-- **30 秒チェックイン** — 気分・エネルギーを選ぶだけで記録完了（テキスト・音声入力も可）
+- **30 秒チェックイン** — 気分・エネルギーを選ぶだけで記録完了（テキスト・音声入力に対応）
+- **音声入力** — テキスト欄を 🎤 で音声入力 → GROQ Whisper が文字起こし。iPhone のホーム画面 PWA でも安定動作（[詳細](#音声入力音声で日記を書く)）
 - **AI 日記生成** — チェックイン内容から日記文・タグ・感情を自動生成（GROQ / Kimi K2、日本語特化）。文章はリアルタイムにストリーミング表示され、過去の日記から文体を学習します
 - **AI 書き直し** — 「感情豊かに」「短くして」などワンタップで文体変更
 - **Notion 自動同期** — 保存と同時に Notion データベースへ書き出し
@@ -40,7 +41,7 @@ npm run dev
 | フレームワーク | Next.js 15 (App Router) |
 | ホスティング | Vercel |
 | 認証・DB | Supabase Auth + PostgreSQL（RLS でユーザーごとにデータ分離） |
-| AI | GROQ API（Kimi K2 / GPT-OSS、日本語特化で選定） |
+| AI | GROQ API（Kimi K2 / GPT-OSS、日本語特化で選定。音声文字起こしは Whisper） |
 | 外部同期 | Notion API / Google Calendar API |
 | 状態管理 | Zustand |
 | スタイリング | Tailwind CSS |
@@ -64,6 +65,7 @@ iPhone Safari（PWA）
  │  │  POST /api/rewrite-draft     │───┼──→  GROQ API（書き直し）
  │  │  POST /api/analyze           │───┼──→  GROQ API（パーソナリティ分析）
  │  │  POST /api/weekly-report     │───┼──→  GROQ API（週次レポート）
+ │  │  POST /api/transcribe        │───┼──→  GROQ API（音声文字起こし / Whisper）
  │  │  POST /api/notion-sync       │───┼──→  Notion API
  │  │  GET  /api/calendar/today    │───┼──→  Google Calendar API
  │  │  GET/POST /api/settings      │   │  ← 設定の読み書き（トークン暗号化）
@@ -116,6 +118,60 @@ iPhone Safari（PWA）
          └── Notion にページ作成（同期済みならスキップ — 重複作成なし）
          ※ Notion 同期が失敗しても日記の保存には影響しません
 ```
+
+---
+
+## 音声入力（音声で日記を書く）
+
+チェックインのテキスト欄（出来事・困ったこと等）では 🎤 ボタンから**音声で入力**できます。話した内容がテキストに変換され、欄に挿入されます。
+
+### 仕組み
+
+```
+🎤 タップ（録音開始）
+   └─ MediaRecorder で端末のマイク音声を録音
+🎤 再タップ（録音停止）
+   └─ 録音データ（音声ファイル）を POST /api/transcribe へ送信
+        └─ サーバーで GROQ Whisper が文字起こし（日本語）
+   └─ 返ってきたテキストを入力欄に挿入
+```
+
+ボタンは 3 状態：**🎤 グレー（待機）→ 🔴 赤・点滅（録音中）→ ⏳ スピナー（変換中）→ 待機に戻る**。録音は 60 秒で自動停止し、画面遷移時にはマイクを確実に解放します。
+
+### なぜ Whisper（サーバー文字起こし）なのか
+
+以前はブラウザ標準の **Web Speech API** を使っていましたが、**iPhone のホーム画面 PWA（standalone）では Web Speech API が動かず、ボタンが赤いまま固まる**既知の不具合がありました（API は存在するのに `onresult` / `onend` / `onerror` がどれも発火しない）。
+
+そこで「**端末で録音 → サーバーで GROQ Whisper が文字起こし**」方式に変更しました。録音に使う `MediaRecorder` は iOS の PWA でも動くため、**iPhone・Android・PC すべてで安定動作**します。文字起こしの精度も Web Speech より高く、長めの発話にも対応できます。
+
+### API キーは追加で必要？ → **不要**
+
+音声文字起こしは **日記生成と同じ `GROQ_API_KEY` を使い回します**。新しい API キーやアカウント、別サービスの登録は一切要りません。すでに日記生成が動いているなら、音声入力もそのまま動きます。
+
+- **使用モデル**: `whisper-large-v3-turbo`（高速・低コスト。日本語も実用十分）
+- **速度・コスト**: 1 回の文字起こしは数百ミリ秒〜数秒。GROQ の無料枠で問題なく使えます
+- **AI 日記生成と同じ BFF 経由**: 音声ファイルは必ず Next.js サーバー（`/api/transcribe`）を通して GROQ へ送られ、API キーはブラウザに出ません
+- **GROQ_API_KEY 未設定時**: 音声入力は `503`（「音声入力は現在利用できません」）を返すだけで、アプリ自体は壊れません（日記生成のオフラインフォールバックと同じ思想）
+
+精度を最優先したい場合だけ、環境変数でより重いモデルに変更できます（[AI モデルを差し替えたい](#ai-モデルを差し替えたい日本語品質速度コスト調整)参照）：
+
+```env
+GROQ_MODEL_TRANSCRIBE=whisper-large-v3   # turbo より高精度・低速
+```
+
+### ⚠️ 重要：HTTPS が必須（ローカルテストの落とし穴）
+
+ブラウザのマイク取得（`getUserMedia`）は**セキュアコンテキスト（HTTPS か localhost）でしか動きません**。これは Web 標準のセキュリティ制約で、コードでは回避できません。
+
+| アクセス方法 | マイク | 用途 |
+|------|:----:|------|
+| `http://localhost:3000`（PC） | ✅ | 開発中の動作確認はここで |
+| `https://<your-app>.vercel.app`（本番 PWA） | ✅ | **iPhone 実機テストはこれ** |
+| `http://192.168.x.x:3000`（LAN の生 HTTP） | ❌ | 「マイクの使用が許可されていません」になる。バグではなく仕様 |
+
+そのため、**iPhone 実機での音声入力テストは本番（HTTPS）へデプロイしてから**行ってください。PC では `localhost` でそのまま確認できます。
+
+> ✅ サーバー側（GROQ Whisper による文字起こし）は実音声で検証済みです。日本語音声 → 正確な文字起こしが数百ミリ秒で返ること、未認証アクセスが `401` で弾かれることを確認しています。実機で確認が残るのは「🎤 をタップして喋る」ブラウザ操作の部分のみです。
 
 ---
 
@@ -208,7 +264,8 @@ Copy-Item .env.local.example .env.local
 NEXT_PUBLIC_SUPABASE_URL=https://xxxxxxxxxxxx.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ...
 
-# GROQ（必須 — AI 日記生成・書き直し・分析・週次レポート）
+# GROQ（必須 — AI 日記生成・書き直し・分析・週次レポート・音声文字起こし）
+# ※ 音声入力もこの 1 つのキーで動きます。追加のキーは不要です
 GROQ_API_KEY=gsk_...
 
 # シークレット暗号化キー（推奨 — Notion トークン等を DB に暗号化保存）
@@ -365,6 +422,7 @@ npm run lint         # lint だけ単独で
 # .env.local（または Vercel の環境変数）
 GROQ_MODEL_QUALITY=moonshotai/kimi-k2-instruct-0905   # 日記生成・分析・書き直し
 GROQ_MODEL_FAST=openai/gpt-oss-20b                     # タグ抽出など軽量タスク
+GROQ_MODEL_TRANSCRIBE=whisper-large-v3-turbo           # 音声入力の文字起こし（既定）
 ```
 
 | 目的 | おすすめ `GROQ_MODEL_QUALITY` |
@@ -472,6 +530,7 @@ git push origin main      # 3. これがトリガー → Vercel が自動ビル�
 |------|:----------:|:----------:|
 | チェックイン入力 | ✅ | ✅ |
 | AI 日記生成 | テンプレート生成 | GROQ API |
+| 音声入力（🎤） | ❌ 503（利用不可） | ✅ GROQ Whisper |
 | データ保存 | ❌ Supabase 必須 | ✅ |
 | Notion 同期 | スキップ | ✅ |
 | 認証 | ❌ ログインで停止 | ✅ |
@@ -549,6 +608,7 @@ create policy "entries: own rows only"
 │       ├── rewrite-draft/       # AI 書き直し（GROQ）
 │       ├── analyze/             # パーソナリティ分析（GROQ）
 │       ├── weekly-report/       # 週次レポート（GROQ）
+│       ├── transcribe/          # 音声文字起こし（GROQ Whisper）
 │       ├── notion-sync/         # Notion 同期
 │       ├── calendar/today/      # Google Calendar 取得
 │       └── settings/            # 設定の読み書き（トークン暗号化）
@@ -596,8 +656,8 @@ create policy "entries: own rows only"
 **カレンダーの予定が取得できない**
 → 一度サインアウトして **Google で再ログイン**してください（カレンダー権限の同意とトークン保存はログイン時に行われます）。Google Cloud Console で Calendar API が有効か、`GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` が設定されているかも確認。
 
-**iPhone で音声入力が動かない**
-→ Web Speech API は iOS Safari でのみ動作します。タップ操作を起点に起動する必要があります。
+**音声入力（🎤）が動かない・録音できない**
+→ ① **HTTPS でアクセスしているか確認**。マイク取得（`getUserMedia`）はセキュアコンテキスト必須で、`http://192.168.x.x`（LAN の生 HTTP）では動きません。本番 `https://...vercel.app` か PC の `localhost` で試してください（詳細は[音声入力](#音声入力音声で日記を書く)）。② 「マイクの使用が許可されていません」→ ブラウザ / OS のマイク権限を確認（iPhone は **設定 → Safari → マイク**、PWA は初回プロンプトで許可）。③ 「音声入力は現在利用できません」→ `GROQ_API_KEY` が未設定。④ 文字起こしは GROQ Whisper を使うため**ネットワーク接続が必要**です（オフラインでは使えません）。
 
 **ダークモードが適用されない**
 → OS のカラースキーム設定に自動追従します。iPhone の **設定 → 画面表示と明るさ** で切り替えてください。
