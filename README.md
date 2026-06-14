@@ -8,7 +8,7 @@ iPhone のホーム画面から使える AI 日記アプリ（PWA）。気分と
 
 - **30 秒チェックイン** — 気分・エネルギーを選ぶだけで記録完了（テキスト・音声入力に対応）
 - **音声入力** — テキスト欄を 🎤 で音声入力 → GROQ Whisper が文字起こし。iPhone のホーム画面 PWA でも安定動作（[詳細](#音声入力音声で日記を書く)）
-- **AI 日記生成** — チェックイン内容から日記文・タグ・感情を自動生成（GROQ / Kimi K2、日本語特化）。文章はリアルタイムにストリーミング表示され、過去の日記から文体を学習します
+- **AI 日記生成** — チェックイン内容から日記文・タグ・感情を自動生成（GROQ / gpt-oss-120b、日本語が自然）。文章はリアルタイムにストリーミング表示され、過去の日記から文体を学習します
 - **AI 書き直し** — 「感情豊かに」「短くして」などワンタップで文体変更
 - **Notion 自動同期** — 保存と同時に Notion データベースへ書き出し
 - **インサイト分析** — 過去の記録から傾向・パーソナリティ・感情トリガーを AI 分析
@@ -41,7 +41,7 @@ npm run dev
 | フレームワーク | Next.js 15 (App Router) |
 | ホスティング | Vercel |
 | 認証・DB | Supabase Auth + PostgreSQL（RLS でユーザーごとにデータ分離） |
-| AI | GROQ API（Kimi K2 / GPT-OSS、日本語特化で選定。音声文字起こしは Whisper） |
+| AI | GROQ API（gpt-oss-120b / gpt-oss-20b、日本語で選定。音声文字起こしは Whisper） |
 | 外部同期 | Notion API / Google Calendar API |
 | 状態管理 | Zustand |
 | スタイリング | Tailwind CSS |
@@ -420,15 +420,17 @@ npm run lint         # lint だけ単独で
 
 ```env
 # .env.local（または Vercel の環境変数）
-GROQ_MODEL_QUALITY=moonshotai/kimi-k2-instruct-0905   # 日記生成・分析・書き直し
+GROQ_MODEL_QUALITY=openai/gpt-oss-120b                 # 日記生成・分析・書き直し
 GROQ_MODEL_FAST=openai/gpt-oss-20b                     # タグ抽出など軽量タスク
 GROQ_MODEL_TRANSCRIBE=whisper-large-v3-turbo           # 音声入力の文字起こし（既定）
 ```
 
 | 目的 | おすすめ `GROQ_MODEL_QUALITY` |
 |------|------|
-| 日本語の自然さ最優先 | `moonshotai/kimi-k2-instruct-0905`（既定） |
-| 速度・無料枠の制限がきつい時 | `qwen/qwen3-32b`（日本語も比較的強く軽い） |
+| 日本語が自然で JSON も安定（既定） | `openai/gpt-oss-120b` |
+| さらに軽く・速く | `llama-3.3-70b-versatile` |
+
+> ⚠️ **Groq はモデルを頻繁に廃止・改名します。** 以前の既定 `moonshotai/kimi-k2-instruct-0905` は廃止され、指定すると `404` → 毎回オフラインにフォールバックしていました。AI 生成が急にテンプレ調になったら、まず[利用可能モデル一覧](https://console.groq.com/docs/models)に現在の `GROQ_MODEL_QUALITY` が載っているか確認してください。`qwen/qwen3-32b` は reasoning モデルで `<think>` タグが本文に混入し JSON モードも壊れるため非推奨です。
 
 - 最新の利用可能モデルは [console.groq.com/docs/models](https://console.groq.com/docs/models) で確認（モデルは頻繁に入れ替わります）
 - JSON モード（`response_format`）は Groq の全モデルで使えるため、分析・週次レポート等のルートはモデルを変えても壊れません
@@ -648,7 +650,10 @@ create policy "entries: own rows only"
 → ① `GROQ_API_KEY` が正しく設定されているか確認（Vercel の場合は環境変数登録後に **Redeploy** が必要）。② Vercel/ターミナルのログに `GROQ ... error` が出ていないか確認。`429` ならレート制限なので[運用・保守のコスト項](#コストレート制限)へ。③ モデル ID が無効だと毎回フォールバックします → `GROQ_MODEL_QUALITY` を見直す。
 
 **日本語が不自然・硬い**
-→ モデルを日本語に強いものへ差し替え。既定は Kimi K2 ですが、[AI モデルを差し替えたい](#ai-モデルを差し替えたい日本語品質速度コスト調整)を参照。
+→ モデルを日本語に強いものへ差し替え。既定は `openai/gpt-oss-120b` です（[AI モデルを差し替えたい](#ai-モデルを差し替えたい日本語品質速度コスト調整)を参照）。
+
+**AI 日記生成が毎回テンプレ調になる（要約・本文が AI で出ない）**
+→ `GROQ_MODEL_QUALITY` のモデルが Groq で**廃止された**可能性大。指定モデルが存在しないと `404` で毎回オフラインにフォールバックします。[利用可能モデル一覧](https://console.groq.com/docs/models)で現在のモデル ID を確認し、`lib/groq.ts` の既定か環境変数を有効なものに更新してください。
 
 **Notion 同期されない（`notion_page_id` が null のまま）**
 → 設定画面または `.env.local` で Notion トークンと DB ID が設定されているか確認。Notion DB にインテグレーションが接続されているかも確認（DB の **...** → **接続先を追加**）。
