@@ -10,7 +10,7 @@ export default function NotFound() {
       </p>
       <Link
         href="/"
-        className="mt-8 w-full max-w-xs py-3.5 rounded-2xl animated-gradient text-white font-bold text-center active:scale-95 transition-transform"
+        className="mt-8 w-full max-w-xs py-3.5 rounded-3xl animated-gradient text-white font-bold text-center active:scale-95 transition-transform"
       >
         ホームに戻る
       </Link>

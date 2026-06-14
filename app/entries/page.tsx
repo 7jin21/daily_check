@@ -66,7 +66,7 @@ export default async function EntriesPage() {
           <p className="text-sm mt-2">チェックインして最初の日記を書こう</p>
           <Link
             href="/checkin"
-            className="inline-block mt-6 px-6 py-3 rounded-2xl bg-sky-500 text-white font-semibold"
+            className="inline-block mt-6 px-6 py-3 rounded-3xl bg-sky-500 text-white font-semibold"
           >
             今日の記録をする
           </Link>

@@ -40,7 +40,7 @@ export default function EnergyStep() {
             key={e.value}
             onClick={() => handleSelect(e.value)}
             className={`
-              w-full flex items-center gap-4 p-4 rounded-2xl border-2 transition-all duration-150 active:scale-[0.99]
+              w-full flex items-center gap-4 p-4 rounded-3xl border-2 transition-all duration-150 active:scale-[0.99]
               ${energy === e.value
                 ? 'border-sky-400 bg-sky-50 dark:bg-sky-900/30'
                 : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800'

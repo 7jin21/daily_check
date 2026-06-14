@@ -137,7 +137,7 @@ export default async function HomePage() {
       {!todayEntry ? (
         <Link
           href="/checkin"
-          className="block w-full p-5 rounded-2xl animated-gradient text-white shadow-xl shadow-sky-500/25 active:scale-95 transition-transform overflow-hidden relative"
+          className="block w-full p-5 rounded-3xl animated-gradient text-white shadow-xl shadow-sky-500/25 active:scale-95 transition-transform overflow-hidden relative"
         >
           {/* 背景の装飾 */}
           <div className="absolute -top-6 -right-6 w-28 h-28 rounded-full bg-white/10 blur-xl pointer-events-none" />
@@ -153,7 +153,7 @@ export default async function HomePage() {
       ) : (
         <Link
           href={`/entries/${today}`}
-          className="block w-full p-5 rounded-2xl bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/50 active:scale-95 transition-transform"
+          className="block w-full p-5 rounded-3xl bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/50 active:scale-95 transition-transform"
         >
           <div className="flex items-center justify-between">
             <div>
@@ -290,7 +290,7 @@ function Onboarding() {
       <div className="mt-auto animate-slide-up" style={{ animationDelay: '0.35s', animationFillMode: 'backwards' }}>
         <Link
           href="/checkin"
-          className="block w-full py-4 text-center rounded-2xl animated-gradient text-white font-bold text-lg active:scale-95 transition-transform glow-sky"
+          className="block w-full py-4 text-center rounded-3xl animated-gradient text-white font-bold text-lg active:scale-95 transition-transform glow-sky"
         >
           最初のチェックインを始める ✍️
         </Link>

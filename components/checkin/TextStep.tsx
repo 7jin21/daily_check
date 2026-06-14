@@ -32,7 +32,7 @@ export default function TextStep({ value, onChange, placeholder }: TextStepProps
           placeholder={placeholder}
           rows={6}
           className="
-            w-full p-4 pb-10 rounded-2xl border-2 border-slate-200 dark:border-slate-700
+            w-full p-4 pb-10 rounded-3xl border-2 border-slate-200 dark:border-slate-700
             bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100
             placeholder-slate-400 text-base resize-none
             focus:outline-none focus:border-sky-400 transition-colors

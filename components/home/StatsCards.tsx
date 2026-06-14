@@ -43,7 +43,7 @@ export default function StatsCards({ stats }: StatsCardsProps) {
   return (
     <div className="grid grid-cols-3 gap-3">
       {/* Streak — highlighted when high */}
-      <div className={`rounded-2xl p-3 border text-center ${ss.bg} ${ss.border}`}>
+      <div className={`rounded-3xl p-3 border text-center ${ss.bg} ${ss.border}`}>
         <div className="text-xl mb-1">{streakIcon}</div>
         <div className={`text-base font-bold ${ss.text}`}>
           {stats.streak ? `${stats.streak}日` : '0日'}
@@ -51,13 +51,13 @@ export default function StatsCards({ stats }: StatsCardsProps) {
         <div className="text-xs text-slate-400 mt-0.5">連続記録</div>
       </div>
 
-      <div className="bg-white dark:bg-slate-800 rounded-2xl p-3 border border-slate-100 dark:border-slate-700 text-center">
+      <div className="bg-white dark:bg-slate-800 rounded-3xl p-3 border border-slate-100 dark:border-slate-700 text-center">
         <div className="text-xl mb-1">📖</div>
         <div className="text-base font-bold text-slate-800 dark:text-white">{stats.total}件</div>
         <div className="text-xs text-slate-400 mt-0.5">総記録数</div>
       </div>
 
-      <div className="bg-white dark:bg-slate-800 rounded-2xl p-3 border border-slate-100 dark:border-slate-700 text-center">
+      <div className="bg-white dark:bg-slate-800 rounded-3xl p-3 border border-slate-100 dark:border-slate-700 text-center">
         <div className="text-xl mb-1">✨</div>
         <div className="text-base font-bold text-slate-800 dark:text-white">
           {stats.avgMood ? `${moodEmoji} ${stats.avgMood}` : '—'}

@@ -140,7 +140,7 @@ export default function SettingsPage() {
               value={notionTokenInput}
               onChange={(e) => setNotionTokenInput(e.target.value)}
               placeholder={hasNotionToken ? '設定済み（変更する場合のみ入力）' : 'secret_...'}
-              className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 text-base focus:outline-none focus:ring-2 focus:ring-sky-400"
+              className="w-full px-4 py-3 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 text-base focus:outline-none focus:ring-2 focus:ring-sky-400"
             />
           </div>
           <div>
@@ -152,12 +152,12 @@ export default function SettingsPage() {
               value={notionDatabaseId}
               onChange={(e) => setNotionDatabaseId(e.target.value)}
               placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-              className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 text-base focus:outline-none focus:ring-2 focus:ring-sky-400"
+              className="w-full px-4 py-3 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 text-base focus:outline-none focus:ring-2 focus:ring-sky-400"
             />
           </div>
         </div>
 
-        <div className="mt-3 p-3 rounded-xl bg-sky-50 dark:bg-sky-900/20 text-sky-700 dark:text-sky-400 text-xs">
+        <div className="mt-3 p-3 rounded-2xl bg-sky-50 dark:bg-sky-900/20 text-sky-700 dark:text-sky-400 text-xs">
           📝 Notion API トークンは{' '}
           <a href="https://www.notion.so/my-integrations" target="_blank" rel="noopener noreferrer" className="underline">
             notion.so/my-integrations
@@ -210,7 +210,7 @@ export default function SettingsPage() {
               type="time"
               value={notificationTime}
               onChange={(e) => setNotificationTime(e.target.value)}
-              className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 text-base focus:outline-none focus:ring-2 focus:ring-sky-400"
+              className="w-full px-4 py-3 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 text-base focus:outline-none focus:ring-2 focus:ring-sky-400"
             />
           </div>
         )}
@@ -220,7 +220,7 @@ export default function SettingsPage() {
       <button
         onClick={handleSave}
         disabled={isSaving}
-        className="w-full py-4 rounded-2xl bg-gradient-to-r from-sky-400 to-violet-500 text-white font-bold text-lg disabled:opacity-40 active:scale-95 transition-transform"
+        className="w-full py-4 rounded-3xl bg-gradient-to-r from-sky-400 to-violet-500 text-white font-bold text-lg disabled:opacity-40 active:scale-95 transition-transform"
       >
         {isSaving ? '保存中...' : '設定を保存'}
       </button>
@@ -232,7 +232,7 @@ export default function SettingsPage() {
       {/* サインアウト */}
       <button
         onClick={handleSignOut}
-        className="w-full py-4 rounded-2xl border border-red-200 dark:border-red-800 text-red-500 font-medium text-base active:scale-95 transition-transform"
+        className="w-full py-4 rounded-3xl border border-red-200 dark:border-red-800 text-red-500 font-medium text-base active:scale-95 transition-transform"
       >
         サインアウト
       </button>

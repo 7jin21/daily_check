@@ -19,7 +19,7 @@ export default function MoodStep() {
           key={m.value}
           onClick={() => handleSelect(m.value)}
           className={`
-            flex flex-col items-center gap-2 p-3 rounded-2xl border-2 transition-all duration-150 active:scale-95
+            flex flex-col items-center gap-2 p-3 rounded-3xl border-2 transition-all duration-150 active:scale-95
             ${mood === m.value
               ? 'border-sky-400 bg-sky-50 dark:bg-sky-900/30 scale-105'
               : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800'

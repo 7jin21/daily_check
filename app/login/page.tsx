@@ -79,7 +79,7 @@ export default function LoginPage() {
         <button
           onClick={() => handleOAuthLogin('apple')}
           disabled={isLoading !== null}
-          className="w-full flex items-center justify-center gap-3 px-6 py-4 rounded-2xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-semibold text-base disabled:opacity-60 active:scale-95 transition-transform shadow-lg"
+          className="w-full flex items-center justify-center gap-3 px-6 py-4 rounded-3xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-semibold text-base disabled:opacity-60 active:scale-95 transition-transform shadow-lg"
         >
           {isLoading === 'apple' ? (
             <div className="spinner border-white/30 border-t-white dark:border-slate-900/30 dark:border-t-slate-900" />
@@ -94,7 +94,7 @@ export default function LoginPage() {
         <button
           onClick={() => handleOAuthLogin('google')}
           disabled={isLoading !== null}
-          className="w-full flex items-center justify-center gap-3 px-6 py-4 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-white font-semibold text-base disabled:opacity-60 active:scale-95 transition-transform shadow-sm"
+          className="w-full flex items-center justify-center gap-3 px-6 py-4 rounded-3xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-white font-semibold text-base disabled:opacity-60 active:scale-95 transition-transform shadow-sm"
         >
           {isLoading === 'google' ? (
             <div className="spinner" />
@@ -108,7 +108,7 @@ export default function LoginPage() {
       </div>
 
       {error && (
-        <div className="mt-4 w-full max-w-sm p-4 rounded-2xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 text-sm text-center animate-fade-in">
+        <div className="mt-4 w-full max-w-sm p-4 rounded-3xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 text-sm text-center animate-fade-in">
           {error}
         </div>
       )}

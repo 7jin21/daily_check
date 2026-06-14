@@ -25,7 +25,7 @@ export default function PersonalityCard({ analysis }: PersonalityCardProps) {
       {sections.map((s) => (
         <div
           key={s.title}
-          className="bg-white dark:bg-slate-800 rounded-2xl p-4 border border-slate-100 dark:border-slate-700"
+          className="bg-white dark:bg-slate-800 rounded-3xl p-4 border border-slate-100 dark:border-slate-700"
         >
           <div className="flex items-center gap-2 mb-2">
             <span className="text-xl">{s.icon}</span>

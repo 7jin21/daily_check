@@ -144,7 +144,7 @@ export default function CheckinPage() {
         <button
           onClick={handleNext}
           disabled={!canProceed()}
-          className="w-full py-4 rounded-2xl animated-gradient text-white font-bold text-lg disabled:opacity-30 active:scale-95 transition-transform shadow-lg shadow-sky-500/20 dark:shadow-sky-500/10"
+          className="w-full py-4 rounded-3xl animated-gradient text-white font-bold text-lg disabled:opacity-30 active:scale-95 transition-transform shadow-lg shadow-sky-500/20 dark:shadow-sky-500/10"
         >
           {currentStep < totalSteps - 1 ? '次へ →' : 'AIに日記を書いてもらう ✨'}
         </button>

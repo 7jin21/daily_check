@@ -329,7 +329,7 @@ export default function InsightsPage() {
             <p className="text-sm text-slate-500 mt-1 mb-4">直近7日間の日記からナラティブレポートを生成</p>
             <button
               onClick={loadWeeklyReport}
-              className="px-6 py-2.5 rounded-2xl animated-gradient text-white font-semibold text-sm"
+              className="px-6 py-2.5 rounded-3xl animated-gradient text-white font-semibold text-sm"
             >
               レポートを作成
             </button>
@@ -421,7 +421,7 @@ export default function InsightsPage() {
             <p className="text-sm text-slate-500 mt-1 mb-4">あなたの傾向・強み・成長ポイントを発見</p>
             <button
               onClick={loadAnalysis}
-              className="px-6 py-2.5 rounded-2xl animated-gradient text-white font-semibold text-sm"
+              className="px-6 py-2.5 rounded-3xl animated-gradient text-white font-semibold text-sm"
             >
               分析を開始
             </button>
