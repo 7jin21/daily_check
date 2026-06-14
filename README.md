@@ -418,13 +418,51 @@ npm run build         # 更新後に必ずビルドが通るか確認
 
 ### 本番リリースの流れ
 
-```bash
-git add -A
-git commit -m "..."
-git push origin main      # GitHub 連携済みなら Vercel が自動デプロイ
+#### Vercel は「ローカル」と「Git」どちらをビルドする？
+
+デプロイ方法で変わります。**本リポジトリは GitHub 連携（`git push` 起点）に統一**しています。
+
+| デプロイ方法 | ビルド対象 | コミット | 本番フローで使う？ |
+|------|------|:----:|:----:|
+| `git push origin main` | GitHub 上のコミット | 必須 | ✅ これに統一 |
+| `vercel --prod`（CLI） | 手元のローカルファイル（未コミット分も乗る） | 不要 | ❌ 使わない |
+
+> CLI 直デプロイと Git 連携を混ぜると「Git に無い変更が本番に出ている」というズレの原因になります。CLI（`vercel --prod`）は封印し、必ず `git push` 経由でリリースしてください。`.vercel/` フォルダはリンク情報なので残っていて問題ありません（`.gitignore` 済み）。
+
+#### 全体像
+
+```
+[ローカル PC]                    [GitHub]                 [Vercel クラウド]
+ コード修正                       main ブランチ              ビルド & 配信
+ npm run build  ── git push ──▶  コミット履歴  ── 自動 ──▶  本番 URL
+ （手元で検証）                                  デプロイ      (.vercel/output)
+     │
+     └─ .env.local（ローカル専用・アップロードされない）
+                                              環境変数は Vercel 側で別管理 ▲
+                                              Settings → Environment Variables
 ```
 
-環境変数を追加・変更した時は、Vercel に登録したうえで **Redeploy** が必要です（`.env.local` はローカル専用で、本番には反映されません）。
+ポイントは **ビルドはクラウドで実行される**こと。ローカルの `.env.local` は一緒に上がりません。
+
+#### リリース手順
+
+```bash
+npm run build             # 1. 本番と同じビルドが通るか（型・lint も検査）
+# 2. 手動テスト（上記チェックリスト）
+git add -A
+git commit -m "..."
+git push origin main      # 3. これがトリガー → Vercel が自動ビルド&本番反映
+```
+
+- **`main` への push = 本番デプロイ**。他ブランチに push すると本番に影響しないプレビュー URL が生成される（試運転に便利）
+- リリース後は Vercel ダッシュボードでデプロイの成功を確認
+
+#### 環境変数を変えた時（重要）
+
+`.env.local` は**ローカル専用で本番には反映されません**。本番にも効かせるには：
+
+1. Vercel → **Settings → Environment Variables** に同じキーを登録（例: 今日変えた `GROQ_MODEL_QUALITY`）
+2. **Redeploy**（環境変数はビルド時に取り込まれるため、登録しただけでは反映されない）
 
 ---
 
