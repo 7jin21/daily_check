@@ -9,6 +9,7 @@ iPhone のホーム画面から使える AI 日記アプリ（PWA）。気分と
 - **30 秒チェックイン** — 気分・エネルギーを選ぶだけで記録完了（テキスト・音声入力に対応）
 - **音声入力** — テキスト欄を 🎤 で音声入力 → GROQ Whisper が文字起こし。iPhone のホーム画面 PWA でも安定動作（[詳細](#音声入力音声で日記を書く)）
 - **AI 日記生成** — チェックイン内容から日記文・タグ・感情を自動生成（GROQ / gpt-oss-120b、日本語が自然）。文章はリアルタイムにストリーミング表示され、過去の日記から文体を学習します
+- **AI 内省ガイド** — 日記生成の前に、AI が「足りていない1点」（例: なぜそう感じた？／何を大事にしていた？）を **1問だけ** 3〜4択で提示。タップで選ぶだけで感情の理由・価値観が日記に織り込まれます（スキップ可・[詳細](#ai-内省ガイド入力を深掘りする1問)）
 - **AI 書き直し** — 「感情豊かに」「短くして」などワンタップで文体変更
 - **Notion 自動同期** — 保存と同時に Notion データベースへ書き出し
 - **インサイト分析** — 過去の記録から傾向・パーソナリティ・感情トリガーを AI 分析
@@ -60,6 +61,7 @@ iPhone Safari（PWA）
  │  App Router（React）                 │  ← 画面
  │  ┌──────────────────────────────┐   │
  │  │  API Routes（BFF）           │   │  ← サーバー処理
+ │  │  POST /api/checkin-question  │───┼──→  GROQ API（生成前の内省質問・JSON）
  │  │  POST /api/generate-draft    │───┼──→  GROQ API（日記生成・ストリーミング）
  │  │  POST /api/draft-meta        │───┼──→  GROQ API（タグ・サマリー抽出）
  │  │  POST /api/rewrite-draft     │───┼──→  GROQ API（書き直し）
@@ -108,6 +110,8 @@ iPhone Safari（PWA）
    └── Zustand store + localStorage に保存
 
 2. "AI に日記を書いてもらう"
+   └── （生成の前に）POST /api/checkin-question → 足りない1点を1問だけ提示（skip 可）
+   └── 回答があれば生成の文脈に追加し、保存時に freeform へ畳む
    └── POST /api/generate-draft → GROQ API
    └── { draft, tags, summary, dominantEmotion } を受け取り編集画面へ
    └── API 未設定・失敗時 → オフラインテンプレートにフォールバック
@@ -118,6 +122,40 @@ iPhone Safari（PWA）
          └── Notion にページ作成（同期済みならスキップ — 重複作成なし）
          ※ Notion 同期が失敗しても日記の保存には影響しません
 ```
+
+---
+
+## AI 内省ガイド（入力を深掘りする1問）
+
+日記を「出来事ログ」で終わらせず、**感情の理由・価値観**まで残すための仕組み。チェックイン後・日記生成の前に、AI が入力を読み「足りていない1点」だけを質問します。蓄積すると、将来 AI が「あなたが何を大切にしているか」を読み取る素材になります。
+
+### 仕組み
+
+```
+チェックイン入力
+   └─ POST /api/checkin-question（gpt-oss-120b / JSON モード）
+        ├─ 十分書けている / ほぼ空 / 失敗 → 質問せず通過（skip）
+        └─ 足りない1点があれば → 1問＋3〜4択を返す
+   └─ ユーザーが選ぶ（＋任意で一言／スキップ可）
+   └─ 回答を生成プロンプトに渡して日記を生成
+   └─ 保存時に freeform へ畳んで残す（DB 列は増やさない）
+```
+
+### 何を聞くか（最も欠けている1点）
+
+- 感情はあるが「なぜそう感じたか」が無い
+- 出来事はあるが「どう感じたか」が無い
+- 迷い／選択はあるが「何を優先したか」が無い
+- 感謝はあるが「その何が嬉しかったか」が無い
+
+### 設計上の約束
+
+- **質問は1問だけ**。選択肢は候補（決めつけない）＋「どれも近くない」を必ず付与。
+- **絶対にブロックしない**: 質問生成が失敗・遅延（7 秒）・未ログイン・GROQ 未設定なら、黙って日記生成へ進む。
+- **DB 変更なし**: 回答は `freeform` に畳み、`diary_entries` のスキーマは据え置き。
+- すでに今日の下書きがある状態（`/draft` 再訪）では質問しない。
+
+> 💡 入力が極端に短い（本文の合計 4 文字未満）と質問は出ません。一文くらい書くと「なぜ？」が出やすいです。
 
 ---
 
@@ -433,7 +471,7 @@ GROQ_MODEL_TRANSCRIBE=whisper-large-v3-turbo           # 音声入力の文字�
 > ⚠️ **Groq はモデルを頻繁に廃止・改名します。** 以前の既定 `moonshotai/kimi-k2-instruct-0905` は廃止され、指定すると `404` → 毎回オフラインにフォールバックしていました。AI 生成が急にテンプレ調になったら、まず[利用可能モデル一覧](https://console.groq.com/docs/models)に現在の `GROQ_MODEL_QUALITY` が載っているか確認してください。`qwen/qwen3-32b` は reasoning モデルで `<think>` タグが本文に混入し JSON モードも壊れるため非推奨です。
 
 - 最新の利用可能モデルは [console.groq.com/docs/models](https://console.groq.com/docs/models) で確認（モデルは頻繁に入れ替わります）
-- JSON モード（`response_format`）は Groq の全モデルで使えるため、分析・週次レポート等のルートはモデルを変えても壊れません
+- **JSON モードのルート（`draft-meta` / `rewrite-draft` / `analyze` / `weekly-report` / `checkin-question`）は `reasoning_effort: 'low'` を必ず付ける**。gpt-oss 系は reasoning が JSON 出力を壊し `400 json_validate_failed` を起こすため（付けないと毎回フォールバック＝タグ/要約が空になる等の劣化）。あわせてプロンプトに「JSON」の語を必ず含める（Groq の JSON モード要件）。モデルを差し替える時もこの2点を維持すること
 - **モデル ID を間違えても安全**: 生成はオフラインテンプレートに、JSON 系は各フォールバックに自動で切り替わります（白画面にはならない）
 
 ### ログイン方法を追加・変更したい
@@ -605,6 +643,7 @@ create policy "entries: own rows only"
 │   ├── login/page.tsx           # ログイン
 │   ├── auth/callback/route.ts   # OAuth コールバック（Google トークン保存）
 │   └── api/
+│       ├── checkin-question/    # 生成前の内省質問（GROQ・JSON・skip可）
 │       ├── generate-draft/      # AI 日記生成（GROQ・ストリーミング・文体学習）
 │       ├── draft-meta/          # タグ・サマリー・感情の抽出（GROQ）
 │       ├── rewrite-draft/       # AI 書き直し（GROQ）
@@ -615,7 +654,7 @@ create policy "entries: own rows only"
 │       ├── calendar/today/      # Google Calendar 取得
 │       └── settings/            # 設定の読み書き（トークン暗号化）
 ├── components/
-│   ├── checkin/                 # MoodStep / EnergyStep / TextStep
+│   ├── checkin/                 # MoodStep / EnergyStep / TextStep / ReflectionQuestion
 │   ├── home/                    # StatsCards / MoodChart / WeekStrip ほか
 │   ├── insights/                # PersonalityCard
 │   └── ui/                      # BottomNav / VoiceInputButton ほか
