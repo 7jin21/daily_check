@@ -18,6 +18,8 @@ interface CheckinState extends CheckinInput {
   draftResult: DraftResult | null
   editedDraft: string          // ユーザーが編集したドラフト（ナビゲーション間で保持）
   isGenerating: boolean
+  reflectionQ: string          // AIが投げた内省の問い（任意）
+  reflectionA: string          // それへのユーザーの回答（選択肢＋一言）
   // Actions
   setMood: (mood: number) => void
   setEnergy: (energy: number) => void
@@ -32,6 +34,7 @@ interface CheckinState extends CheckinInput {
   setDraftResult: (result: DraftResult) => void
   setEditedDraft: (text: string) => void
   setIsGenerating: (isGenerating: boolean) => void
+  setReflection: (question: string, answer: string) => void
   reset: () => void
   // Derived
   getInput: () => CheckinInput
@@ -41,7 +44,7 @@ const initialState: Omit<CheckinState, keyof Pick<CheckinState,
   'setMood' | 'setEnergy' | 'setEvents' | 'setChallenges' | 'setGratitude' |
   'setFreeform' | 'setCurrentStep' | 'nextStep' | 'prevStep' |
   'setCheckinDate' | 'setDraftResult' | 'setEditedDraft' | 'setIsGenerating' |
-  'reset' | 'getInput'
+  'setReflection' | 'reset' | 'getInput'
 >> = {
   mood: null,
   energy: null,
@@ -54,6 +57,8 @@ const initialState: Omit<CheckinState, keyof Pick<CheckinState,
   draftResult: null,
   editedDraft: '',
   isGenerating: false,
+  reflectionQ: '',
+  reflectionA: '',
 }
 
 export const useCheckinStore = create<CheckinState>()(
@@ -74,6 +79,7 @@ export const useCheckinStore = create<CheckinState>()(
       setDraftResult: (draftResult) => set({ draftResult }),
       setEditedDraft: (editedDraft) => set({ editedDraft }),
       setIsGenerating: (isGenerating) => set({ isGenerating }),
+      setReflection: (reflectionQ, reflectionA) => set({ reflectionQ, reflectionA }),
 
       reset: () => set({ ...initialState }),
 
@@ -102,6 +108,8 @@ export const useCheckinStore = create<CheckinState>()(
         checkinDate: state.checkinDate,
         draftResult: state.draftResult,
         editedDraft: state.editedDraft,
+        reflectionQ: state.reflectionQ,
+        reflectionA: state.reflectionA,
       }),
     }
   )

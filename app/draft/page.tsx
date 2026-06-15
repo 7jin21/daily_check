@@ -8,6 +8,7 @@ import { useCheckinStore } from '@/stores/checkin'
 import { getSupabaseClient } from '@/lib/supabase'
 import { apiPost } from '@/lib/api-client'
 import { generateOfflineDraft } from '@/lib/offline-draft'
+import ReflectionQuestion from '@/components/checkin/ReflectionQuestion'
 
 type RewriteInstruction = 'emotional' | 'shorter' | 'positive' | 'formal'
 
@@ -50,6 +51,7 @@ export default function DraftPage() {
     setEditedDraft,
     setIsGenerating,
     isGenerating,
+    setReflection,
     reset,
   } = useCheckinStore()
 
@@ -59,8 +61,11 @@ export default function DraftPage() {
   const [isOffline, setIsOffline] = useState(false)
   const [rewritingKey, setRewritingKey] = useState<RewriteInstruction | null>(null)
   const [rewriteError, setRewriteError] = useState<string | null>(null)
+  const [reflectPhase, setReflectPhase] = useState<'pending' | 'fetching' | 'asking' | 'done'>('pending')
+  const [reflectQuestion, setReflectQuestion] = useState<{ question: string; options: string[] } | null>(null)
   const abortRef = useRef<AbortController | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const startedRef = useRef(false) // StrictMode(dev)の二重実行で生成/質問が2回走らないようにする
 
   useEffect(() => {
     const today = getTodayJST()
@@ -79,11 +84,14 @@ export default function DraftPage() {
     }
 
     // editedDraft が空の場合のみ生成/初期化（編集済みなら保持）
-    if (!editedDraft) {
+    // startedRef で StrictMode(dev) の二重起動を防ぐ（生成・質問が2回走らないように）
+    if (!editedDraft && !startedRef.current) {
+      startedRef.current = true
       if (draftResult) {
         setEditedDraft(draftResult.draft)
       } else {
-        generateDraft()
+        // 生成の「前」に、AIが内省の問いを1つだけ投げる（不要・失敗なら即生成へ）
+        startReflectionThenGenerate()
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -108,12 +116,13 @@ export default function DraftPage() {
     setEditedDraft('')
 
     const input = getInput()
+    const { reflectionQ, reflectionA } = useCheckinStore.getState()
     try {
-      // 日記本文は text/plain でストリーミングされる
+      // 日記本文は text/plain でストリーミングされる。内省Q&Aがあれば文脈として渡す
       const res = await fetch('/api/generate-draft', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(input),
+        body: JSON.stringify({ ...input, reflectionQ, reflectionA }),
         signal: abortRef.current.signal,
       })
       if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`)
@@ -168,6 +177,43 @@ export default function DraftPage() {
     }
   }
 
+  // 生成前の内省質問ゲート。質問が不要/失敗/遅延（7秒）なら黙って生成へ進む（絶対にブロックしない）。
+  const startReflectionThenGenerate = async () => {
+    setReflectPhase('fetching')
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), 7000)
+    try {
+      const res = await apiPost<{ skip: boolean; question?: string; options?: string[] }>(
+        '/api/checkin-question',
+        getInput(),
+        { signal: controller.signal }
+      )
+      clearTimeout(timer)
+      if (!res.skip && res.question && Array.isArray(res.options) && res.options.length >= 2) {
+        setReflectQuestion({ question: res.question, options: res.options })
+        setReflectPhase('asking')
+        return
+      }
+    } catch {
+      // 失敗・タイムアウト → 質問なしで生成へ
+    }
+    clearTimeout(timer)
+    setReflectPhase('done')
+    generateDraft()
+  }
+
+  const handleReflectAnswer = (answer: string) => {
+    setReflection(reflectQuestion?.question ?? '', answer)
+    setReflectPhase('done')
+    generateDraft()
+  }
+
+  const handleReflectSkip = () => {
+    setReflection('', '')
+    setReflectPhase('done')
+    generateDraft()
+  }
+
   const handleCancel = () => {
     abortRef.current?.abort()
     router.push('/checkin')
@@ -207,6 +253,11 @@ export default function DraftPage() {
 
     const input = getInput()
     const entryDate = getTodayJST()
+    // 内省Q&Aは DB 列を増やさず freeform に畳んで残す（将来のAI分析の材料にする）
+    const { reflectionQ, reflectionA } = useCheckinStore.getState()
+    const freeformToSave = reflectionA?.trim()
+      ? `${input.freeform ? input.freeform + '\n\n' : ''}【ふりかえり】${reflectionQ}\n→ ${reflectionA}`
+      : input.freeform
 
     try {
       const supabase = getSupabaseClient()
@@ -228,7 +279,7 @@ export default function DraftPage() {
             events: input.events,
             challenges: input.challenges,
             gratitude: input.gratitude,
-            freeform: input.freeform,
+            freeform: freeformToSave,
             ai_draft: draftResult?.draft ?? editedDraft,
             edited_draft: editedDraft,
             tags: draftResult?.tags ?? [],
@@ -269,6 +320,28 @@ export default function DraftPage() {
     } finally {
       setIsSaving(false)
     }
+  }
+
+  // 内省の問いを表示中
+  if (reflectPhase === 'asking' && reflectQuestion) {
+    return (
+      <ReflectionQuestion
+        question={reflectQuestion.question}
+        options={reflectQuestion.options}
+        onSubmit={handleReflectAnswer}
+        onSkip={handleReflectSkip}
+      />
+    )
+  }
+
+  // 問いを生成中（最大7秒。失敗すれば自動で生成へ進む）
+  if (reflectPhase === 'fetching') {
+    return (
+      <div className="min-h-dvh flex flex-col items-center justify-center px-4 gap-6">
+        <div className="spinner" style={{ width: 40, height: 40, borderWidth: 3 }} />
+        <p className="text-slate-400 text-sm">今日の記録を読んでいます…</p>
+      </div>
+    )
   }
 
   if (isGenerating) {

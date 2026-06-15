@@ -57,6 +57,8 @@ export async function POST() {
     const completion = await groq.chat.completions.create({
       model: GROQ_MODELS.quality,
       max_tokens: 1024,
+      // gpt-oss は reasoning が JSON モードを壊し 400 を起こすため抑制
+      reasoning_effort: 'low',
       response_format: { type: 'json_object' },
       messages: [
         {

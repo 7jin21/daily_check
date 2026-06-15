@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
   }
 
   // 2. リクエストボディ検証
-  let input: CheckinInput
+  let input: CheckinInput & { reflectionQ?: string; reflectionA?: string }
   try {
     input = await req.json()
   } catch {
@@ -137,7 +137,7 @@ export async function POST(req: NextRequest) {
   }
 }
 
-function buildPrompt(input: CheckinInput): string {
+function buildPrompt(input: CheckinInput & { reflectionQ?: string; reflectionA?: string }): string {
   const parts: string[] = []
 
   parts.push(`気分スコア: ${input.mood}/5`)
@@ -154,6 +154,15 @@ function buildPrompt(input: CheckinInput): string {
   }
   if (input.freeform?.trim()) {
     parts.push(`その他メモ:\n${input.freeform}`)
+  }
+
+  // 内省の問いと答え（あれば）。気持ち・価値観として日記に自然に織り込む。
+  const q = input.reflectionQ?.trim()
+  const a = input.reflectionA?.trim()
+  if (q && a) {
+    parts.push(
+      `本人が振り返って答えたこと（ここに表れた気持ち・価値観を日記に自然に織り込む。問いや「答え:」などのラベルはそのまま書かない）:\n問い: ${q.slice(0, 300)}\n答え: ${a.slice(0, 300)}`
+    )
   }
 
   return parts.join('\n\n')

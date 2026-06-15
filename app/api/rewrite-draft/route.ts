@@ -39,6 +39,8 @@ export async function POST(req: NextRequest) {
       // 日本語の文体変換は品質重視モデルを使う
       model: GROQ_MODELS.quality,
       max_tokens: 1024,
+      // gpt-oss は reasoning が JSON モードを壊し 400 を起こすため抑制
+      reasoning_effort: 'low',
       response_format: { type: 'json_object' },
       messages: [
         {
