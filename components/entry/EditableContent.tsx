@@ -76,11 +76,11 @@ export default function EditableContent({ entryId, initialContent, entryDate, mo
   return (
     <div className="card mb-6">
       <div className="flex items-center justify-between mb-3">
-        <h2 className="text-sm font-semibold text-slate-500 dark:text-slate-400">日記</h2>
+        <h2 className="eyebrow">Diary</h2>
         {!isEditing && (
           <button
             onClick={() => setIsEditing(true)}
-            className="text-xs text-sky-500 font-medium"
+            className="text-xs text-[var(--primary)] font-medium"
             style={{ minHeight: 0, minWidth: 0, padding: 0 }}
           >
             編集
@@ -94,27 +94,27 @@ export default function EditableContent({ entryId, initialContent, entryDate, mo
             ref={textareaRef}
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
-            className="w-full min-h-36 p-3 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/60 text-slate-800 dark:text-slate-200 text-base resize-none overflow-hidden focus:outline-none focus:ring-2 focus:ring-sky-400 leading-relaxed"
+            className="w-full min-h-36 p-3 rounded-[3px] border border-[var(--border)] bg-[var(--surface-secondary)] text-[var(--foreground)] text-base resize-none overflow-hidden focus:outline-none focus:ring-2 focus:ring-[var(--primary)] leading-relaxed"
           />
-          {error && <p className="mt-1.5 text-xs text-red-500">{error}</p>}
+          {error && <p className="mt-1.5 text-xs" style={{ color: '#9c4a2f' }}>{error}</p>}
           <div className="flex gap-2 mt-3">
             <button
               onClick={handleSave}
               disabled={saving || !draft.trim()}
-              className="flex-1 py-2.5 rounded-2xl bg-sky-500 text-white text-sm font-semibold disabled:opacity-50 active:scale-95 transition-transform"
+              className="flex-1 py-2.5 rounded-[2px] bg-[var(--accent)] text-[#2a2622] text-sm font-bold disabled:opacity-50 active:scale-95 transition-transform"
             >
               {saving ? '保存中…' : '保存する'}
             </button>
             <button
               onClick={handleCancel}
-              className="px-4 py-2.5 rounded-2xl border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 text-sm active:scale-95 transition-transform"
+              className="px-4 py-2.5 rounded-[2px] border border-[var(--border)] text-[var(--muted)] text-sm active:scale-95 transition-transform"
             >
               キャンセル
             </button>
           </div>
         </div>
       ) : (
-        <p className="text-base text-slate-800 dark:text-slate-200 whitespace-pre-wrap leading-relaxed">
+        <p className="text-base text-[var(--foreground)] whitespace-pre-wrap leading-relaxed">
           {saved}
         </p>
       )}

@@ -13,18 +13,18 @@ export default function Loading() {
       </div>
 
       {/* CTAカード */}
-      <div className="skeleton h-24 rounded-3xl" />
+      <div className="skeleton h-24 rounded-[3px]" />
 
       {/* 統計カード */}
       <div className="grid grid-cols-3 gap-3">
-        <div className="skeleton h-24 rounded-3xl" />
-        <div className="skeleton h-24 rounded-3xl" />
-        <div className="skeleton h-24 rounded-3xl" />
+        <div className="skeleton h-24 rounded-[3px]" />
+        <div className="skeleton h-24 rounded-[3px]" />
+        <div className="skeleton h-24 rounded-[3px]" />
       </div>
 
       {/* コンテンツカード */}
-      <div className="skeleton h-28 rounded-3xl" />
-      <div className="skeleton h-40 rounded-3xl" />
+      <div className="skeleton h-28 rounded-[3px]" />
+      <div className="skeleton h-40 rounded-[3px]" />
     </div>
   )
 }

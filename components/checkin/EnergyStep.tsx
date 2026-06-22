@@ -40,13 +40,13 @@ export default function EnergyStep() {
             key={e.value}
             onClick={() => handleSelect(e.value)}
             className={`
-              w-full flex items-center gap-4 p-4 rounded-3xl border-2 transition-all duration-150 active:scale-[0.99]
+              w-full flex items-center gap-4 p-4 rounded-[3px] border transition-all duration-150 active:scale-[0.99]
               ${energy === e.value
-                ? 'border-sky-400 bg-sky-50 dark:bg-sky-900/30'
-                : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800'
+                ? ''
+                : 'border-[var(--border)] bg-[var(--surface)]'
               }
             `}
-            style={energy === e.value ? { borderColor: e.color } : {}}
+            style={energy === e.value ? { borderColor: e.color, background: `${e.color}1f` } : {}}
             aria-pressed={energy === e.value}
           >
             <span
@@ -54,10 +54,10 @@ export default function EnergyStep() {
               style={{ backgroundColor: e.color }}
             />
             <div className="text-left">
-              <div className="font-semibold text-slate-800 dark:text-slate-100 text-sm">
+              <div className="font-semibold text-[var(--foreground)] text-sm">
                 {e.value}. {e.label}
               </div>
-              <div className="text-xs text-slate-400">{e.description}</div>
+              <div className="text-xs text-[var(--muted-2)]">{e.description}</div>
             </div>
           </button>
         ))}

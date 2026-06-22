@@ -39,16 +39,16 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <meta name="apple-mobile-web-app-title" content="Inner Mirror" />
         <link rel="apple-touch-icon" href="/icon-192.png" />
-        {/* やさしい丸ゴシック */}
+        {/* エディトリアル: 欧文 Schibsted Grotesk ＋ 和文 Zen Kaku Gothic New */}
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link
-          href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@400;500;700&display=swap"
+          href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap"
           rel="stylesheet"
         />
-        {/* テーマカラー: ライト／ダークそれぞれ指定 */}
-        <meta name="theme-color" media="(prefers-color-scheme: light)" content="#0ea5e9" />
-        <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0f172a" />
+        {/* テーマカラー: ライト＝紙色 / ダーク＝エスプレッソ */}
+        <meta name="theme-color" media="(prefers-color-scheme: light)" content="#ece6da" />
+        <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#1c1916" />
       </head>
       <body>
         {/* Service Worker 登録（静的アセットのオフラインキャッシュ） */}

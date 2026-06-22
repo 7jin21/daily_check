@@ -339,7 +339,7 @@ export default function DraftPage() {
     return (
       <div className="min-h-dvh flex flex-col items-center justify-center px-4 gap-6">
         <div className="spinner" style={{ width: 40, height: 40, borderWidth: 3 }} />
-        <p className="text-slate-400 text-sm">今日の記録を読んでいます…</p>
+        <p className="text-[var(--muted-2)] text-sm">今日の記録を読んでいます…</p>
       </div>
     )
   }
@@ -351,10 +351,10 @@ export default function DraftPage() {
         <div className="min-h-dvh flex flex-col px-4 pt-6">
           <div className="flex items-center gap-3 mb-6">
             <div className="spinner" style={{ width: 20, height: 20 }} />
-            <h1 className="text-lg font-bold text-slate-900 dark:text-white">AIが日記を書いています…</h1>
+            <h1 className="text-lg font-bold text-[var(--foreground)]">AIが日記を書いています…</h1>
           </div>
           <div className="card flex-1 mb-4 overflow-y-auto">
-            <p className="text-base text-slate-800 dark:text-slate-200 whitespace-pre-wrap leading-relaxed">
+            <p className="text-base text-[var(--foreground)] whitespace-pre-wrap leading-relaxed">
               {editedDraft}
               <span className="typing-cursor" aria-hidden="true" />
             </p>
@@ -362,7 +362,7 @@ export default function DraftPage() {
           <div className="pb-6">
             <button
               onClick={handleCancel}
-              className="w-full py-3 rounded-3xl border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 text-sm"
+              className="w-full py-3 rounded-[2px] border border-[var(--border)] text-[var(--muted)] text-sm"
             >
               キャンセルして入力に戻る
             </button>
@@ -376,12 +376,12 @@ export default function DraftPage() {
       <div className="min-h-dvh flex flex-col items-center justify-center px-4 gap-6">
         <div className="spinner" style={{ width: 48, height: 48, borderWidth: 3 }} />
         <div className="text-center">
-          <p className="font-semibold text-slate-700 dark:text-slate-300 text-lg">AIが日記を書いています...</p>
-          <p className="text-slate-400 text-sm mt-1">少々お待ちください ✨</p>
+          <p className="font-bold text-[var(--foreground)] text-lg">AIが日記を書いています...</p>
+          <p className="text-[var(--muted-2)] text-sm mt-1">少々お待ちください ✨</p>
         </div>
         <button
           onClick={handleCancel}
-          className="px-6 py-3 rounded-3xl border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 text-sm"
+          className="px-6 py-3 rounded-[2px] border border-[var(--border)] text-[var(--muted)] text-sm"
         >
           キャンセルして入力に戻る
         </button>
@@ -396,19 +396,19 @@ export default function DraftPage() {
         <div className="min-h-dvh flex flex-col items-center justify-center px-4 gap-6 animate-fade-in">
           <div className="text-7xl animate-float">✨</div>
           <div className="text-center">
-            <p className="font-bold text-slate-800 dark:text-white text-2xl">保存しました！</p>
-            <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">今日も記録できました</p>
+            <p className="font-bold text-[var(--foreground)] text-2xl">保存しました！</p>
+            <p className="text-[var(--muted)] text-sm mt-1">今日も記録できました</p>
           </div>
           <div className="w-full space-y-3">
             <Link
               href={`/entries/${savedEntryDate}`}
-              className="block w-full py-4 text-center rounded-3xl animated-gradient text-white font-bold text-lg active:scale-95 transition-transform glow-sky"
+              className="block w-full py-4 text-center rounded-[2px] bg-[var(--accent)] text-[#2a2622] font-bold text-base active:scale-[0.99] transition-transform glow-sky"
             >
               今日の日記を見る
             </Link>
             <Link
               href="/"
-              className="block w-full py-3 text-center rounded-3xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 text-base active:scale-95 transition-transform"
+              className="block w-full py-3 text-center rounded-[2px] border border-[var(--border)] text-[var(--muted)] text-base active:scale-95 transition-transform"
             >
               ホームに戻る
             </Link>
@@ -425,16 +425,16 @@ export default function DraftPage() {
       <div className="flex items-center gap-3 mb-6">
         <button
           onClick={() => router.push('/checkin')}
-          className="w-11 h-11 rounded-full bg-slate-100 dark:bg-slate-700 flex items-center justify-center text-xl text-slate-600 dark:text-slate-300"
+          className="w-11 h-11 rounded-full bg-[var(--surface-secondary)] border border-[var(--border)] flex items-center justify-center text-xl text-[var(--foreground)]"
           aria-label="入力に戻る"
         >
           ‹
         </button>
-        <h1 className="text-xl font-bold text-slate-900 dark:text-white">日記のドラフト</h1>
+        <h1 className="text-xl font-bold text-[var(--foreground)]">日記のドラフト</h1>
       </div>
 
       {isOffline && (
-        <div className="mb-4 p-3 rounded-2xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-400 text-sm">
+        <div className="mb-4 p-3 rounded-[3px] text-sm" style={{ background: 'rgba(197,137,95,0.12)', border: '1px solid rgba(197,137,95,0.35)', color: '#a4683f' }}>
           <p className="font-semibold">⚠️ AI生成に失敗しました</p>
           <p className="mt-0.5 text-xs">ネットワーク接続を確認のうえ「書き直す」を試してください。以下はオフライン生成のドラフトです。</p>
         </div>
@@ -442,12 +442,12 @@ export default function DraftPage() {
 
       {draftResult && (
         <div className="mb-4">
-          <p className="text-sm text-slate-500 dark:text-slate-400 mb-2">{draftResult.summary}</p>
+          <p className="text-sm text-[var(--muted)] mb-2">{draftResult.summary}</p>
           <div className="flex flex-wrap gap-2">
             {draftResult.tags.map((tag) => (
               <span
                 key={tag}
-                className="px-3 py-1 rounded-full bg-sky-100 dark:bg-sky-900/30 text-sky-700 dark:text-sky-400 text-xs font-medium"
+                className="px-3 py-1 rounded-full bg-[var(--surface-secondary)] border border-[var(--border)] text-[var(--primary)] text-xs font-medium"
               >
                 #{tag}
               </span>
@@ -457,39 +457,39 @@ export default function DraftPage() {
       )}
 
       <div className="flex-1 mb-4">
-        <label className="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-2">
+        <label className="block text-sm font-medium text-[var(--muted)] mb-2">
           編集して保存できます
         </label>
         <textarea
           ref={textareaRef}
           value={editedDraft}
           onChange={(e) => setEditedDraft(e.target.value)}
-          className="w-full min-h-40 p-4 rounded-3xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 text-base resize-none overflow-hidden focus:outline-none focus:ring-2 focus:ring-sky-400"
+          className="w-full min-h-40 p-4 rounded-[3px] border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] text-base resize-none overflow-hidden focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
         />
 
         {/* AI書き直しボタン */}
         <div className="mt-3">
-          <p className="text-xs text-slate-400 dark:text-slate-500 mb-2">AIに書き直してもらう</p>
+          <p className="text-xs text-[var(--muted-2)] mb-2">AIに書き直してもらう</p>
           <div className="flex flex-wrap gap-2">
             {REWRITE_BUTTONS.map(({ key, label }) => (
               <button
                 key={key}
                 onClick={() => handleRewrite(key)}
                 disabled={!!rewritingKey || isSaving}
-                className="px-3 py-1.5 rounded-full text-xs font-medium border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-400 bg-white dark:bg-slate-800 disabled:opacity-40 active:scale-95 transition-transform"
+                className="px-3 py-1.5 rounded-full text-xs font-medium border border-[var(--border)] text-[var(--muted)] bg-[var(--surface)] disabled:opacity-40 active:scale-95 transition-transform"
               >
                 {rewritingKey === key ? '書き直し中...' : label}
               </button>
             ))}
           </div>
           {rewriteError && (
-            <p className="mt-2 text-xs text-red-500">{rewriteError}</p>
+            <p className="mt-2 text-xs" style={{ color: '#9c4a2f' }}>{rewriteError}</p>
           )}
         </div>
       </div>
 
       {saveError && (
-        <div className="mb-4 p-3 rounded-2xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 text-sm">
+        <div className="mb-4 p-3 rounded-[3px] text-sm" style={{ background: 'rgba(181,101,74,0.12)', border: '1px solid rgba(181,101,74,0.35)', color: '#9c4a2f' }}>
           <p className="font-semibold">保存できませんでした</p>
           <p className="mt-0.5 text-xs">{saveError}</p>
         </div>
@@ -499,14 +499,14 @@ export default function DraftPage() {
         <button
           onClick={handleSave}
           disabled={isSaving || !editedDraft.trim()}
-          className="w-full py-4 rounded-3xl bg-gradient-to-r from-sky-400 to-violet-500 text-white font-bold text-lg disabled:opacity-40 active:scale-95 transition-transform"
+          className="w-full py-4 rounded-[2px] bg-[var(--accent)] text-[#2a2622] font-bold text-base disabled:opacity-40 active:scale-[0.99] transition-transform"
         >
           {isSaving ? '保存中...' : '保存する 💾'}
         </button>
         <button
           onClick={handleRegenerate}
           disabled={isGenerating || isSaving}
-          className="w-full py-3 rounded-3xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 text-base disabled:opacity-40"
+          className="w-full py-3 rounded-[2px] border border-[var(--border)] text-[var(--muted)] text-base disabled:opacity-40"
         >
           🔄 AIに書き直してもらう
         </button>

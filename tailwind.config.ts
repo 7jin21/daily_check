@@ -10,25 +10,26 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
+        // 暖色エディトリアル: テラコッタ／山吹のアクセント階調
         primary: {
-          50: '#f0f9ff',
-          100: '#e0f2fe',
-          200: '#bae6fd',
-          300: '#7dd3fc',
-          400: '#38bdf8',
-          500: '#0ea5e9',
-          600: '#0284c7',
-          700: '#0369a1',
-          800: '#075985',
-          900: '#0c4a6e',
+          50: '#f6efe7',
+          100: '#ecddcb',
+          200: '#dcc2a3',
+          300: '#cba27a',
+          400: '#b8855c',
+          500: '#9c6b4a',
+          600: '#86583c',
+          700: '#6c4630',
+          800: '#523526',
+          900: '#3a261b',
         },
         surface: {
-          DEFAULT: '#ffffff',
-          dark: '#1a1a2e',
+          DEFAULT: '#f4efe6',
+          dark: '#2a2622',
         },
       },
       fontFamily: {
-        sans: ['var(--font-sans)', 'system-ui', 'sans-serif'],
+        sans: ['var(--font-sans)', 'Schibsted Grotesk', 'Zen Kaku Gothic New', 'system-ui', 'sans-serif'],
       },
       spacing: {
         'safe-bottom': 'env(safe-area-inset-bottom)',

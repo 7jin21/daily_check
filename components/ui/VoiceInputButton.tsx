@@ -225,7 +225,7 @@ export default function VoiceInputButton({ onResult }: VoiceInputButtonProps) {
       {errorMsg && (
         <span
           role="status"
-          className="absolute bottom-full right-0 mb-2 whitespace-nowrap rounded-lg bg-slate-800 px-2 py-1 text-xs text-white shadow-lg"
+          className="absolute bottom-full right-0 mb-2 whitespace-nowrap rounded-[3px] bg-[#2a2622] px-2 py-1 text-xs text-[#f4efe6] shadow-lg"
         >
           {errorMsg}
         </span>
@@ -239,15 +239,15 @@ export default function VoiceInputButton({ onResult }: VoiceInputButtonProps) {
           w-11 h-11 rounded-full flex items-center justify-center transition-all
           ${
             status === 'recording'
-              ? 'bg-red-500 text-white animate-pulse'
+              ? 'bg-[#b5654a] text-white animate-pulse'
               : status === 'transcribing'
-                ? 'bg-slate-200 dark:bg-slate-600 text-slate-400 cursor-wait'
-                : 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400'
+                ? 'bg-[var(--surface-secondary)] text-[var(--muted-2)] cursor-wait'
+                : 'bg-[var(--surface-secondary)] border border-[var(--border)] text-[var(--muted)]'
           }
         `}
       >
         {status === 'transcribing' ? (
-          <span className="w-4 h-4 rounded-full border-2 border-slate-400 border-t-transparent animate-spin" />
+          <span className="w-4 h-4 rounded-full border-2 border-[var(--muted-2)] border-t-transparent animate-spin" />
         ) : (
           '🎤'
         )}

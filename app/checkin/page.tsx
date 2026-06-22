@@ -90,20 +90,20 @@ export default function CheckinPage() {
       <div className="flex items-center gap-3 mb-6">
         <button
           onClick={handleBack}
-          className="w-11 h-11 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-xl text-slate-600 dark:text-slate-300 active:scale-90 transition-transform"
+          className="w-11 h-11 rounded-full bg-[var(--surface-secondary)] border border-[var(--border)] flex items-center justify-center text-xl text-[var(--foreground)] active:scale-90 transition-transform"
           aria-label="戻る"
         >
           ‹
         </button>
         <div className="flex-1">
-          <div className="flex items-center justify-between text-xs text-slate-400 mb-1.5">
+          <div className="flex items-center justify-between text-xs text-[var(--muted-2)] mb-1.5">
             <span className="font-medium">{currentStep + 1} / {totalSteps}</span>
             <span className="tabular-nums">{Math.round(progress)}%</span>
           </div>
           {/* プログレスバー（グロー付き） */}
-          <div className="h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+          <div className="h-2 bg-[var(--surface-secondary)] rounded-full overflow-hidden">
             <div
-              className="h-full bg-gradient-to-r from-sky-400 to-violet-500 rounded-full transition-all duration-300 progress-bar-glow"
+              className="h-full bg-[var(--accent)] rounded-full transition-all duration-300 progress-bar-glow"
               style={{ width: `${progress}%` }}
             />
           </div>
@@ -112,8 +112,8 @@ export default function CheckinPage() {
 
       {/* ステップタイトル */}
       <div key={`title-${currentStep}`} className="mb-6 animate-fade-in">
-        <h2 className="text-2xl font-bold text-slate-900 dark:text-white">{step.title}</h2>
-        <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">
+        <h2 className="text-2xl font-bold text-[var(--foreground)]">{step.title}</h2>
+        <p className="text-[var(--muted)] text-sm mt-1">
           {getDailyDescription(step.id) || step.description}
         </p>
       </div>
@@ -144,12 +144,12 @@ export default function CheckinPage() {
         <button
           onClick={handleNext}
           disabled={!canProceed()}
-          className="w-full py-4 rounded-3xl animated-gradient text-white font-bold text-lg disabled:opacity-30 active:scale-95 transition-transform shadow-lg shadow-sky-500/20 dark:shadow-sky-500/10"
+          className="w-full py-4 rounded-[2px] bg-[var(--accent)] text-[#2a2622] font-bold text-base disabled:opacity-30 active:scale-[0.99] transition-transform glow-sky"
         >
           {currentStep < totalSteps - 1 ? '次へ →' : 'AIに日記を書いてもらう ✨'}
         </button>
         {(step.id === 'events' || step.id === 'challenges' || step.id === 'gratitude' || step.id === 'freeform') && (
-          <p className="text-center text-xs text-slate-400 mt-2">入力しなくても次へ進めます</p>
+          <p className="text-center text-xs text-[var(--muted-2)] mt-2">入力しなくても次へ進めます</p>
         )}
       </div>
     </div>

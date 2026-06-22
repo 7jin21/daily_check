@@ -49,13 +49,13 @@ export default async function EntryDetailPage({ params }: Props) {
       <div className="flex items-center gap-3 mb-6">
         <Link
           href="/entries"
-          className="w-11 h-11 rounded-full bg-slate-100 dark:bg-slate-700 flex items-center justify-center text-xl text-slate-600 dark:text-slate-300"
+          className="w-11 h-11 rounded-full bg-[var(--surface-secondary)] border border-[var(--border)] flex items-center justify-center text-xl text-[var(--foreground)]"
           aria-label="一覧に戻る"
         >
           ‹
         </Link>
         <div>
-          <h1 className="text-xl font-bold text-slate-900 dark:text-white">
+          <h1 className="text-xl font-bold text-[var(--foreground)]">
             {new Date(`${date}T12:00:00+09:00`).toLocaleDateString('ja-JP', {
               timeZone: 'Asia/Tokyo',
               year: 'numeric',
@@ -71,15 +71,15 @@ export default async function EntryDetailPage({ params }: Props) {
       <div className="flex gap-3 mb-6">
         <div className="flex-1 card text-center">
           <p className="text-3xl mb-1">{MOOD_EMOJI[entry.mood as number] ?? '😐'}</p>
-          <p className="text-xs text-slate-500">気分</p>
-          <p className="text-sm font-medium text-slate-700 dark:text-slate-300">
+          <p className="eyebrow">気分</p>
+          <p className="text-sm font-medium text-[var(--foreground)] mt-1">
             {MOOD_LABEL[entry.mood as number] ?? '-'}
           </p>
         </div>
         <div className="flex-1 card text-center">
           <p className="text-3xl mb-1">⚡</p>
-          <p className="text-xs text-slate-500">エネルギー</p>
-          <p className="text-sm font-medium text-slate-700 dark:text-slate-300">
+          <p className="eyebrow">エネルギー</p>
+          <p className="text-sm font-medium text-[var(--foreground)] mt-1">
             {ENERGY_LABEL[entry.energy as number] ?? '-'}
           </p>
         </div>
@@ -91,7 +91,7 @@ export default async function EntryDetailPage({ params }: Props) {
           {(entry.tags as string[]).map((tag) => (
             <span
               key={tag}
-              className="px-3 py-1 rounded-full bg-sky-100 dark:bg-sky-900/30 text-sky-700 dark:text-sky-400 text-xs font-medium"
+              className="px-3 py-1 rounded-full bg-[var(--surface-secondary)] border border-[var(--border)] text-[var(--primary)] text-xs font-medium"
             >
               #{tag}
             </span>
@@ -115,33 +115,33 @@ export default async function EntryDetailPage({ params }: Props) {
       <div className="space-y-4">
         {entry.events && (
           <div className="card">
-            <h3 className="text-sm font-semibold text-slate-500 dark:text-slate-400 mb-2">今日の出来事</h3>
-            <p className="text-base text-slate-700 dark:text-slate-300 whitespace-pre-wrap">{entry.events}</p>
+            <h3 className="eyebrow mb-2">今日の出来事</h3>
+            <p className="text-base text-[var(--foreground)] whitespace-pre-wrap leading-relaxed">{entry.events}</p>
           </div>
         )}
         {entry.challenges && (
           <div className="card">
-            <h3 className="text-sm font-semibold text-slate-500 dark:text-slate-400 mb-2">課題・困ったこと</h3>
-            <p className="text-base text-slate-700 dark:text-slate-300 whitespace-pre-wrap">{entry.challenges}</p>
+            <h3 className="eyebrow mb-2">課題・困ったこと</h3>
+            <p className="text-base text-[var(--foreground)] whitespace-pre-wrap leading-relaxed">{entry.challenges}</p>
           </div>
         )}
         {entry.gratitude && (
           <div className="card">
-            <h3 className="text-sm font-semibold text-slate-500 dark:text-slate-400 mb-2">感謝できること</h3>
-            <p className="text-base text-slate-700 dark:text-slate-300 whitespace-pre-wrap">{entry.gratitude}</p>
+            <h3 className="eyebrow mb-2">感謝できること</h3>
+            <p className="text-base text-[var(--foreground)] whitespace-pre-wrap leading-relaxed">{entry.gratitude}</p>
           </div>
         )}
         {entry.freeform && (
           <div className="card">
-            <h3 className="text-sm font-semibold text-slate-500 dark:text-slate-400 mb-2">メモ</h3>
-            <p className="text-base text-slate-700 dark:text-slate-300 whitespace-pre-wrap">{entry.freeform}</p>
+            <h3 className="eyebrow mb-2">メモ</h3>
+            <p className="text-base text-[var(--foreground)] whitespace-pre-wrap leading-relaxed">{entry.freeform}</p>
           </div>
         )}
       </div>
 
       {/* Notion同期状態 */}
       {entry.notion_synced_at && (
-        <p className="mt-6 text-xs text-center text-slate-400">
+        <p className="mt-6 text-xs text-center text-[var(--muted-2)]">
           ✓ Notionに同期済み ({new Date(entry.notion_synced_at as string).toLocaleDateString('ja-JP')})
         </p>
       )}

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 
-const COLORS = ['#38bdf8', '#a78bfa', '#34d399', '#fbbf24', '#f87171', '#fb923c', '#e879f9']
+const COLORS = ['#c89a6a', '#9c6b4a', '#6f8a5f', '#9caa7e', '#cdbf9a', '#c5895f', '#2a2622']
 
 // 疑似ランダムだが決定論的な紙吹雪データ（SSRフラッシュなし）
 const PIECES = Array.from({ length: 42 }, (_, i) => ({

@@ -33,7 +33,7 @@ export default function MoodChart({ entries }: MoodChartProps) {
 
   if (!data.length) {
     return (
-      <div className="flex items-center justify-center h-32 text-slate-400 text-sm">
+      <div className="flex items-center justify-center h-32 text-[var(--muted)] text-sm">
         記録が溜まるとここにグラフが表示されます
       </div>
     )
@@ -44,28 +44,26 @@ export default function MoodChart({ entries }: MoodChartProps) {
       <AreaChart data={data} margin={{ top: 4, right: 4, left: -24, bottom: 0 }}>
         <defs>
           <linearGradient id="moodGrad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="5%" stopColor="#38bdf8" stopOpacity={0.3} />
-            <stop offset="95%" stopColor="#38bdf8" stopOpacity={0} />
-          </linearGradient>
-          <linearGradient id="energyGrad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="5%" stopColor="#a78bfa" stopOpacity={0.3} />
-            <stop offset="95%" stopColor="#a78bfa" stopOpacity={0} />
+            <stop offset="5%" stopColor="#9c6b4a" stopOpacity={0.18} />
+            <stop offset="95%" stopColor="#9c6b4a" stopOpacity={0} />
           </linearGradient>
         </defs>
-        <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" strokeOpacity={0.4} />
-        <XAxis dataKey="date" tick={{ fontSize: 10 }} tickLine={false} />
-        <YAxis domain={[1, 5]} ticks={[1, 2, 3, 4, 5]} tick={{ fontSize: 10 }} tickLine={false} axisLine={false} />
+        <CartesianGrid strokeDasharray="3 3" stroke="#cdbf9a" strokeOpacity={0.5} />
+        <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#b3a892' }} tickLine={false} />
+        <YAxis domain={[1, 5]} ticks={[1, 2, 3, 4, 5]} tick={{ fontSize: 10, fill: '#b3a892' }} tickLine={false} axisLine={false} />
         <Tooltip
           contentStyle={{
-            borderRadius: 12,
-            border: 'none',
-            boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+            borderRadius: 3,
+            border: '1px solid #e0d6c5',
+            background: '#f4efe6',
+            boxShadow: '0 4px 12px rgba(42,38,34,0.08)',
             fontSize: 12,
+            color: '#2a2622',
           }}
         />
         <Legend wrapperStyle={{ fontSize: 12, paddingTop: 8 }} />
-        <Area type="monotone" dataKey="気分" stroke="#38bdf8" fill="url(#moodGrad)" strokeWidth={2} dot={false} />
-        <Area type="monotone" dataKey="エネルギー" stroke="#a78bfa" fill="url(#energyGrad)" strokeWidth={2} dot={false} />
+        <Area type="monotone" dataKey="エネルギー" stroke="#7d8a6a" strokeDasharray="5 5" fill="none" strokeWidth={2} dot={false} />
+        <Area type="monotone" dataKey="気分" stroke="#9c6b4a" fill="url(#moodGrad)" strokeWidth={2.5} dot={false} />
       </AreaChart>
     </ResponsiveContainer>
   )

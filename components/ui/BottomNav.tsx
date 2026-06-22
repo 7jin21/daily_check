@@ -22,7 +22,7 @@ export default function BottomNav() {
 
   return (
     <nav
-      className="fixed bottom-0 left-0 right-0 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-700 z-50"
+      className="fixed bottom-0 left-0 right-0 bg-[var(--surface)] border-t border-[var(--border)] z-50"
       style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
     >
       <div className="flex items-stretch h-[60px]">
@@ -34,8 +34,8 @@ export default function BottomNav() {
               href={href}
               className={`flex-1 flex flex-col items-center justify-center gap-0.5 text-xs transition-colors ${
                 isActive
-                  ? 'text-sky-500'
-                  : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-400'
+                  ? 'text-[var(--primary)]'
+                  : 'text-[var(--muted)] hover:text-[var(--foreground)]'
               }`}
             >
               <Icon active={isActive} />

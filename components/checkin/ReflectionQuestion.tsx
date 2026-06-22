@@ -31,11 +31,11 @@ export default function ReflectionQuestion({
 
   return (
     <div className="min-h-dvh flex flex-col px-4 pt-6 animate-fade-in">
-      <div className="mb-2 text-xs font-semibold text-sky-500">もう一歩だけ、深めてみませんか？</div>
-      <h1 className="text-xl font-bold text-slate-900 dark:text-white leading-relaxed mb-1">
+      <div className="eyebrow mb-2">One more step</div>
+      <h1 className="text-xl font-bold text-[var(--foreground)] leading-relaxed mb-1">
         {question}
       </h1>
-      <p className="text-sm text-slate-400 mb-5">近いものがあれば選んでください（任意）</p>
+      <p className="text-sm text-[var(--muted-2)] mb-5">近いものがあれば選んでください（任意）</p>
 
       <div className="flex flex-col gap-2.5 mb-5">
         {options.map((opt) => {
@@ -45,10 +45,10 @@ export default function ReflectionQuestion({
               key={opt}
               type="button"
               onClick={() => setSelected(active ? null : opt)}
-              className={`w-full text-left px-4 py-3.5 rounded-3xl border-2 transition-all active:scale-[0.98] ${
+              className={`w-full text-left px-4 py-3.5 rounded-[3px] border transition-all active:scale-[0.98] ${
                 active
-                  ? 'border-sky-400 bg-sky-50 dark:bg-sky-900/30 text-slate-900 dark:text-white'
-                  : 'border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300'
+                  ? 'border-[var(--primary)] bg-[var(--primary)]/10 text-[var(--foreground)]'
+                  : 'border-[var(--border)] text-[var(--foreground)]'
               }`}
             >
               {opt}
@@ -58,13 +58,13 @@ export default function ReflectionQuestion({
       </div>
 
       <div className="mb-2">
-        <label className="block text-xs text-slate-400 mb-1.5">ひとこと足す（任意）</label>
+        <label className="block text-xs text-[var(--muted-2)] mb-1.5">ひとこと足す（任意）</label>
         <textarea
           value={note}
           onChange={(e) => setNote(e.target.value.slice(0, 200))}
           rows={2}
           placeholder="例：内容は納得しているけど、前提を確認されなかったのが嫌だった"
-          className="w-full p-3 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 text-base resize-none focus:outline-none focus:ring-2 focus:ring-sky-400"
+          className="w-full p-3 rounded-[3px] border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] text-base resize-none focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
         />
       </div>
 
@@ -74,14 +74,14 @@ export default function ReflectionQuestion({
         <button
           onClick={handleSubmit}
           disabled={!canSubmit}
-          className="w-full py-4 rounded-3xl animated-gradient text-white font-bold text-lg disabled:opacity-30 active:scale-95 transition-transform shadow-lg shadow-sky-500/20"
+          className="w-full py-4 rounded-[2px] bg-[var(--accent)] text-[#2a2622] font-bold text-base disabled:opacity-30 active:scale-[0.99] transition-transform glow-sky"
         >
           この内容で日記を書く ✨
         </button>
         <button
           onClick={onSkip}
           type="button"
-          className="w-full py-3 rounded-3xl border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 text-sm active:scale-95 transition-transform"
+          className="w-full py-3 rounded-[2px] border border-[var(--border)] text-[var(--muted)] text-sm active:scale-[0.99] transition-transform"
         >
           スキップして書く
         </button>

@@ -40,20 +40,20 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-dvh flex flex-col items-center justify-center px-6 relative overflow-hidden bg-gradient-to-b from-slate-50 to-white dark:from-slate-950 dark:to-slate-900">
+    <div className="min-h-dvh flex flex-col items-center justify-center px-6 relative overflow-hidden bg-[var(--background)]">
 
-      {/* 背景の装飾オーブ */}
-      <div className="absolute -top-24 -left-24 w-72 h-72 rounded-full bg-sky-400/15 blur-3xl animate-float pointer-events-none" />
-      <div className="absolute -bottom-16 -right-16 w-80 h-80 rounded-full bg-violet-500/15 blur-3xl animate-float pointer-events-none" style={{ animationDelay: '1.8s' }} />
-      <div className="absolute top-1/3 right-0 w-48 h-48 rounded-full bg-sky-300/10 blur-2xl pointer-events-none" />
+      {/* 背景の装飾オーブ（暖色のやわらかい光） */}
+      <div className="absolute -top-24 -left-24 w-72 h-72 rounded-full bg-[var(--accent)]/12 blur-3xl animate-float pointer-events-none" />
+      <div className="absolute -bottom-16 -right-16 w-80 h-80 rounded-full bg-[var(--primary)]/10 blur-3xl animate-float pointer-events-none" style={{ animationDelay: '1.8s' }} />
 
       {/* ロゴ */}
       <div className="mb-10 text-center animate-slide-up">
-        <div className="w-24 h-24 mx-auto mb-5 rounded-3xl animated-gradient flex items-center justify-center shadow-2xl shadow-sky-500/30">
-          <span className="text-5xl">🪞</span>
+        <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-[#2a2622] border border-[var(--accent)] flex items-center justify-center shadow-xl glow-sky">
+          <span className="text-3xl">🪞</span>
         </div>
-        <h1 className="text-4xl font-bold gradient-text tracking-tight">Inner Mirror</h1>
-        <p className="mt-2 text-slate-500 dark:text-slate-400 text-base">
+        <div className="eyebrow mb-3" style={{ letterSpacing: '0.3em' }}>Diary</div>
+        <h1 className="text-3xl font-bold gradient-text tracking-tight">Inner Mirror</h1>
+        <p className="mt-3 text-[var(--muted)] text-base leading-relaxed">
           毎日の気づきを、AIが日記に
         </p>
       </div>
@@ -68,7 +68,7 @@ export default function LoginPage() {
           ].map((f) => (
             <div key={f.label} className="flex flex-col items-center gap-1">
               <span className="text-2xl">{f.icon}</span>
-              <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">{f.label}</span>
+              <span className="text-xs text-[var(--muted)] font-medium">{f.label}</span>
             </div>
           ))}
         </div>
@@ -79,10 +79,10 @@ export default function LoginPage() {
         <button
           onClick={() => handleOAuthLogin('apple')}
           disabled={isLoading !== null}
-          className="w-full flex items-center justify-center gap-3 px-6 py-4 rounded-3xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-semibold text-base disabled:opacity-60 active:scale-95 transition-transform shadow-lg"
+          className="w-full flex items-center justify-center gap-3 px-6 py-4 rounded-[2px] bg-[#2a2622] text-[#f4efe6] font-semibold text-base disabled:opacity-60 active:scale-[0.99] transition-transform shadow-lg"
         >
           {isLoading === 'apple' ? (
-            <div className="spinner border-white/30 border-t-white dark:border-slate-900/30 dark:border-t-slate-900" />
+            <div className="spinner border-white/30 border-t-white" />
           ) : (
             <>
               <AppleIcon />
@@ -94,7 +94,7 @@ export default function LoginPage() {
         <button
           onClick={() => handleOAuthLogin('google')}
           disabled={isLoading !== null}
-          className="w-full flex items-center justify-center gap-3 px-6 py-4 rounded-3xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-white font-semibold text-base disabled:opacity-60 active:scale-95 transition-transform shadow-sm"
+          className="w-full flex items-center justify-center gap-3 px-6 py-4 rounded-[2px] bg-[var(--surface)] border border-[var(--border)] text-[var(--foreground)] font-semibold text-base disabled:opacity-60 active:scale-[0.99] transition-transform"
         >
           {isLoading === 'google' ? (
             <div className="spinner" />
@@ -108,12 +108,12 @@ export default function LoginPage() {
       </div>
 
       {error && (
-        <div className="mt-4 w-full max-w-sm p-4 rounded-3xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 text-sm text-center animate-fade-in">
+        <div className="mt-4 w-full max-w-sm p-4 rounded-[3px] bg-[#b5654a]/10 border border-[#b5654a]/30 text-[#9c4a2f] dark:text-[#d39177] text-sm text-center animate-fade-in">
           {error}
         </div>
       )}
 
-      <p className="mt-10 text-xs text-slate-400 text-center max-w-xs">
+      <p className="mt-10 text-xs text-[var(--muted-2)] text-center max-w-xs">
         サインインすることで、利用規約とプライバシーポリシーに同意したことになります。
       </p>
     </div>

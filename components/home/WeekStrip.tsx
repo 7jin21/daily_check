@@ -5,7 +5,7 @@ interface Entry {
   mood: number
 }
 
-const MOOD_COLOR = ['', '#ef4444', '#f97316', '#eab308', '#84cc16', '#22c55e']
+const MOOD_COLOR = ['', '#b5654a', '#c5895f', '#cdbf9a', '#9caa7e', '#6f8a5f']
 const DAY_LABELS = ['月', '火', '水', '木', '金', '土', '日']
 
 export default function WeekStrip({ entries }: { entries: Entry[] }) {
@@ -34,18 +34,18 @@ export default function WeekStrip({ entries }: { entries: Entry[] }) {
         let extraClass = ''
 
         if (isFuture) {
-          extraClass = 'border-2 border-dashed border-slate-200 dark:border-slate-700'
+          extraClass = 'border border-dashed border-[var(--border)]'
         } else if (mood !== null) {
           bgStyle = { backgroundColor: MOOD_COLOR[mood] }
         } else {
-          extraClass = 'bg-slate-100 dark:bg-slate-700/60'
+          bgStyle = { backgroundColor: 'var(--surface-secondary)', border: '1px solid var(--border)' }
         }
 
         return (
-          <div key={date} className="flex flex-col items-center gap-1.5">
+          <div key={date} className="flex flex-col items-center gap-3">
             <span
-              className={`text-xs font-medium ${
-                isToday ? 'text-sky-500' : 'text-slate-400 dark:text-slate-500'
+              className={`text-xs tracking-wide ${
+                isToday ? 'text-[var(--primary)] font-bold' : 'text-[var(--muted)]'
               }`}
             >
               {DAY_LABELS[i]}
@@ -55,21 +55,18 @@ export default function WeekStrip({ entries }: { entries: Entry[] }) {
                 width: 32,
                 height: 32,
                 borderRadius: '50%',
+                boxShadow: isToday ? '0 0 0 2px var(--primary)' : undefined,
                 ...bgStyle,
               }}
-              className={[
-                'flex items-center justify-center flex-shrink-0',
-                extraClass,
-                isToday ? 'ring-2 ring-sky-400 ring-offset-2 dark:ring-offset-slate-900' : '',
-              ]
+              className={['flex items-center justify-center flex-shrink-0', extraClass]
                 .filter(Boolean)
                 .join(' ')}
             >
               {isToday && mood === null && (
-                <span className="w-1.5 h-1.5 rounded-full bg-sky-400 block" />
+                <span className="w-1.5 h-1.5 rounded-full bg-[var(--primary)] block" />
               )}
             </div>
-            <span className="text-[10px] text-slate-300 dark:text-slate-600">
+            <span className="text-[10px] tracking-wide text-[var(--muted-2)]">
               {isToday ? '今日' : ' '}
             </span>
           </div>

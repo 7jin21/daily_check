@@ -99,19 +99,22 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="px-4 pt-6 space-y-6">
-      <h1 className="text-2xl font-bold text-slate-900 dark:text-white">設定</h1>
+    <div className="px-5 pt-8 space-y-6">
+      <div className="section-head" style={{ borderBottomColor: 'var(--divider-strong)' }}>
+        <div className="eyebrow">Settings</div>
+        <h1 className="text-2xl font-bold text-[var(--foreground)]">設定</h1>
+      </div>
 
       {/* アカウント情報 */}
       <div className="card">
-        <h2 className="font-semibold text-slate-700 dark:text-slate-300 mb-4">アカウント</h2>
+        <h2 className="font-bold text-[var(--foreground)] mb-4">アカウント</h2>
         <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-full bg-gradient-to-br from-sky-400 to-violet-500 flex items-center justify-center text-white text-xl">
+          <div className="w-12 h-12 rounded-full bg-[#2a2622] border border-[var(--accent)] flex items-center justify-center text-[#e9ddc7] text-xl">
             👤
           </div>
           <div>
-            <p className="font-medium text-slate-800 dark:text-slate-200">{userEmail ?? 'ログイン済み'}</p>
-            <p className="text-sm text-slate-500">Inner Mirrorユーザー</p>
+            <p className="font-medium text-[var(--foreground)]">{userEmail ?? 'ログイン済み'}</p>
+            <p className="text-sm text-[var(--muted)]">Inner Mirrorユーザー</p>
           </div>
         </div>
       </div>
@@ -119,20 +122,20 @@ export default function SettingsPage() {
       {/* Notion連携 */}
       <div className="card">
         <div className="flex items-center justify-between mb-1">
-          <h2 className="font-semibold text-slate-700 dark:text-slate-300">Notion連携</h2>
+          <h2 className="font-bold text-[var(--foreground)]">Notion連携</h2>
           {hasNotionToken && (
-            <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 font-medium">
+            <span className="text-xs px-2 py-0.5 rounded-full bg-[#6f8a5f]/15 text-[#5a7350] dark:text-[#9caa7e] font-medium">
               連携中
             </span>
           )}
         </div>
-        <p className="text-xs text-slate-400 mb-4">
+        <p className="text-xs text-[var(--muted)] mb-4">
           日記を自動的にNotionデータベースに同期します
         </p>
 
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-1">
+            <label className="block text-sm font-medium text-[var(--muted)] mb-1">
               Notion APIトークン
             </label>
             <input
@@ -140,11 +143,11 @@ export default function SettingsPage() {
               value={notionTokenInput}
               onChange={(e) => setNotionTokenInput(e.target.value)}
               placeholder={hasNotionToken ? '設定済み（変更する場合のみ入力）' : 'secret_...'}
-              className="w-full px-4 py-3 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 text-base focus:outline-none focus:ring-2 focus:ring-sky-400"
+              className="w-full px-4 py-3 rounded-[3px] border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] text-base focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-1">
+            <label className="block text-sm font-medium text-[var(--muted)] mb-1">
               データベースID
             </label>
             <input
@@ -152,12 +155,12 @@ export default function SettingsPage() {
               value={notionDatabaseId}
               onChange={(e) => setNotionDatabaseId(e.target.value)}
               placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-              className="w-full px-4 py-3 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 text-base focus:outline-none focus:ring-2 focus:ring-sky-400"
+              className="w-full px-4 py-3 rounded-[3px] border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] text-base focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
             />
           </div>
         </div>
 
-        <div className="mt-3 p-3 rounded-2xl bg-sky-50 dark:bg-sky-900/20 text-sky-700 dark:text-sky-400 text-xs">
+        <div className="mt-3 p-3 rounded-[3px] bg-[var(--surface-secondary)] text-[var(--muted)] text-xs">
           📝 Notion API トークンは{' '}
           <a href="https://www.notion.so/my-integrations" target="_blank" rel="noopener noreferrer" className="underline">
             notion.so/my-integrations
@@ -178,17 +181,17 @@ export default function SettingsPage() {
 
       {/* 通知設定 */}
       <div className="card">
-        <h2 className="font-semibold text-slate-700 dark:text-slate-300 mb-4">通知</h2>
+        <h2 className="font-bold text-[var(--foreground)] mb-4">通知</h2>
 
         <div className="flex items-center justify-between mb-4">
           <div>
-            <p className="font-medium text-slate-700 dark:text-slate-300">毎日のリマインダー</p>
-            <p className="text-sm text-slate-500">チェックインを忘れないように通知</p>
+            <p className="font-medium text-[var(--foreground)]">毎日のリマインダー</p>
+            <p className="text-sm text-[var(--muted)]">チェックインを忘れないように通知</p>
           </div>
           <button
             onClick={() => updateSettings({ notificationsEnabled: !settings.notificationsEnabled })}
             className={`w-12 h-7 rounded-full transition-colors ${
-              settings.notificationsEnabled ? 'bg-sky-500' : 'bg-slate-200 dark:bg-slate-700'
+              settings.notificationsEnabled ? 'bg-[var(--primary)]' : 'bg-[var(--surface-secondary)] border border-[var(--border)]'
             }`}
             role="switch"
             aria-checked={settings.notificationsEnabled}
@@ -203,14 +206,14 @@ export default function SettingsPage() {
 
         {settings.notificationsEnabled && (
           <div>
-            <label className="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-1">
+            <label className="block text-sm font-medium text-[var(--muted)] mb-1">
               通知時刻
             </label>
             <input
               type="time"
               value={notificationTime}
               onChange={(e) => setNotificationTime(e.target.value)}
-              className="w-full px-4 py-3 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 text-base focus:outline-none focus:ring-2 focus:ring-sky-400"
+              className="w-full px-4 py-3 rounded-[3px] border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] text-base focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
             />
           </div>
         )}
@@ -220,19 +223,19 @@ export default function SettingsPage() {
       <button
         onClick={handleSave}
         disabled={isSaving}
-        className="w-full py-4 rounded-3xl bg-gradient-to-r from-sky-400 to-violet-500 text-white font-bold text-lg disabled:opacity-40 active:scale-95 transition-transform"
+        className="w-full py-4 rounded-[2px] bg-[var(--accent)] text-[#2a2622] font-bold text-base disabled:opacity-40 active:scale-[0.99] transition-transform"
       >
         {isSaving ? '保存中...' : '設定を保存'}
       </button>
 
       {saveMessage && (
-        <p className="text-center text-sm text-green-600 dark:text-green-400">{saveMessage}</p>
+        <p className="text-center text-sm text-[var(--primary)]">{saveMessage}</p>
       )}
 
       {/* サインアウト */}
       <button
         onClick={handleSignOut}
-        className="w-full py-4 rounded-3xl border border-red-200 dark:border-red-800 text-red-500 font-medium text-base active:scale-95 transition-transform"
+        className="w-full py-4 rounded-[2px] border border-[#b5654a]/40 text-[#9c4a2f] dark:text-[#d39177] font-medium text-base active:scale-[0.99] transition-transform"
       >
         サインアウト
       </button>

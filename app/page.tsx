@@ -111,25 +111,33 @@ export default async function HomePage() {
     new Date().toLocaleString('en-US', { timeZone: 'Asia/Tokyo', hour: 'numeric', hour12: false })
   )
   const greeting =
-    hourJST < 12 ? 'おはようございます 🌅'
-    : hourJST < 18 ? 'こんにちは ☀️'
-    : 'こんばんは 🌙'
+    hourJST < 12 ? 'おはようございます'
+    : hourJST < 18 ? 'こんにちは'
+    : 'こんばんは'
+
+  const MOOD_DOT = ['', '#b5654a', '#c5895f', '#cdbf9a', '#9caa7e', '#6f8a5f']
 
   return (
-    <div className="px-4 pt-6 pb-6 space-y-6">
+    <div className="px-5 pt-8 pb-8 space-y-11">
       {/* ストリーク達成バナー（マイルストーン時のみ） */}
       {stats && <StreakCelebration streak={stats.streak} />}
 
       {/* ヘッダー */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-start justify-between pb-6 border-b border-[var(--divider-strong)]">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">{greeting}</h1>
-          <p className="text-slate-500 dark:text-slate-400 text-sm mt-0.5">
+          <h1 className="text-3xl font-bold text-[var(--foreground)] tracking-tight">{greeting}</h1>
+          <p className="text-[var(--muted)] text-xs tracking-[0.16em] mt-2">
             {new Date().toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo', year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' })}
           </p>
         </div>
-        <div className="w-10 h-10 rounded-full animated-gradient flex items-center justify-center text-lg shadow-md shadow-sky-500/20">
-          🪞
+        <div className="flex items-center gap-3 pt-1">
+          <div className="text-right">
+            <div className="eyebrow" style={{ letterSpacing: '0.24em' }}>Diary</div>
+            <div className="text-xs text-[var(--muted)] mt-0.5">全{stats?.total ?? 0}件</div>
+          </div>
+          <div className="w-10 h-10 rounded-full bg-[#2a2622] border border-[var(--accent)] flex items-center justify-center text-[#e9ddc7] text-sm">
+            私
+          </div>
         </div>
       </div>
 
@@ -137,33 +145,29 @@ export default async function HomePage() {
       {!todayEntry ? (
         <Link
           href="/checkin"
-          className="block w-full p-5 rounded-3xl animated-gradient text-white shadow-xl shadow-sky-500/25 active:scale-95 transition-transform overflow-hidden relative"
+          className="block w-full p-7 rounded-[3px] bg-[#2a2622] active:scale-[0.99] transition-transform"
         >
-          {/* 背景の装飾 */}
-          <div className="absolute -top-6 -right-6 w-28 h-28 rounded-full bg-white/10 blur-xl pointer-events-none" />
-          <div className="absolute -bottom-4 -left-4 w-20 h-20 rounded-full bg-white/10 blur-lg pointer-events-none" />
-          <div className="flex items-center justify-between relative">
-            <div>
-              <p className="font-bold text-xl tracking-tight">今日のチェックイン</p>
-              <p className="text-white/70 text-sm mt-0.5">まだ記録していません</p>
-            </div>
-            <span className="text-5xl animate-float">✍️</span>
+          <div className="eyebrow mb-3" style={{ color: 'var(--accent)', letterSpacing: '0.3em' }}>
+            Today&apos;s check-in
           </div>
+          <p className="font-bold text-xl text-[#f4efe6] tracking-tight">まだ今日の記録がありません</p>
+          <p className="text-sm text-[#f4efe6]/55 mt-2 leading-relaxed">
+            今日はどんな一日でしたか。ひと言だけでも残しておきましょう。
+          </p>
+          <span className="inline-block mt-5 bg-[var(--accent)] text-[#2a2622] text-sm font-bold px-7 py-3 rounded-[2px] tracking-wide">
+            今日を記録する →
+          </span>
         </Link>
       ) : (
         <Link
           href={`/entries/${today}`}
-          className="block w-full p-5 rounded-3xl bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/50 active:scale-95 transition-transform"
+          className="block w-full p-7 rounded-[3px] bg-[#e7dcc7] border border-[#ddd0b8] active:scale-[0.99] transition-transform dark:bg-[var(--surface)] dark:border-[var(--border)]"
         >
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="font-bold text-lg text-emerald-700 dark:text-emerald-400">今日の記録完了！</p>
-              <p className="text-emerald-600 dark:text-emerald-500 text-sm mt-0.5">
-                {todayEntry.summary ?? '記録済み'}
-              </p>
-            </div>
-            <span className="text-4xl">✅</span>
-          </div>
+          <div className="eyebrow mb-3" style={{ letterSpacing: '0.3em' }}>Today&apos;s check-in</div>
+          <p className="font-bold text-xl text-[var(--foreground)] tracking-tight">今日の記録、完了しました</p>
+          <p className="text-sm text-[var(--muted)] mt-2 leading-relaxed">
+            {todayEntry.summary ?? '記録済み'}
+          </p>
         </Link>
       )}
 
@@ -171,61 +175,89 @@ export default async function HomePage() {
       {stats && <StatsCards stats={stats} />}
 
       {/* 今週の記録 */}
-      <div className="card">
-        <h2 className="font-semibold text-slate-700 dark:text-slate-300 mb-4">今週の記録</h2>
-        <WeekStrip entries={entries} />
-      </div>
+      <section>
+        <div className="section-head">
+          <div className="eyebrow">This week</div>
+          <h2 className="text-base font-bold text-[var(--foreground)]">今週の記録</h2>
+        </div>
+        <div className="mt-6">
+          <WeekStrip entries={entries} />
+        </div>
+      </section>
 
       {/* 記録ヒートマップ */}
       {entries.length > 0 && (
-        <div className="card">
-          <h2 className="font-semibold text-slate-700 dark:text-slate-300 mb-3">記録の軌跡</h2>
-          <CalendarHeatmap entries={entries} />
-        </div>
+        <section>
+          <div className="section-head">
+            <div className="eyebrow">90-day trace</div>
+            <h2 className="text-base font-bold text-[var(--foreground)]">記録の軌跡</h2>
+          </div>
+          <div className="mt-6">
+            <CalendarHeatmap entries={entries} />
+          </div>
+        </section>
       )}
 
       {/* 気分チャート */}
       {entries.length > 1 && (
-        <div className="card">
-          <h2 className="font-semibold text-slate-700 dark:text-slate-300 mb-3">気分の推移</h2>
-          <MoodChart entries={entries.slice(0, 14).reverse()} />
-        </div>
+        <section>
+          <div className="section-head">
+            <div className="eyebrow">Mood &amp; energy</div>
+            <h2 className="text-base font-bold text-[var(--foreground)]">気分の推移</h2>
+          </div>
+          <div className="mt-5">
+            <MoodChart entries={entries.slice(0, 14).reverse()} />
+          </div>
+        </section>
       )}
 
       {/* 最近の記録 */}
       {recentEntries.length > 0 && (
-        <div>
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="font-semibold text-slate-700 dark:text-slate-300">最近の記録</h2>
-            <Link href="/entries" className="text-sky-500 text-sm font-medium">
-              すべて見る
+        <section>
+          <div className="section-head" style={{ borderBottomColor: 'var(--divider-strong)' }}>
+            <div className="flex items-baseline gap-4">
+              <div className="eyebrow">Recent</div>
+              <h2 className="text-base font-bold text-[var(--foreground)]">最近の記録</h2>
+            </div>
+            <Link href="/entries" className="text-xs tracking-wide text-[var(--primary)]">
+              すべて見る →
             </Link>
           </div>
-          <div className="space-y-2">
-            {recentEntries.map((entry) => (
-              <Link
-                key={entry.id}
-                href={`/entries/${entry.entry_date}`}
-                className="block card hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors active:scale-[0.98]"
-              >
-                <div className="flex items-center gap-3">
-                  <span className="text-2xl">
-                    {entry.mood === 5 ? '😄' : entry.mood === 4 ? '🙂' : entry.mood === 3 ? '😐' : entry.mood === 2 ? '😕' : '😞'}
-                  </span>
+          <div>
+            {recentEntries.map((entry) => {
+              const d = new Date(`${entry.entry_date}T12:00:00+09:00`)
+              const dayNum = d.toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo', day: '2-digit' })
+              const wd = d.toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo', weekday: 'short' })
+              const mon = d.toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo', month: 'short' })
+              return (
+                <Link
+                  key={entry.id}
+                  href={`/entries/${entry.entry_date}`}
+                  className="flex gap-5 items-start py-5 border-b border-[var(--border)] active:opacity-70 transition-opacity"
+                >
+                  <div className="flex-none w-12 text-right pt-0.5">
+                    <div className="text-xl font-bold text-[var(--foreground)] leading-none tracking-tight">{dayNum}</div>
+                    <div className="text-[11px] text-[var(--muted)] tracking-wide mt-1.5">{mon}·{wd}</div>
+                  </div>
+                  <div
+                    className="flex-none w-2.5 h-2.5 rounded-full mt-2"
+                    style={{ backgroundColor: MOOD_DOT[entry.mood] ?? '#cdbf9a' }}
+                  />
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                      {new Date(`${entry.entry_date}T12:00:00+09:00`).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo', month: 'short', day: 'numeric', weekday: 'short' })}
-                    </p>
-                    <p className="text-sm text-slate-500 dark:text-slate-400 truncate">
+                    <p className="text-sm text-[var(--foreground)] leading-relaxed truncate">
                       {entry.summary ?? entry.dominant_emotion ?? '記録あり'}
                     </p>
+                    {entry.tags?.length > 0 && (
+                      <p className="text-xs text-[var(--muted-2)] mt-1 truncate">
+                        {entry.tags.slice(0, 3).map((t) => `#${t}`).join('  ')}
+                      </p>
+                    )}
                   </div>
-                  <span className="text-slate-300 dark:text-slate-600">›</span>
-                </div>
-              </Link>
-            ))}
+                </Link>
+              )
+            })}
           </div>
-        </div>
+        </section>
       )}
 
     </div>
@@ -253,16 +285,17 @@ function Onboarding() {
   ]
 
   return (
-    <div className="min-h-dvh flex flex-col px-6 pt-12 pb-8">
+    <div className="min-h-dvh flex flex-col px-6 pt-14 pb-8">
       {/* ヒーロー */}
-      <div className="text-center mb-10 animate-slide-up">
-        <div className="w-20 h-20 mx-auto mb-5 rounded-3xl animated-gradient flex items-center justify-center shadow-xl shadow-sky-500/25">
-          <span className="text-4xl">🪞</span>
+      <div className="text-center mb-12 animate-slide-up">
+        <div className="w-16 h-16 mx-auto mb-6 rounded-full bg-[#2a2622] border border-[var(--accent)] flex items-center justify-center">
+          <span className="text-[#e9ddc7] text-xl tracking-wide">私</span>
         </div>
-        <h1 className="text-2xl font-bold text-slate-900 dark:text-white">
+        <div className="eyebrow mb-3" style={{ letterSpacing: '0.3em' }}>Welcome</div>
+        <h1 className="text-2xl font-bold text-[var(--foreground)] tracking-tight">
           ようこそ、<span className="gradient-text">Inner Mirror</span> へ
         </h1>
-        <p className="text-slate-500 dark:text-slate-400 text-sm mt-2">
+        <p className="text-[var(--muted)] text-sm mt-3 leading-relaxed">
           毎日30秒で、AIがあなたの日記を書きます
         </p>
       </div>
@@ -275,10 +308,10 @@ function Onboarding() {
             className="card flex items-start gap-4 animate-slide-up"
             style={{ animationDelay: `${0.08 * (i + 1)}s`, animationFillMode: 'backwards' }}
           >
-            <span className="text-3xl flex-shrink-0">{step.icon}</span>
+            <span className="text-2xl flex-shrink-0 pt-0.5">{step.icon}</span>
             <div>
-              <p className="font-bold text-slate-800 dark:text-slate-200 text-sm">{step.title}</p>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
+              <p className="font-bold text-[var(--foreground)] text-sm">{step.title}</p>
+              <p className="text-xs text-[var(--muted)] mt-1.5 leading-relaxed">
                 {step.description}
               </p>
             </div>
@@ -290,11 +323,11 @@ function Onboarding() {
       <div className="mt-auto animate-slide-up" style={{ animationDelay: '0.35s', animationFillMode: 'backwards' }}>
         <Link
           href="/checkin"
-          className="block w-full py-4 text-center rounded-3xl animated-gradient text-white font-bold text-lg active:scale-95 transition-transform glow-sky"
+          className="block w-full py-4 text-center rounded-[2px] bg-[var(--accent)] text-[#2a2622] font-bold text-base active:scale-[0.99] transition-transform glow-sky"
         >
-          最初のチェックインを始める ✍️
+          最初のチェックインを始める →
         </Link>
-        <p className="text-center text-xs text-slate-400 mt-3">
+        <p className="text-center text-xs text-[var(--muted)] mt-3">
           途中でやめてもOK。入力は自動保存されます
         </p>
       </div>

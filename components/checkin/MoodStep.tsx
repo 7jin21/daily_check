@@ -19,13 +19,13 @@ export default function MoodStep() {
           key={m.value}
           onClick={() => handleSelect(m.value)}
           className={`
-            flex flex-col items-center gap-2 p-3 rounded-3xl border-2 transition-all duration-150 active:scale-95
+            flex flex-col items-center gap-2 p-3 rounded-[3px] border transition-all duration-150 active:scale-95
             ${mood === m.value
-              ? 'border-sky-400 bg-sky-50 dark:bg-sky-900/30 scale-105'
-              : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800'
+              ? 'scale-105'
+              : 'border-[var(--border)] bg-[var(--surface)]'
             }
           `}
-          style={mood === m.value ? { borderColor: m.color } : {}}
+          style={mood === m.value ? { borderColor: m.color, background: `${m.color}1f` } : {}}
           aria-label={m.label}
           aria-pressed={mood === m.value}
         >
@@ -36,7 +36,7 @@ export default function MoodStep() {
           >
             {m.emoji}
           </span>
-          <span className="text-xs text-slate-500 dark:text-slate-400 text-center leading-tight">
+          <span className="text-xs text-[var(--muted)] text-center leading-tight">
             {m.label}
           </span>
         </button>

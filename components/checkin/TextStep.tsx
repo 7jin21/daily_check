@@ -32,16 +32,16 @@ export default function TextStep({ value, onChange, placeholder }: TextStepProps
           placeholder={placeholder}
           rows={6}
           className="
-            w-full p-4 pb-10 rounded-3xl border-2 border-slate-200 dark:border-slate-700
-            bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100
-            placeholder-slate-400 text-base resize-none
-            focus:outline-none focus:border-sky-400 transition-colors
+            w-full p-4 pb-10 rounded-[3px] border border-[var(--border)]
+            bg-[var(--surface)] text-[var(--foreground)]
+            placeholder:text-[var(--muted-2)] text-base resize-none
+            focus:outline-none focus:border-[var(--primary)] transition-colors
           "
         />
         {/* 文字数カウンター */}
         <span
           className={`absolute bottom-3 left-4 text-xs tabular-nums ${
-            isNearLimit ? 'text-amber-500' : 'text-slate-300 dark:text-slate-600'
+            isNearLimit ? 'text-[#a4683f]' : 'text-[var(--muted-2)]'
           }`}
         >
           {value.length}/{MAX_CHARS}
@@ -50,7 +50,7 @@ export default function TextStep({ value, onChange, placeholder }: TextStepProps
           <VoiceInputButton onResult={handleVoiceResult} />
         </div>
       </div>
-      <p className="text-xs text-slate-400 px-1">キーワードや短文でOK。音声入力も使えます 🎤</p>
+      <p className="text-xs text-[var(--muted-2)] px-1">キーワードや短文でOK。音声入力も使えます 🎤</p>
     </div>
   )
 }

@@ -23,15 +23,12 @@ export default function PersonalityCard({ analysis }: PersonalityCardProps) {
   return (
     <div className="space-y-3">
       {sections.map((s) => (
-        <div
-          key={s.title}
-          className="bg-white dark:bg-slate-800 rounded-3xl p-4 border border-slate-100 dark:border-slate-700"
-        >
+        <div key={s.title} className="card" style={{ padding: 16 }}>
           <div className="flex items-center gap-2 mb-2">
             <span className="text-xl">{s.icon}</span>
-            <h3 className="font-bold text-slate-700 dark:text-slate-200 text-sm">{s.title}</h3>
+            <h3 className="font-bold text-[var(--foreground)] text-sm">{s.title}</h3>
           </div>
-          <p className="text-slate-600 dark:text-slate-400 text-sm leading-relaxed">{s.content}</p>
+          <p className="text-[var(--muted)] text-sm leading-relaxed">{s.content}</p>
         </div>
       ))}
     </div>

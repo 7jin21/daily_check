@@ -24,3 +24,6 @@ Thumbs.db
 # Claude Code local settings (per-machine permissions)
 .claude/settings.local.json
 .vercel
+
+# デザイン見本（deco.cxバンドル・約8MB。リスキンの参照元。リポジトリには含めない）
+日記ダッシュボード（単一HTML）.html

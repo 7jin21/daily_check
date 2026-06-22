@@ -1,19 +1,19 @@
 // 気分の定数
 export const MOODS = [
-  { value: 1, emoji: '😞', label: 'とても悪い', color: '#ef4444' },
-  { value: 2, emoji: '😕', label: '悪い', color: '#f97316' },
-  { value: 3, emoji: '😐', label: '普通', color: '#eab308' },
-  { value: 4, emoji: '🙂', label: '良い', color: '#84cc16' },
-  { value: 5, emoji: '😄', label: 'とても良い', color: '#22c55e' },
+  { value: 1, emoji: '😞', label: 'とても悪い', color: '#b5654a' },
+  { value: 2, emoji: '😕', label: '悪い', color: '#c5895f' },
+  { value: 3, emoji: '😐', label: '普通', color: '#cdbf9a' },
+  { value: 4, emoji: '🙂', label: '良い', color: '#9caa7e' },
+  { value: 5, emoji: '😄', label: 'とても良い', color: '#6f8a5f' },
 ] as const
 
 // エネルギーの定数
 export const ENERGY = [
-  { value: 1, label: '枯渇', description: '何もできない', color: '#ef4444' },
-  { value: 2, label: '低い', description: '最小限のみ', color: '#f97316' },
-  { value: 3, label: '普通', description: '日常通り', color: '#eab308' },
-  { value: 4, label: '高い', description: '活発に動ける', color: '#84cc16' },
-  { value: 5, label: '最高', description: '何でもできる', color: '#22c55e' },
+  { value: 1, label: '枯渇', description: '何もできない', color: '#b5654a' },
+  { value: 2, label: '低い', description: '最小限のみ', color: '#c5895f' },
+  { value: 3, label: '普通', description: '日常通り', color: '#cdbf9a' },
+  { value: 4, label: '高い', description: '活発に動ける', color: '#9caa7e' },
+  { value: 5, label: '最高', description: '何でもできる', color: '#6f8a5f' },
 ] as const
 
 // チェックインのステップ定数

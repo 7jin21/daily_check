@@ -9,8 +9,8 @@ interface CalendarHeatmapProps {
   entries: Entry[]
 }
 
-// mood 1-5 → color; index 0 unused
-const MOOD_COLOR = ['', '#ef4444', '#f97316', '#eab308', '#84cc16', '#22c55e']
+// mood 1-5 → color; index 0 unused（アース系）
+const MOOD_COLOR = ['', '#b5654a', '#c5895f', '#cdbf9a', '#9caa7e', '#6f8a5f']
 
 function subtractDays(dateStr: string, n: number): string {
   const [y, m, d] = dateStr.split('-').map(Number)
@@ -58,7 +58,7 @@ export default function CalendarHeatmap({ entries }: CalendarHeatmapProps) {
             <div
               key={wi}
               style={{ width: 14, marginRight: 2, flexShrink: 0 }}
-              className="text-[9px] text-slate-400 leading-none"
+              className="text-[9px] text-[var(--muted-2)] leading-none"
             >
               {monthLabelByWeek[wi]}
             </div>
@@ -73,7 +73,7 @@ export default function CalendarHeatmap({ entries }: CalendarHeatmapProps) {
               <div
                 key={label}
                 style={{ height: 14, marginBottom: 2 }}
-                className="text-[9px] text-slate-400 flex items-center justify-end pr-0.5"
+                className="text-[9px] text-[var(--muted-2)] flex items-center justify-end pr-0.5"
               >
                 {[1, 3, 5].includes(i) ? label : ''}
               </div>
@@ -100,7 +100,7 @@ export default function CalendarHeatmap({ entries }: CalendarHeatmapProps) {
                     }}
                     className={
                       !cell.isFuture && cell.mood === null
-                        ? 'bg-slate-100 dark:bg-slate-700/60'
+                        ? 'bg-[var(--surface-secondary)]'
                         : ''
                     }
                     title={
@@ -118,17 +118,19 @@ export default function CalendarHeatmap({ entries }: CalendarHeatmapProps) {
         </div>
 
         {/* Legend */}
-        <div className="flex items-center justify-between mt-3">
-          <span className="text-[11px] text-slate-400">90日間で {recorded90} 日記録</span>
-          <div className="flex items-center gap-1">
-            <span className="text-[10px] text-slate-400">悪</span>
+        <div className="flex items-center justify-between mt-4">
+          <span className="text-[11px] text-[var(--muted)]">
+            直近90日で <span className="font-bold text-[var(--foreground)]">{recorded90}日</span> 記録
+          </span>
+          <div className="flex items-center gap-1.5">
+            <span className="text-[10px] text-[var(--muted-2)]">悪</span>
             {[1, 2, 3, 4, 5].map((m) => (
               <div
                 key={m}
-                style={{ width: 10, height: 10, borderRadius: 2, backgroundColor: MOOD_COLOR[m] }}
+                style={{ width: 12, height: 12, borderRadius: 2, backgroundColor: MOOD_COLOR[m] }}
               />
             ))}
-            <span className="text-[10px] text-slate-400">良</span>
+            <span className="text-[10px] text-[var(--muted-2)]">良</span>
           </div>
         </div>
       </div>
