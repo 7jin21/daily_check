@@ -45,7 +45,8 @@ npm run dev
 | AI | GROQ API（gpt-oss-120b / gpt-oss-20b、日本語で選定。音声文字起こしは Whisper） |
 | 外部同期 | Notion API / Google Calendar API |
 | 状態管理 | Zustand |
-| スタイリング | Tailwind CSS |
+| スタイリング | Tailwind CSS ＋ CSS 変数（暖色エディトリアル基調 / トークン一元管理） |
+| フォント | Schibsted Grotesk（欧文）＋ Zen Kaku Gothic New（和文） |
 | PWA | Web App Manifest + Service Worker |
 
 ---
@@ -474,6 +475,20 @@ GROQ_MODEL_TRANSCRIBE=whisper-large-v3-turbo           # 音声入力の文字�
 - **JSON モードのルート（`draft-meta` / `rewrite-draft` / `analyze` / `weekly-report` / `checkin-question`）は `reasoning_effort: 'low'` を必ず付ける**。gpt-oss 系は reasoning が JSON 出力を壊し `400 json_validate_failed` を起こすため（付けないと毎回フォールバック＝タグ/要約が空になる等の劣化）。あわせてプロンプトに「JSON」の語を必ず含める（Groq の JSON モード要件）。モデルを差し替える時もこの2点を維持すること
 - **モデル ID を間違えても安全**: 生成はオフラインテンプレートに、JSON 系は各フォールバックに自動で切り替わります（白画面にはならない）
 
+### 見た目（配色・フォント）を変えたい
+
+外観は「**暖色エディトリアル**」基調 — 紙色の背景＋エスプレッソの文字＋テラコッタ／山吹のアクセント、フラットで角丸 3px のカード。配色は **CSS 変数で一元管理**しているので、コンポーネントを触らずトークンだけ変えれば全画面に反映されます。
+
+| 変えたいもの | 触る場所 |
+|------|------|
+| ページ／カード／文字色・罫線（紙・エスプレッソ・テラコッタ・山吹） | `app/globals.css` の `:root`（ダークは `@media (prefers-color-scheme: dark)` と `.dark`） |
+| Tailwind の `primary` / `surface` 階調 | `tailwind.config.ts` |
+| 気分・エネルギーの色ランプ（アース系 `#b5654a`→`#6f8a5f`） | `lib/constants.ts` の `MOODS` / `ENERGY` |
+| フォント（欧文 Schibsted Grotesk ＋ 和文 Zen Kaku Gothic New） | `app/layout.tsx`（Google Fonts の `link`）＋ `app/globals.css` / `tailwind.config.ts` |
+| iOS ステータスバー色（theme-color） | `app/layout.tsx` の `<meta name="theme-color">` |
+
+> ダークモードは OS のカラースキームに自動追従します（暖色エスプレッソ系）。`.dark` クラスによる手動オーバーライドの口は用意済みですが、切り替え UI は未実装です（[今後の実装予定](#今後の実装予定)）。
+
 ### ログイン方法を追加・変更したい
 
 - **メール+パスワード**を足したい → Supabase の **Authentication → Providers → Email** を有効化（外部設定が不要で一番手軽）
@@ -710,9 +725,13 @@ create policy "entries: own rows only"
 
 ## 今後の実装予定
 
-- [ ] プッシュ通知（Web Push API）
-- [ ] チェックイン時に当日のカレンダー予定を自動挿入する UI
-- [ ] 気分ヒートマップ（カレンダービュー）
-- [ ] データエクスポート（JSON / CSV）
-- [ ] 日記エントリーの削除機能
-- [ ] テーマ手動切り替え（ライト / ダーク / システム）
+下準備だけ済んでいる項目は、現状どこまでできているかを併記しています。
+
+- [ ] **プッシュ通知（Web Push API）** — 設定画面にリマインダーの ON/OFF・通知時刻の入力 UI はあるが、実際の配信（Service Worker の push 購読・VAPID）は未実装。今は「設定値を保存するだけ」
+- [ ] **チェックイン時に当日のカレンダー予定を自動挿入する UI** — 取得 API（`/api/calendar/today`）は実装済みだが、チェックイン画面からはまだ呼んでいない（配線するだけ）
+- [ ] **気分ヒートマップ（月カレンダービュー）** — 13 週のコントリビューション型ヒートマップはホームに**実装済み**（`components/home/CalendarHeatmap.tsx`）。残るは月めくりのカレンダー表示
+- [ ] **データエクスポート（JSON / CSV）** — 未着手（暫定の手動エクスポートは[データのバックアップ](#データのバックアップ)参照）
+- [ ] **日記エントリーの削除機能** — 未着手（現状は編集・上書き保存のみ）
+- [ ] **テーマ手動切り替え（ライト / ダーク / システム）** — `.dark` クラス＋ `localStorage('inner-mirror-theme')` 読み取りの土台は `app/layout.tsx` にあるが、切り替え UI は未実装（現状は OS のカラースキームに自動追従）
+
+> ✅ **実装済み**（旧・実装予定から移動）: 90 日（13 週）気分ヒートマップ、AI 内省ガイド、音声入力（GROQ Whisper）、Notion 自動同期、週次レポート。
