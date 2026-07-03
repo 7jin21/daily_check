@@ -16,20 +16,34 @@ export const ENERGY = [
   { value: 5, label: '最高', description: '何でもできる', color: '#6f8a5f' },
 ] as const
 
-// チェックインのステップ定数
+// チェックインのステップ定数（2画面: 調子 → メモ。タップ数を最小にする）
 export const STEPS = [
-  { id: 'mood', title: '今日の気分は？', description: '直感で選んでください' },
-  { id: 'energy', title: 'エネルギーレベルは？', description: '今の体の状態を教えてください' },
-  { id: 'events', title: '今日あったことは？', description: '出来事・行動・会話など' },
-  { id: 'challenges', title: '困ったことや課題は？', description: '問題・悩み・不安など（任意）' },
-  { id: 'gratitude', title: '感謝できることは？', description: '小さなことでも大丈夫' },
-  { id: 'freeform', title: '自由記述', description: '何でも書いてください（任意）' },
+  { id: 'state', title: '今日の調子は？', description: '気分とエネルギーをタップ' },
+  { id: 'notes', title: '今日のことを少しだけ', description: '書けるところだけでOK（すべて任意）' },
 ] as const
 
 export type StepId = typeof STEPS[number]['id']
 
 // 毎日ローテーションするサブテキスト (曜日 or 日付ベース)
 const STEP_DESCRIPTIONS: Record<string, string[]> = {
+  state: [
+    '気分とエネルギーをタップ',
+    '直感で選んでください',
+    '今この瞬間の気持ちと充電具合は？',
+    '体の感覚に耳を傾けて',
+    '正直に選んでみて',
+    '自分に正直になって',
+    '今日の自分をひと目で',
+  ],
+  notes: [
+    '書けるところだけでOK（すべて任意）',
+    '印象に残ったことをひと言だけでも',
+    'キーワードだけでも日記になります',
+    '音声入力🎤も使えます',
+    '今日の「ハイライト」は？',
+    '全部スキップしてもOK',
+    'ゆっくりでいいので、思い出してみて',
+  ],
   mood: [
     '直感で選んでください',
     '今この瞬間の気持ちは？',

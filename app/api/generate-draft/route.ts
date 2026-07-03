@@ -25,12 +25,18 @@ export async function POST(req: NextRequest) {
   }
 
   // 2. リクエストボディ検証
-  let input: CheckinInput & { reflectionQ?: string; reflectionA?: string }
+  let input: CheckinInput & { reflectionQ?: string; reflectionA?: string; entryDate?: string }
   try {
     input = await req.json()
   } catch {
     return NextResponse.json({ error: 'Invalid request body' }, { status: 400 })
   }
+
+  // 対象日（過去日付の書き忘れ救済）。不正な形式なら無視して今日扱い
+  const entryDate =
+    typeof input.entryDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(input.entryDate)
+      ? input.entryDate
+      : null
 
   const { mood, energy } = input
   if (
@@ -53,7 +59,7 @@ export async function POST(req: NextRequest) {
   // 3. GROQ API が設定されていない場合はオフラインフォールバック
   if (!process.env.GROQ_API_KEY) {
     console.warn('GROQ_API_KEY未設定 - オフラインフォールバックを使用')
-    const result = generateOfflineDraft(input)
+    const result = generateOfflineDraft(input, entryDate)
     return new NextResponse(result.draft, {
       headers: { ...PLAIN_HEADERS, 'X-Draft-Fallback': '1' },
     })
@@ -106,7 +112,7 @@ export async function POST(req: NextRequest) {
         },
         {
           role: 'user',
-          content: buildPrompt(input) + styleSamples,
+          content: buildPrompt(input, entryDate) + styleSamples,
         },
       ],
     })
@@ -130,15 +136,29 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     console.error('GROQ draft generation error:', err)
     // フォールバック
-    const result = generateOfflineDraft(input)
+    const result = generateOfflineDraft(input, entryDate)
     return new NextResponse(result.draft, {
       headers: { ...PLAIN_HEADERS, 'X-Draft-Fallback': '1' },
     })
   }
 }
 
-function buildPrompt(input: CheckinInput & { reflectionQ?: string; reflectionA?: string }): string {
+function buildPrompt(
+  input: CheckinInput & { reflectionQ?: string; reflectionA?: string },
+  entryDate: string | null
+): string {
   const parts: string[] = []
+
+  // 過去日付の書き忘れ救済: その日の日記として書く（「今日」と書かないよう明示）
+  if (entryDate) {
+    const label = new Date(`${entryDate}T12:00:00+09:00`).toLocaleDateString('ja-JP', {
+      timeZone: 'Asia/Tokyo',
+      month: 'long',
+      day: 'numeric',
+      weekday: 'long',
+    })
+    parts.push(`この日記の対象日: ${label}（この日を振り返って書かれた日記として自然に書く）`)
+  }
 
   parts.push(`気分スコア: ${input.mood}/5`)
   parts.push(`エネルギースコア: ${input.energy}/5`)

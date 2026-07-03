@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Confetti from '@/components/ui/Confetti'
 import { useCheckinStore } from '@/stores/checkin'
+import { useSettingsStore } from '@/stores/settings'
 import { getSupabaseClient } from '@/lib/supabase'
 import { apiPost } from '@/lib/api-client'
 import { generateOfflineDraft } from '@/lib/offline-draft'
@@ -45,6 +46,7 @@ export default function DraftPage() {
   const {
     getInput,
     checkinDate,
+    targetDate,
     draftResult,
     editedDraft,
     setDraftResult,
@@ -54,6 +56,7 @@ export default function DraftPage() {
     setReflection,
     reset,
   } = useCheckinStore()
+  const notificationsEnabled = useSettingsStore((s) => s.settings.notificationsEnabled)
 
   const [isSaving, setIsSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
@@ -116,13 +119,14 @@ export default function DraftPage() {
     setEditedDraft('')
 
     const input = getInput()
-    const { reflectionQ, reflectionA } = useCheckinStore.getState()
+    const { reflectionQ, reflectionA, targetDate: entryTarget } = useCheckinStore.getState()
     try {
-      // 日記本文は text/plain でストリーミングされる。内省Q&Aがあれば文脈として渡す
+      // 日記本文は text/plain でストリーミングされる。内省Q&Aがあれば文脈として渡す。
+      // entryDate は過去日付の書き忘れ救済用（null なら今日扱い）
       const res = await fetch('/api/generate-draft', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...input, reflectionQ, reflectionA }),
+        body: JSON.stringify({ ...input, reflectionQ, reflectionA, entryDate: entryTarget ?? undefined }),
         signal: abortRef.current.signal,
       })
       if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`)
@@ -143,7 +147,7 @@ export default function DraftPage() {
 
       if (isFallback) {
         // サーバー側でオフラインテンプレートが使われた
-        const offline = generateOfflineDraft(input)
+        const offline = generateOfflineDraft(input, entryTarget)
         setDraftResult({ ...offline, draft: text })
         setIsOffline(true)
         return
@@ -151,7 +155,7 @@ export default function DraftPage() {
 
       // メタ情報（タグ・サマリー・感情）は本文確定後にバックグラウンドで取得。
       // 失敗時はローカル生成のメタにフォールバック
-      const offlineMeta = generateOfflineDraft(input)
+      const offlineMeta = generateOfflineDraft(input, entryTarget)
       setDraftResult({
         draft: text,
         tags: offlineMeta.tags,
@@ -168,7 +172,7 @@ export default function DraftPage() {
     } catch (err) {
       if (err instanceof DOMException && err.name === 'AbortError') return
       console.warn('AI生成失敗、オフラインドラフトを使用します:', err)
-      const offlineResult = generateOfflineDraft(input)
+      const offlineResult = generateOfflineDraft(input, entryTarget)
       setDraftResult(offlineResult)
       setEditedDraft(offlineResult.draft)
       setIsOffline(true)
@@ -252,7 +256,8 @@ export default function DraftPage() {
     setSaveError(null)
 
     const input = getInput()
-    const entryDate = getTodayJST()
+    // 過去日付の記録なら targetDate、通常は今日
+    const entryDate = useCheckinStore.getState().targetDate ?? getTodayJST()
     // 内省Q&Aは DB 列を増やさず freeform に畳んで残す（将来のAI分析の材料にする）
     const { reflectionQ, reflectionA } = useCheckinStore.getState()
     const freeformToSave = reflectionA?.trim()
@@ -404,7 +409,7 @@ export default function DraftPage() {
               href={`/entries/${savedEntryDate}`}
               className="block w-full py-4 text-center rounded-[2px] bg-[var(--accent)] text-[#2a2622] font-bold text-base active:scale-[0.99] transition-transform glow-sky"
             >
-              今日の日記を見る
+              日記を見る
             </Link>
             <Link
               href="/"
@@ -412,6 +417,15 @@ export default function DraftPage() {
             >
               ホームに戻る
             </Link>
+            {/* 記録の習慣化ナッジ: リマインダー未設定の場合のみ */}
+            {!notificationsEnabled && (
+              <Link
+                href="/settings"
+                className="block w-full py-2 text-center text-xs text-[var(--muted)] underline underline-offset-2"
+              >
+                🔔 リマインダーを設定して、記録を習慣にする
+              </Link>
+            )}
           </div>
         </div>
       </>
@@ -430,7 +444,11 @@ export default function DraftPage() {
         >
           ‹
         </button>
-        <h1 className="text-xl font-bold text-[var(--foreground)]">日記のドラフト</h1>
+        <h1 className="text-xl font-bold text-[var(--foreground)]">
+          {targetDate
+            ? `${new Date(`${targetDate}T12:00:00+09:00`).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo', month: 'long', day: 'numeric' })}の日記のドラフト`
+            : '日記のドラフト'}
+        </h1>
       </div>
 
       {isOffline && (

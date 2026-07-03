@@ -6,7 +6,9 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
 // 認証不要のパス
-const PUBLIC_PATHS = ['/login', '/auth/callback']
+// /api/cron はユーザーセッションを持たない Vercel Cron から呼ばれる。
+// ルート自身が CRON_SECRET で認証するため、ここでは素通しする
+const PUBLIC_PATHS = ['/login', '/auth/callback', '/api/cron']
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
@@ -75,6 +77,6 @@ export const config = {
      * - favicon.ico
      * - public ディレクトリ内のファイル
      */
-    '/((?!_next/static|_next/image|favicon.ico|icon-192.png|icon-512.png|manifest.json|sw.js).*)',
+    '/((?!_next/static|_next/image|favicon.ico|icon-192.png|icon-512.png|icon-maskable.png|manifest.json|sw.js).*)',
   ],
 }

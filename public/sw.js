@@ -19,6 +19,40 @@ self.addEventListener('activate', (event) => {
   )
 })
 
+// ─── Web Push（毎日のリマインダー） ───
+self.addEventListener('push', (event) => {
+  let data = {}
+  try {
+    data = event.data ? event.data.json() : {}
+  } catch {
+    // ペイロードが JSON でない場合は既定文言
+  }
+  event.waitUntil(
+    self.registration.showNotification(data.title || 'Inner Mirror 🪞', {
+      body: data.body || '今日の記録をしませんか？',
+      icon: '/icon-192.png',
+      badge: '/icon-192.png',
+      data: { url: data.url || '/checkin' },
+    })
+  )
+})
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close()
+  const url = (event.notification.data && event.notification.data.url) || '/checkin'
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
+      for (const client of windowClients) {
+        if ('focus' in client) {
+          client.navigate(url)
+          return client.focus()
+        }
+      }
+      return clients.openWindow(url)
+    })
+  )
+})
+
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url)
 

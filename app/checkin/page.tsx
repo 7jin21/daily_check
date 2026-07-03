@@ -4,32 +4,34 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useCheckinStore } from '@/stores/checkin'
 import { STEPS, getDailyDescription } from '@/lib/constants'
-import MoodStep from '@/components/checkin/MoodStep'
-import EnergyStep from '@/components/checkin/EnergyStep'
-import TextStep from '@/components/checkin/TextStep'
+import StateStep from '@/components/checkin/StateStep'
+import NotesStep from '@/components/checkin/NotesStep'
 import { hapticTap } from '@/lib/haptics'
 
 function getTodayJST() {
   return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Tokyo' })
 }
 
+// 過去日付の記録（書き忘れ救済）は7日前まで許可する
+function isValidPastDate(date: string, today: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return false
+  if (date >= today) return false
+  const diffDays = (Date.parse(`${today}T00:00:00Z`) - Date.parse(`${date}T00:00:00Z`)) / 86_400_000
+  return diffDays <= 7
+}
+
+function formatDateLabel(date: string): string {
+  return new Date(`${date}T12:00:00+09:00`).toLocaleDateString('ja-JP', {
+    timeZone: 'Asia/Tokyo',
+    month: 'long',
+    day: 'numeric',
+    weekday: 'short',
+  })
+}
+
 export default function CheckinPage() {
   const router = useRouter()
-  const {
-    currentStep,
-    mood,
-    energy,
-    events,
-    challenges,
-    gratitude,
-    freeform,
-    setEvents,
-    setChallenges,
-    setGratitude,
-    setFreeform,
-    nextStep,
-    prevStep,
-  } = useCheckinStore()
+  const { currentStep, mood, energy, targetDate, nextStep, prevStep } = useCheckinStore()
 
   const [direction, setDirection] = useState<'forward' | 'back'>('forward')
 
@@ -45,20 +47,38 @@ export default function CheckinPage() {
         state.reset()
       }
       state.setCheckinDate(today)
+      // ステップ構成の変更（旧6ステップ→2ステップ）で保存値が範囲外の場合に備える
+      if (state.currentStep >= STEPS.length) state.setCurrentStep(0)
     }
     checkDateRollover()
+
+    // ?date=YYYY-MM-DD → 過去日付の記録（書き忘れ救済）
+    const params = new URLSearchParams(window.location.search)
+    const dateParam = params.get('date')
+    const today = getTodayJST()
+    if (dateParam && isValidPastDate(dateParam, today)) {
+      const state = useCheckinStore.getState()
+      if (state.targetDate !== dateParam) {
+        // 別の日の入力が残っていたら混ざらないように消してから対象日を設定
+        state.reset()
+        state.setCheckinDate(today)
+        state.setTargetDate(dateParam)
+      }
+    }
+
     document.addEventListener('visibilitychange', checkDateRollover)
     return () => document.removeEventListener('visibilitychange', checkDateRollover)
   }, [])
 
-  const step = STEPS[currentStep]
+  const stepIndex = Math.min(currentStep, STEPS.length - 1)
+  const step = STEPS[stepIndex]
   const totalSteps = STEPS.length
-  const progress = ((currentStep + 1) / totalSteps) * 100
+  const progress = ((stepIndex + 1) / totalSteps) * 100
 
   const handleNext = () => {
     hapticTap()
     setDirection('forward')
-    if (currentStep < totalSteps - 1) {
+    if (stepIndex < totalSteps - 1) {
       nextStep()
     } else {
       router.push('/draft')
@@ -66,7 +86,7 @@ export default function CheckinPage() {
   }
 
   const handleBack = () => {
-    if (currentStep === 0) {
+    if (stepIndex === 0) {
       router.push('/')
     } else {
       setDirection('back')
@@ -74,11 +94,18 @@ export default function CheckinPage() {
     }
   }
 
+  // 対象日を今日に戻す（過去日付モードの解除。入力の混在を防ぐため全部リセット）
+  const handleClearTargetDate = () => {
+    const state = useCheckinStore.getState()
+    state.reset()
+    state.setCheckinDate(getTodayJST())
+    router.replace('/checkin')
+  }
+
   const canProceed = () => {
     switch (step?.id) {
-      case 'mood':   return mood !== null
-      case 'energy': return energy !== null
-      default:       return true
+      case 'state': return mood !== null && energy !== null
+      default:      return true
     }
   }
 
@@ -87,7 +114,7 @@ export default function CheckinPage() {
   return (
     <div className="min-h-dvh flex flex-col px-4 pt-4">
       {/* ヘッダー */}
-      <div className="flex items-center gap-3 mb-6">
+      <div className="flex items-center gap-3 mb-4">
         <button
           onClick={handleBack}
           className="w-11 h-11 rounded-full bg-[var(--surface-secondary)] border border-[var(--border)] flex items-center justify-center text-xl text-[var(--foreground)] active:scale-90 transition-transform"
@@ -97,7 +124,7 @@ export default function CheckinPage() {
         </button>
         <div className="flex-1">
           <div className="flex items-center justify-between text-xs text-[var(--muted-2)] mb-1.5">
-            <span className="font-medium">{currentStep + 1} / {totalSteps}</span>
+            <span className="font-medium">{stepIndex + 1} / {totalSteps}</span>
             <span className="tabular-nums">{Math.round(progress)}%</span>
           </div>
           {/* プログレスバー（グロー付き） */}
@@ -110,9 +137,23 @@ export default function CheckinPage() {
         </div>
       </div>
 
+      {/* 過去日付の記録バナー */}
+      {targetDate && (
+        <div className="mb-4 px-4 py-2.5 rounded-[3px] flex items-center justify-between text-sm"
+          style={{ background: 'rgba(197,137,95,0.12)', border: '1px solid rgba(197,137,95,0.35)', color: '#a4683f' }}
+        >
+          <span>🕰 <b>{formatDateLabel(targetDate)}</b> の記録をあとから書いています</span>
+          <button onClick={handleClearTargetDate} className="text-xs underline ml-3 flex-shrink-0">
+            今日に戻す
+          </button>
+        </div>
+      )}
+
       {/* ステップタイトル */}
-      <div key={`title-${currentStep}`} className="mb-6 animate-fade-in">
-        <h2 className="text-2xl font-bold text-[var(--foreground)]">{step.title}</h2>
+      <div key={`title-${stepIndex}`} className="mb-5 animate-fade-in">
+        <h2 className="text-2xl font-bold text-[var(--foreground)]">
+          {targetDate && step.id === 'state' ? 'その日の調子は？' : step.title}
+        </h2>
         <p className="text-[var(--muted)] text-sm mt-1">
           {getDailyDescription(step.id) || step.description}
         </p>
@@ -120,23 +161,11 @@ export default function CheckinPage() {
 
       {/* ステップコンテンツ（方向付きアニメーション） */}
       <div
-        key={currentStep}
+        key={stepIndex}
         className={`flex-1 ${direction === 'forward' ? 'animate-enter-right' : 'animate-enter-left'}`}
       >
-        {step.id === 'mood' && <MoodStep />}
-        {step.id === 'energy' && <EnergyStep />}
-        {step.id === 'events' && (
-          <TextStep value={events} onChange={setEvents} placeholder="今日起きたこと、やったこと、会った人など..." />
-        )}
-        {step.id === 'challenges' && (
-          <TextStep value={challenges} onChange={setChallenges} placeholder="困ったこと、悩み、うまくいかなかったこと..." />
-        )}
-        {step.id === 'gratitude' && (
-          <TextStep value={gratitude} onChange={setGratitude} placeholder="感謝できること、うれしかったこと、よかったこと..." />
-        )}
-        {step.id === 'freeform' && (
-          <TextStep value={freeform} onChange={setFreeform} placeholder="思ったこと、気づいたこと、なんでも..." />
-        )}
+        {step.id === 'state' && <StateStep />}
+        {step.id === 'notes' && <NotesStep />}
       </div>
 
       {/* 次へボタン */}
@@ -146,10 +175,10 @@ export default function CheckinPage() {
           disabled={!canProceed()}
           className="w-full py-4 rounded-[2px] bg-[var(--accent)] text-[#2a2622] font-bold text-base disabled:opacity-30 active:scale-[0.99] transition-transform glow-sky"
         >
-          {currentStep < totalSteps - 1 ? '次へ →' : 'AIに日記を書いてもらう ✨'}
+          {stepIndex < totalSteps - 1 ? '次へ →' : 'AIに日記を書いてもらう ✨'}
         </button>
-        {(step.id === 'events' || step.id === 'challenges' || step.id === 'gratitude' || step.id === 'freeform') && (
-          <p className="text-center text-xs text-[var(--muted-2)] mt-2">入力しなくても次へ進めます</p>
+        {step.id === 'notes' && (
+          <p className="text-center text-xs text-[var(--muted-2)] mt-2">入力しなくても進めます</p>
         )}
       </div>
     </div>

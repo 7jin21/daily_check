@@ -6,14 +6,21 @@ iPhone のホーム画面から使える AI 日記アプリ（PWA）。気分と
 
 ## できること
 
-- **30 秒チェックイン** — 気分・エネルギーを選ぶだけで記録完了（テキスト・音声入力に対応）
+- **30 秒チェックイン** — 気分・エネルギーを選ぶだけで記録完了（**2 画面構成**。テキスト・音声入力に対応）
+- **書き忘れ救済** — 昨日〜7 日前までの記録をあとから書ける（`/checkin?date=YYYY-MM-DD`。ホームに昨日が空きの場合の導線あり）
+- **毎日のリマインダー（Web Push）** — 記録がまだの日だけ、夜にプッシュ通知。昨日の気分を文面に差し込む（[設定方法](#プッシュ通知リマインダーの設定)）
+- **カレンダー自動挿入** — チェックイン画面で当日の Google Calendar 予定をワンタップ挿入
 - **音声入力** — テキスト欄を 🎤 で音声入力 → GROQ Whisper が文字起こし。iPhone のホーム画面 PWA でも安定動作（[詳細](#音声入力音声で日記を書く)）
 - **AI 日記生成** — チェックイン内容から日記文・タグ・感情を自動生成（GROQ / gpt-oss-120b、日本語が自然）。文章はリアルタイムにストリーミング表示され、過去の日記から文体を学習します
 - **AI 内省ガイド** — 日記生成の前に、AI が「足りていない1点」（例: なぜそう感じた？／何を大事にしていた？）を **1問だけ** 3〜4択で提示。タップで選ぶだけで感情の理由・価値観が日記に織り込まれます（スキップ可・[詳細](#ai-内省ガイド入力を深掘りする1問)）
 - **AI 書き直し** — 「感情豊かに」「短くして」などワンタップで文体変更
 - **Notion 自動同期** — 保存と同時に Notion データベースへ書き出し
-- **インサイト分析** — 過去の記録から傾向・パーソナリティ・感情トリガーを AI 分析
-- **週次レポート** — 直近 7 日間の振り返りナラティブを生成
+- **インサイト分析** — 過去の記録から傾向・パーソナリティ・感情トリガー・**価値観（内省ガイドの回答を素材に）**を AI 分析。曜日×気分・タグ×気分のローカル統計も表示
+- **AI に聞いてみる** — 「最近気分がいい日の共通点は？」など、日記データに基づいて AI が 1 問 1 答
+- **週次レポート** — 直近 7 日間の振り返りナラティブを生成。**先週の「来週のフォーカス」のふり返り付き**
+- **フラッシュバック** — 1 年前・1 ヶ月前の今日の記録をホームに表示
+- **検索・ページング** — 日記一覧でキーワード検索（本文・出来事・メモ）
+- **データ所有権** — JSON / CSV エクスポート、日記の個別削除
 - **オフライン対応** — AI API 未設定でもテンプレート生成で動作
 
 ---
@@ -68,10 +75,14 @@ iPhone Safari（PWA）
  │  │  POST /api/rewrite-draft     │───┼──→  GROQ API（書き直し）
  │  │  POST /api/analyze           │───┼──→  GROQ API（パーソナリティ分析）
  │  │  POST /api/weekly-report     │───┼──→  GROQ API（週次レポート）
+ │  │  POST /api/ask               │───┼──→  GROQ API（日記へのQ&A）
  │  │  POST /api/transcribe        │───┼──→  GROQ API（音声文字起こし / Whisper）
  │  │  POST /api/notion-sync       │───┼──→  Notion API
  │  │  GET  /api/calendar/today    │───┼──→  Google Calendar API
  │  │  GET/POST /api/settings      │   │  ← 設定の読み書き（トークン暗号化）
+ │  │  GET  /api/export            │   │  ← JSON / CSV エクスポート
+ │  │  POST/DELETE /api/push/...   │   │  ← Web Push 購読の登録・解除
+ │  │  GET  /api/cron/reminder     │◀──┼───  Vercel Cron（リマインダー配信）
  │  └──────────────────────────────┘   │
  └──────────────────┬──────────────────┘
                     ▼
@@ -89,18 +100,15 @@ iPhone Safari（PWA）
 
 ## チェックインフロー
 
-6 ステップで 30 秒〜1 分。**必須は気分とエネルギーのみ**で、残りはスキップ可能。
+**2 画面**で 30 秒〜1 分。**必須は気分とエネルギーのみ**で、テキストは全てスキップ可能。
 
 | # | 内容 | 必須 |
 |---|------|:----:|
-| 1 | 気分（5 段階絵文字） | ✅ |
-| 2 | エネルギー（5 段階バー） | ✅ |
-| 3 | 今日の出来事（テキスト / 音声） | — |
-| 4 | 困ったこと | — |
-| 5 | 感謝できること | — |
-| 6 | 自由記述 | — |
+| 1 | 気分（5 段階絵文字）＋ エネルギー（5 段階バー） | ✅ |
+| 2 | 今日あったこと（テキスト / 音声 / 📅 カレンダー予定の挿入）＋ 困ったこと・感謝・自由メモ（折りたたみ） | — |
 
-入力内容は localStorage に自動保存されるため、途中でアプリを閉じても続きから再開できます。
+- 入力内容は localStorage に自動保存されるため、途中でアプリを閉じても続きから再開できます（ホームの CTA が「続きから再開」に変わります）
+- **過去日付の記録**: `/checkin?date=YYYY-MM-DD`（7 日前まで）。ホームに「昨日の記録がありません」導線が出ます。連続記録（ストリーク）も埋めれば復活します
 
 ---
 
@@ -239,6 +247,7 @@ npm install
 2. `supabase/migrations/` 内の SQL を**番号順に**すべて実行する
    - `001_init.sql` （テーブル・RLS・トリガー）
    - `002_google_refresh_token.sql` （Google Calendar 連携用）
+   - `003_push_subscriptions.sql` （プッシュ通知の購読情報）
 
 #### 2-3. API キーを控える
 
@@ -366,6 +375,45 @@ npm run dev
 
 ---
 
+## プッシュ通知（リマインダー）の設定
+
+「記録がまだの日だけ、夜にそっと通知する」Web Push リマインダー。**iPhone は iOS 16.4 以降で「ホーム画面に追加」した PWA からのみ**利用できます（Web 標準の制約）。
+
+### 仕組み
+
+```
+設定画面でトグル ON
+   └─ Notification.requestPermission → Service Worker が Push 購読
+   └─ POST /api/push/subscribe → push_subscriptions テーブルに保存（端末ごと）
+
+Vercel Cron（毎日 12:00 UTC = 21:00 JST）
+   └─ GET /api/cron/reminder（CRON_SECRET で認証）
+        ├─ 今日（JST）記録済みのユーザー → スキップ（通知しない）
+        ├─ 昨日の気分があれば文面に差し込む（「昨日の気分は🙂でした…」）
+        └─ 期限切れの購読（410/404）は自動削除
+```
+
+### セットアップ（3 ステップ）
+
+1. **VAPID キーを生成**して環境変数に設定（ローカルは `.env.local`、本番は Vercel）:
+   ```bash
+   npx web-push generate-vapid-keys
+   ```
+   ```env
+   NEXT_PUBLIC_VAPID_PUBLIC_KEY=B...
+   VAPID_PRIVATE_KEY=...
+   VAPID_SUBJECT=mailto:you@example.com
+   CRON_SECRET=ランダムな文字列
+   SUPABASE_SERVICE_ROLE_KEY=（Supabase → Project Settings → API → service_role）
+   ```
+2. **マイグレーション実行**: Supabase SQL Editor で `003_push_subscriptions.sql` を実行
+3. **デプロイ**: `vercel.json` の crons 設定が有効になる（Hobby プランは 1 日 1 回・時刻は概ね 21 時ごろ）
+
+> 💡 手動で配信テスト: `curl -H "Authorization: Bearer <CRON_SECRET>" https://<your-app>/api/cron/reminder`
+> ⚠️ `SUPABASE_SERVICE_ROLE_KEY` は RLS をバイパスする管理キーです。サーバー専用・`NEXT_PUBLIC_` 禁止。
+
+---
+
 ## Vercel へのデプロイ
 
 ```bash
@@ -380,6 +428,7 @@ vercel
 **1. 環境変数を登録**
 
 Vercel → **Settings → Environment Variables** に `.env.local` の内容をそのまま登録。
+プッシュ通知を使う場合は `NEXT_PUBLIC_VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` / `CRON_SECRET` / `SUPABASE_SERVICE_ROLE_KEY` も忘れずに（[設定方法](#プッシュ通知リマインダーの設定)）。
 
 **2. Supabase に本番 URL を追加**（必須 — 忘れると本番でログイン不可）
 
@@ -585,7 +634,10 @@ git push origin main      # 3. これがトリガー → Vercel が自動ビル�
 |------|:----------:|:----------:|
 | チェックイン入力 | ✅ | ✅ |
 | AI 日記生成 | テンプレート生成 | GROQ API |
+| AI 分析・週次レポート | 統計ベースの簡易版（⚠️ 注記付き） | GROQ API |
+| AI に聞いてみる | ❌ 503（利用不可） | ✅ GROQ API |
 | 音声入力（🎤） | ❌ 503（利用不可） | ✅ GROQ Whisper |
+| プッシュ通知 | ❌（トグルに案内表示） | ✅ VAPID キー設定時 |
 | データ保存 | ❌ Supabase 必須 | ✅ |
 | Notion 同期 | スキップ | ✅ |
 | 認証 | ❌ ログインで停止 | ✅ |
@@ -642,35 +694,48 @@ create policy "entries: own rows only"
 | summary / dominant_emotion | text | AI 生成のサマリー・主要感情 |
 | notion_page_id / notion_synced_at | text / timestamptz | Notion 同期状態 |
 
+### `push_subscriptions` — Web Push 購読（端末ごと）
+
+| カラム | 型 | 説明 |
+|-------|-----|------|
+| user_id | uuid | 購読者 |
+| endpoint | text | Push サービスの URL（unique） |
+| p256dh / auth | text | 暗号化キー |
+
 ---
 
 ## ファイル構成
 
 ```
 ├── app/
-│   ├── page.tsx                 # ホーム（統計・チャート）
-│   ├── checkin/page.tsx         # 6 ステップ チェックイン
+│   ├── page.tsx                 # ホーム（統計・チャート・フラッシュバック・書き忘れ導線）
+│   ├── checkin/page.tsx         # 2 画面チェックイン（過去日付 ?date= 対応）
 │   ├── draft/page.tsx           # AI ドラフト確認・編集・保存
-│   ├── entries/page.tsx         # 日記一覧
-│   ├── entries/[date]/page.tsx  # 日記詳細
-│   ├── insights/page.tsx        # AI 分析・週次レポート
-│   ├── settings/page.tsx        # 設定（Notion・通知・アカウント）
+│   ├── entries/page.tsx         # 日記一覧（検索・ページング）
+│   ├── entries/[date]/page.tsx  # 日記詳細（編集・削除）
+│   ├── insights/page.tsx        # AI 分析・週次レポート・AIに聞く・ローカル統計
+│   ├── settings/page.tsx        # 設定（通知・Notion・データエクスポート・アカウント）
 │   ├── login/page.tsx           # ログイン
 │   ├── auth/callback/route.ts   # OAuth コールバック（Google トークン保存）
 │   └── api/
 │       ├── checkin-question/    # 生成前の内省質問（GROQ・JSON・skip可）
-│       ├── generate-draft/      # AI 日記生成（GROQ・ストリーミング・文体学習）
+│       ├── generate-draft/      # AI 日記生成（GROQ・ストリーミング・文体学習・過去日付）
 │       ├── draft-meta/          # タグ・サマリー・感情の抽出（GROQ）
 │       ├── rewrite-draft/       # AI 書き直し（GROQ）
-│       ├── analyze/             # パーソナリティ分析（GROQ）
-│       ├── weekly-report/       # 週次レポート（GROQ）
+│       ├── analyze/             # パーソナリティ分析＋価値観抽出（GROQ）
+│       ├── weekly-report/       # 週次レポート＋先週フォーカスのふり返り（GROQ）
+│       ├── ask/                 # 日記への 1 問 1 答（GROQ）
 │       ├── transcribe/          # 音声文字起こし（GROQ Whisper）
 │       ├── notion-sync/         # Notion 同期
 │       ├── calendar/today/      # Google Calendar 取得
-│       └── settings/            # 設定の読み書き（トークン暗号化）
+│       ├── settings/            # 設定の読み書き（トークン暗号化）
+│       ├── export/              # JSON / CSV エクスポート
+│       ├── push/subscribe/      # Web Push 購読の登録・解除
+│       └── cron/reminder/       # リマインダー配信（Vercel Cron から）
 ├── components/
-│   ├── checkin/                 # MoodStep / EnergyStep / TextStep / ReflectionQuestion
-│   ├── home/                    # StatsCards / MoodChart / WeekStrip ほか
+│   ├── checkin/                 # StateStep / NotesStep / TextStep / ReflectionQuestion
+│   ├── entry/                   # EditableContent / DeleteEntryButton
+│   ├── home/                    # CheckinCTA / StatsCards / MoodChart / WeekStrip ほか
 │   ├── insights/                # PersonalityCard
 │   └── ui/                      # BottomNav / VoiceInputButton ほか
 ├── lib/
@@ -678,16 +743,19 @@ create policy "entries: own rows only"
 │   ├── crypto.ts                # シークレット暗号化（AES-256-GCM）
 │   ├── supabase.ts              # クライアント用 Supabase
 │   ├── supabase-server.ts       # サーバー用 Supabase
+│   ├── supabase-admin.ts        # Service Role クライアント（cron 専用）
+│   ├── push-client.ts           # Web Push 購読ヘルパー（クライアント）
 │   ├── api-client.ts            # fetch ラッパー（タイムアウト・リトライ）
 │   └── offline-draft.ts         # オフライン日記生成テンプレート
 ├── stores/
-│   ├── checkin.ts               # チェックイン状態（localStorage 永続化）
+│   ├── checkin.ts               # チェックイン状態（localStorage 永続化・対象日）
 │   └── settings.ts              # 端末ローカル設定のみ（サーバー設定は /api/settings）
 ├── middleware.ts                 # 認証ガード（ページ→リダイレクト / API→401）
-├── supabase/migrations/          # 001_init.sql / 002_google_refresh_token.sql
+├── vercel.json                   # Cron 設定（リマインダー配信）
+├── supabase/migrations/          # 001_init / 002_google_refresh_token / 003_push_subscriptions
 └── public/
     ├── manifest.json            # PWA マニフェスト
-    └── sw.js                    # Service Worker（静的アセットキャッシュ）
+    └── sw.js                    # Service Worker（静的キャッシュ + Push 受信）
 ```
 
 ---
@@ -725,13 +793,9 @@ create policy "entries: own rows only"
 
 ## 今後の実装予定
 
-下準備だけ済んでいる項目は、現状どこまでできているかを併記しています。
-
-- [ ] **プッシュ通知（Web Push API）** — 設定画面にリマインダーの ON/OFF・通知時刻の入力 UI はあるが、実際の配信（Service Worker の push 購読・VAPID）は未実装。今は「設定値を保存するだけ」
-- [ ] **チェックイン時に当日のカレンダー予定を自動挿入する UI** — 取得 API（`/api/calendar/today`）は実装済みだが、チェックイン画面からはまだ呼んでいない（配線するだけ）
+- [ ] **通知の時刻指定配信** — 現在は毎日 21 時ごろの一斉配信（Vercel Hobby の cron は 1 日 1 回のため）。`notification_time` 列は保存済みなので、毎時 cron（Pro）にすればユーザー別時刻に対応できる
 - [ ] **気分ヒートマップ（月カレンダービュー）** — 13 週のコントリビューション型ヒートマップはホームに**実装済み**（`components/home/CalendarHeatmap.tsx`）。残るは月めくりのカレンダー表示
-- [ ] **データエクスポート（JSON / CSV）** — 未着手（暫定の手動エクスポートは[データのバックアップ](#データのバックアップ)参照）
-- [ ] **日記エントリーの削除機能** — 未着手（現状は編集・上書き保存のみ）
 - [ ] **テーマ手動切り替え（ライト / ダーク / システム）** — `.dark` クラス＋ `localStorage('inner-mirror-theme')` 読み取りの土台は `app/layout.tsx` にあるが、切り替え UI は未実装（現状は OS のカラースキームに自動追従）
+- [ ] **AI ルートのレート制限・利用規約/プライバシーポリシーページ** — 自分以外のユーザーに公開する場合の前提条件
 
-> ✅ **実装済み**（旧・実装予定から移動）: 90 日（13 週）気分ヒートマップ、AI 内省ガイド、音声入力（GROQ Whisper）、Notion 自動同期、週次レポート。
+> ✅ **実装済み**（旧・実装予定から移動）: プッシュ通知（Web Push + Vercel Cron）、カレンダー予定の自動挿入、データエクスポート（JSON / CSV）、日記の削除、過去日付の記録（書き忘れ救済）、日記検索・ページング、価値観分析（内省回答の活用）、AI への質問、フラッシュバック、90 日気分ヒートマップ、AI 内省ガイド、音声入力（GROQ Whisper）、Notion 自動同期、週次レポート。

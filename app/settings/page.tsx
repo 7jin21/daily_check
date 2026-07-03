@@ -7,6 +7,12 @@ import { useCheckinStore } from '@/stores/checkin'
 import { getSupabaseClient } from '@/lib/supabase'
 import { apiGet, apiPost } from '@/lib/api-client'
 import { clearUserLocalData } from '@/lib/constants'
+import {
+  isPushSupported,
+  isPushConfigured,
+  subscribeToPush,
+  unsubscribeFromPush,
+} from '@/lib/push-client'
 
 interface ServerSettings {
   hasNotionToken: boolean
@@ -28,6 +34,10 @@ export default function SettingsPage() {
   const [notionDatabaseId, setNotionDatabaseId] = useState('')
   const [notificationTime, setNotificationTime] = useState('21:00')
   const [timezone, setTimezone] = useState('Asia/Tokyo')
+
+  // 通知トグルの処理中・エラーメッセージ
+  const [isTogglingPush, setIsTogglingPush] = useState(false)
+  const [pushMessage, setPushMessage] = useState<string | null>(null)
 
   useEffect(() => {
     const supabase = getSupabaseClient()
@@ -88,6 +98,47 @@ export default function SettingsPage() {
     }
   }
 
+  // 通知トグル: Web Push の購読/解除を実際に行う
+  const handleToggleNotifications = async () => {
+    if (isTogglingPush) return
+    setPushMessage(null)
+
+    // OFF にする
+    if (settings.notificationsEnabled) {
+      setIsTogglingPush(true)
+      await unsubscribeFromPush()
+      updateSettings({ notificationsEnabled: false })
+      setPushMessage('リマインダーをオフにしました')
+      setIsTogglingPush(false)
+      return
+    }
+
+    // ON にする
+    if (!isPushConfigured()) {
+      setPushMessage('⚠️ サーバー側の通知設定（VAPID キー）が未完了のため、現在リマインダーは利用できません。README のプッシュ通知セクションを参照してください。')
+      return
+    }
+    if (!isPushSupported()) {
+      setPushMessage('この環境では通知を利用できません。iPhone は iOS 16.4 以降で「ホーム画面に追加」したアプリから設定してください。')
+      return
+    }
+
+    setIsTogglingPush(true)
+    const result = await subscribeToPush()
+    setIsTogglingPush(false)
+
+    if (result.ok) {
+      updateSettings({ notificationsEnabled: true })
+      setPushMessage('✓ この端末にリマインダーが届くようになりました（毎日21時ごろ・未記録の日のみ）')
+    } else if (result.reason === 'denied') {
+      setPushMessage('通知が許可されませんでした。ブラウザ / OS の通知設定を確認してください。')
+    } else if (result.reason === 'not_configured') {
+      setPushMessage('⚠️ サーバー側の通知設定が未完了です。README のプッシュ通知セクションを参照してください。')
+    } else {
+      setPushMessage('通知の設定に失敗しました。時間をおいて再試行してください。')
+    }
+  }
+
   const handleSignOut = async () => {
     const supabase = getSupabaseClient()
     await supabase.auth.signOut()
@@ -99,7 +150,7 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="px-5 pt-8 space-y-6">
+    <div className="px-5 pt-8 pb-8 space-y-6">
       <div className="section-head" style={{ borderBottomColor: 'var(--divider-strong)' }}>
         <div className="eyebrow">Settings</div>
         <h1 className="text-2xl font-bold text-[var(--foreground)]">設定</h1>
@@ -119,6 +170,66 @@ export default function SettingsPage() {
         </div>
       </div>
 
+      {/* 通知設定 */}
+      <div className="card">
+        <div className="flex items-center justify-between mb-1">
+          <h2 className="font-bold text-[var(--foreground)]">通知</h2>
+          <span className="text-[10px] text-[var(--muted-2)] tracking-wide">この端末の設定</span>
+        </div>
+        <p className="text-xs text-[var(--muted)] mb-4">
+          記録がまだの日だけ、夜にそっとお知らせします
+        </p>
+
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <p className="font-medium text-[var(--foreground)]">毎日のリマインダー</p>
+            <p className="text-sm text-[var(--muted)]">チェックインを忘れないように通知</p>
+          </div>
+          <button
+            onClick={handleToggleNotifications}
+            disabled={isTogglingPush}
+            className={`w-12 h-7 rounded-full transition-colors disabled:opacity-50 ${
+              settings.notificationsEnabled ? 'bg-[var(--primary)]' : 'bg-[var(--surface-secondary)] border border-[var(--border)]'
+            }`}
+            role="switch"
+            aria-checked={settings.notificationsEnabled}
+          >
+            <span
+              className={`block w-5 h-5 rounded-full bg-white shadow transition-transform mx-1 ${
+                settings.notificationsEnabled ? 'translate-x-5' : 'translate-x-0'
+              }`}
+            />
+          </button>
+        </div>
+
+        {pushMessage && (
+          <p className="mb-4 p-3 rounded-[3px] bg-[var(--surface-secondary)] text-xs text-[var(--muted)] leading-relaxed">
+            {pushMessage}
+          </p>
+        )}
+
+        {settings.notificationsEnabled && (
+          <div>
+            <label className="block text-sm font-medium text-[var(--muted)] mb-1">
+              通知時刻（目安）
+            </label>
+            <input
+              type="time"
+              value={notificationTime}
+              onChange={(e) => setNotificationTime(e.target.value)}
+              className="w-full px-4 py-3 rounded-[3px] border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] text-base focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
+            />
+            <p className="mt-1.5 text-xs text-[var(--muted-2)]">
+              ※ 現在は毎日21時ごろの一斉配信です（時刻指定配信は準備中）
+            </p>
+          </div>
+        )}
+
+        <p className="mt-3 text-xs text-[var(--muted-2)] leading-relaxed">
+          📱 iPhone では「ホーム画面に追加」したアプリから設定してください（iOS 16.4以降）
+        </p>
+      </div>
+
       {/* Notion連携 */}
       <div className="card">
         <div className="flex items-center justify-between mb-1">
@@ -130,7 +241,7 @@ export default function SettingsPage() {
           )}
         </div>
         <p className="text-xs text-[var(--muted)] mb-4">
-          日記を自動的にNotionデータベースに同期します
+          日記を自動的にNotionデータベースに同期します（アカウント設定・全端末共通）
         </p>
 
         <div className="space-y-4">
@@ -179,44 +290,31 @@ export default function SettingsPage() {
         )}
       </div>
 
-      {/* 通知設定 */}
+      {/* データ管理 */}
       <div className="card">
-        <h2 className="font-bold text-[var(--foreground)] mb-4">通知</h2>
-
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <p className="font-medium text-[var(--foreground)]">毎日のリマインダー</p>
-            <p className="text-sm text-[var(--muted)]">チェックインを忘れないように通知</p>
-          </div>
-          <button
-            onClick={() => updateSettings({ notificationsEnabled: !settings.notificationsEnabled })}
-            className={`w-12 h-7 rounded-full transition-colors ${
-              settings.notificationsEnabled ? 'bg-[var(--primary)]' : 'bg-[var(--surface-secondary)] border border-[var(--border)]'
-            }`}
-            role="switch"
-            aria-checked={settings.notificationsEnabled}
+        <h2 className="font-bold text-[var(--foreground)] mb-1">データ</h2>
+        <p className="text-xs text-[var(--muted)] mb-4">
+          日記データはあなたのものです。いつでも持ち出せます
+        </p>
+        <div className="flex gap-3">
+          <a
+            href="/api/export?format=json"
+            download
+            className="flex-1 py-3 text-center rounded-[3px] border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] text-sm font-medium active:scale-95 transition-transform"
           >
-            <span
-              className={`block w-5 h-5 rounded-full bg-white shadow transition-transform mx-1 ${
-                settings.notificationsEnabled ? 'translate-x-5' : 'translate-x-0'
-              }`}
-            />
-          </button>
+            📦 JSON で保存
+          </a>
+          <a
+            href="/api/export?format=csv"
+            download
+            className="flex-1 py-3 text-center rounded-[3px] border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] text-sm font-medium active:scale-95 transition-transform"
+          >
+            📊 CSV で保存
+          </a>
         </div>
-
-        {settings.notificationsEnabled && (
-          <div>
-            <label className="block text-sm font-medium text-[var(--muted)] mb-1">
-              通知時刻
-            </label>
-            <input
-              type="time"
-              value={notificationTime}
-              onChange={(e) => setNotificationTime(e.target.value)}
-              className="w-full px-4 py-3 rounded-[3px] border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] text-base focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
-            />
-          </div>
-        )}
+        <p className="mt-3 text-xs text-[var(--muted-2)]">
+          個別の日記の削除は、各日記のページ下部から行えます
+        </p>
       </div>
 
       {/* 保存ボタン */}

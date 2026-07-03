@@ -8,9 +8,11 @@ interface TextStepProps {
   value: string
   onChange: (value: string) => void
   placeholder?: string
+  rows?: number
+  showHint?: boolean
 }
 
-export default function TextStep({ value, onChange, placeholder }: TextStepProps) {
+export default function TextStep({ value, onChange, placeholder, rows = 6, showHint = true }: TextStepProps) {
   const handleVoiceResult = (transcript: string) => {
     const next = value ? `${value} ${transcript}` : transcript
     onChange(next.slice(0, MAX_CHARS))
@@ -30,7 +32,7 @@ export default function TextStep({ value, onChange, placeholder }: TextStepProps
           value={value}
           onChange={handleChange}
           placeholder={placeholder}
-          rows={6}
+          rows={rows}
           className="
             w-full p-4 pb-10 rounded-[3px] border border-[var(--border)]
             bg-[var(--surface)] text-[var(--foreground)]
@@ -50,7 +52,9 @@ export default function TextStep({ value, onChange, placeholder }: TextStepProps
           <VoiceInputButton onResult={handleVoiceResult} />
         </div>
       </div>
-      <p className="text-xs text-[var(--muted-2)] px-1">キーワードや短文でOK。音声入力も使えます 🎤</p>
+      {showHint && (
+        <p className="text-xs text-[var(--muted-2)] px-1">キーワードや短文でOK。音声入力も使えます 🎤</p>
+      )}
     </div>
   )
 }

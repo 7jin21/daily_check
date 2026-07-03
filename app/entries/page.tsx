@@ -11,6 +11,12 @@ interface Entry {
   tags: string[]
 }
 
+interface Props {
+  searchParams: Promise<{ q?: string; page?: string }>
+}
+
+const PAGE_SIZE = 60
+
 const MOOD_COLOR: Record<number, string> = {
   1: '#b5654a', 2: '#c5895f', 3: '#cdbf9a', 4: '#9caa7e', 5: '#6f8a5f',
 }
@@ -19,24 +25,48 @@ const ENERGY_BAR: Record<number, string> = {
   1: '▪▫▫▫▫', 2: '▪▪▫▫▫', 3: '▪▪▪▫▫', 4: '▪▪▪▪▫', 5: '▪▪▪▪▪',
 }
 
-export default async function EntriesPage() {
+// PostgREST の or() はカンマ・括弧が構文になるため取り除き、
+// ilike のワイルドカードもエスケープする
+function sanitizeQuery(raw: string): string {
+  return raw.replace(/[,()]/g, ' ').replace(/[%_\\]/g, '\\$&').trim().slice(0, 50)
+}
+
+export default async function EntriesPage({ searchParams }: Props) {
   const supabase = await createServerSupabaseClient()
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) redirect('/login')
 
-  const { data: entries, error } = await supabase
+  const params = await searchParams
+  const rawQuery = (params.q ?? '').trim().slice(0, 50)
+  const q = sanitizeQuery(rawQuery)
+  const page = Math.max(1, parseInt(params.page ?? '1', 10) || 1)
+  const offset = (page - 1) * PAGE_SIZE
+
+  let query = supabase
     .from('diary_entries')
     .select('id, entry_date, mood, energy, summary, tags')
     .eq('user_id', user.id)
+
+  if (q) {
+    const pattern = `%${q}%`
+    query = query.or(
+      `summary.ilike.${pattern},edited_draft.ilike.${pattern},ai_draft.ilike.${pattern},events.ilike.${pattern},freeform.ilike.${pattern}`
+    )
+  }
+
+  // PAGE_SIZE+1 件取得して「次のページがあるか」を判定する
+  const { data: entries, error } = await query
     .order('entry_date', { ascending: false })
-    .limit(100)
+    .range(offset, offset + PAGE_SIZE)
 
   if (error) {
     console.error('Failed to fetch entries:', error)
   }
 
-  const safeEntries: Entry[] = (entries ?? []) as Entry[]
+  const fetched: Entry[] = (entries ?? []) as Entry[]
+  const hasMore = fetched.length > PAGE_SIZE
+  const safeEntries = fetched.slice(0, PAGE_SIZE)
 
   // 月ごとにグループ化
   const grouped = safeEntries.reduce<Record<string, Entry[]>>((acc, entry) => {
@@ -46,9 +76,12 @@ export default async function EntriesPage() {
     return acc
   }, {})
 
+  const pageLink = (p: number) =>
+    `/entries?${new URLSearchParams({ ...(rawQuery ? { q: rawQuery } : {}), page: String(p) })}`
+
   return (
-    <div className="px-5 pt-8">
-      <div className="section-head mb-6" style={{ borderBottomColor: 'var(--divider-strong)' }}>
+    <div className="px-5 pt-8 pb-8">
+      <div className="section-head mb-5" style={{ borderBottomColor: 'var(--divider-strong)' }}>
         <div className="flex items-baseline gap-4">
           <div className="eyebrow">All entries</div>
           <h1 className="text-2xl font-bold text-[var(--foreground)]">日記一覧</h1>
@@ -62,17 +95,52 @@ export default async function EntriesPage() {
         </Link>
       </div>
 
+      {/* キーワード検索（GET フォーム） */}
+      <form method="GET" action="/entries" className="mb-6 flex gap-2">
+        <input
+          type="search"
+          name="q"
+          defaultValue={rawQuery}
+          placeholder="キーワードで検索（本文・出来事・メモ）"
+          className="flex-1 px-4 py-2.5 rounded-[3px] border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
+        />
+        <button
+          type="submit"
+          className="px-4 py-2.5 rounded-[3px] border border-[var(--border)] bg-[var(--surface-secondary)] text-[var(--foreground)] text-sm font-medium active:scale-95 transition-transform"
+        >
+          検索
+        </button>
+      </form>
+
+      {rawQuery && (
+        <p className="mb-4 text-sm text-[var(--muted)]">
+          「{rawQuery}」の検索結果 {safeEntries.length}{hasMore ? '+' : ''}件
+          <Link href="/entries" className="ml-3 text-[var(--primary)] underline underline-offset-2 text-xs">
+            クリア
+          </Link>
+        </p>
+      )}
+
       {safeEntries.length === 0 ? (
         <div className="text-center py-20 text-[var(--muted)]">
           <p className="text-6xl mb-4">📖</p>
-          <p className="font-medium text-lg text-[var(--foreground)]">まだ記録がありません</p>
-          <p className="text-sm mt-2">チェックインして最初の日記を書こう</p>
-          <Link
-            href="/checkin"
-            className="inline-block mt-6 px-7 py-3 rounded-[2px] bg-[var(--accent)] text-[#2a2622] font-bold"
-          >
-            今日の記録をする →
-          </Link>
+          {rawQuery ? (
+            <>
+              <p className="font-medium text-lg text-[var(--foreground)]">見つかりませんでした</p>
+              <p className="text-sm mt-2">別のキーワードで試してみてください</p>
+            </>
+          ) : (
+            <>
+              <p className="font-medium text-lg text-[var(--foreground)]">まだ記録がありません</p>
+              <p className="text-sm mt-2">チェックインして最初の日記を書こう</p>
+              <Link
+                href="/checkin"
+                className="inline-block mt-6 px-7 py-3 rounded-[2px] bg-[var(--accent)] text-[#2a2622] font-bold"
+              >
+                今日の記録をする →
+              </Link>
+            </>
+          )}
         </div>
       ) : (
         <div className="space-y-9">
@@ -120,6 +188,23 @@ export default async function EntriesPage() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* ページング */}
+      {(page > 1 || hasMore) && (
+        <div className="flex items-center justify-between mt-8">
+          {page > 1 ? (
+            <Link href={pageLink(page - 1)} className="text-sm text-[var(--primary)] font-medium">
+              ← 新しい記録
+            </Link>
+          ) : <span />}
+          <span className="text-xs text-[var(--muted-2)]">ページ {page}</span>
+          {hasMore ? (
+            <Link href={pageLink(page + 1)} className="text-sm text-[var(--primary)] font-medium">
+              古い記録 →
+            </Link>
+          ) : <span />}
         </div>
       )}
     </div>

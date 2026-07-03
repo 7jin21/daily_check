@@ -14,9 +14,11 @@ export async function POST() {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  // freeform には AI 内省ガイドの回答（【ふりかえり】行）が畳まれている。
+  // 価値観・感情の理由を読み取る最重要素材なので必ず含める
   const { data: entries, error } = await supabase
     .from('diary_entries')
-    .select('entry_date, mood, energy, events, challenges, gratitude, tags, dominant_emotion')
+    .select('entry_date, mood, energy, events, challenges, gratitude, freeform, tags, dominant_emotion')
     .eq('user_id', user.id)
     .order('entry_date', { ascending: false })
     .limit(30)
@@ -67,6 +69,7 @@ export async function POST() {
         if (e.events?.trim()) parts.push(`出来事: ${e.events.substring(0, 100)}`)
         if (e.challenges?.trim()) parts.push(`困ったこと: ${e.challenges.substring(0, 80)}`)
         if (e.gratitude?.trim()) parts.push(`感謝: ${e.gratitude.substring(0, 60)}`)
+        if (e.freeform?.trim()) parts.push(`メモ・ふりかえり: ${e.freeform.substring(0, 160)}`)
         if (e.dominant_emotion?.trim()) parts.push(`感情: ${e.dominant_emotion}`)
         return parts.join(' / ')
       })
@@ -83,6 +86,8 @@ export async function POST() {
           role: 'system',
           content: `あなたは心理的洞察を提供するコーチです。
 ユーザーの日記データを分析して、パーソナリティの特徴・成長ヒント・感情トリガーを日本語で提供してください。
+「メモ・ふりかえり」内の【ふりかえり】で始まる部分は、AIの問いに本人が答えた内省の記録です。
+感情の理由・価値観・判断基準を読み取る最も重要な材料として重視してください。
 必ず JSON 形式で返してください。`,
         },
         {
@@ -94,6 +99,7 @@ export async function POST() {
   "strengths": ["強み1", "強み2", "強み3"],
   "growthAreas": ["成長領域1", "成長領域2"],
   "emotionalPatterns": ["感情パターン1", "感情パターン2"],
+  "coreValues": ["本人が大切にしていること1", "同2", "同3"],
   "recommendations": ["推奨アクション1", "推奨アクション2", "推奨アクション3"],
   "emotionTriggers": [
     {
@@ -108,7 +114,8 @@ export async function POST() {
     }
   ]
 }
-emotionTriggers は日記データに基づいた具体的なパターンを2〜4件挙げてください。`,
+emotionTriggers は日記データに基づいた具体的なパターンを2〜4件挙げてください。
+coreValues は日記と【ふりかえり】の回答から読み取れる「本人が大切にしているもの」（例: 丁寧に扱われること、家族との時間、達成感）を2〜4件、本人の言葉に近い表現で挙げてください。読み取れない場合は空配列にしてください。`,
         },
       ],
     })
@@ -120,12 +127,16 @@ emotionTriggers は日記データに基づいた具体的なパターンを2〜
       strengths: string[]
       growthAreas: string[]
       emotionalPatterns: string[]
+      coreValues?: string[]
       recommendations: string[]
       emotionTriggers: { trigger: string; effect: 'positive' | 'negative'; description: string }[]
     }
 
     return NextResponse.json({
       ...aiResult,
+      coreValues: Array.isArray(aiResult.coreValues)
+        ? aiResult.coreValues.filter((v): v is string => typeof v === 'string').slice(0, 4)
+        : [],
       moodTrend,
       averageMood: avgMood,
       totalEntries,
@@ -157,6 +168,7 @@ function buildBasicAnalysis(
           ? '平静な感情状態'
           : 'ネガティブ傾向',
     ],
+    coreValues: [],
     recommendations: [
       '今日の小さな成功を記録しましょう',
       '明日やりたいことを1つ決めましょう',
@@ -166,5 +178,7 @@ function buildBasicAnalysis(
     moodTrend,
     averageMood: avgMood,
     totalEntries,
+    // AI が使えなかったことをクライアントに明示する（本物の分析と区別して表示・キャッシュ回避）
+    isFallback: true,
   }
 }

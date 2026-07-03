@@ -5,6 +5,7 @@ import MoodChart from '@/components/home/MoodChart'
 import CalendarHeatmap from '@/components/home/CalendarHeatmap'
 import StreakCelebration from '@/components/home/StreakCelebration'
 import WeekStrip from '@/components/home/WeekStrip'
+import CheckinCTA from '@/components/home/CheckinCTA'
 import Link from 'next/link'
 
 interface DiaryEntry {
@@ -106,6 +107,17 @@ export default async function HomePage() {
   const todayEntry = entries.find((e) => e.entry_date === today)
   const recentEntries = entries.slice(0, 5)
 
+  // 昨日の書き忘れ救済: 昨日が空で、それ以前に記録があるなら「あとから書く」導線を出す
+  const yesterday = subtractDays(today, 1)
+  const hasYesterday = entries.some((e) => e.entry_date === yesterday)
+  const missedYesterday = !hasYesterday && entries.some((e) => e.entry_date < yesterday)
+
+  // フラッシュバック: 1年前・1ヶ月前の今日（365日分取得済みの entries から探す）
+  const flashbacks = [
+    { label: '1年前の今日', entry: entries.find((e) => e.entry_date === subtractDays(today, 365)) },
+    { label: '1ヶ月前の今日', entry: entries.find((e) => e.entry_date === subtractDays(today, 30)) },
+  ].filter((f): f is { label: string; entry: DiaryEntry } => !!f.entry)
+
   // 時間帯に応じた挨拶（Asia/Tokyo）
   const hourJST = parseInt(
     new Date().toLocaleString('en-US', { timeZone: 'Asia/Tokyo', hour: 'numeric', hour12: false })
@@ -141,34 +153,48 @@ export default async function HomePage() {
         </div>
       </div>
 
-      {/* チェックインCTA */}
-      {!todayEntry ? (
+      {/* チェックインCTA（入力途中なら「続きから再開」に切り替わる） */}
+      <CheckinCTA today={today} todayEntry={todayEntry ? { summary: todayEntry.summary } : null} />
+
+      {/* 昨日の書き忘れ救済 */}
+      {missedYesterday && (
         <Link
-          href="/checkin"
-          className="block w-full p-7 rounded-[3px] bg-[#2a2622] active:scale-[0.99] transition-transform"
+          href={`/checkin?date=${yesterday}`}
+          className="flex items-center justify-between px-5 py-4 rounded-[3px] border border-dashed border-[var(--border)] bg-[var(--surface)] active:opacity-70 transition-opacity -mt-6"
         >
-          <div className="eyebrow mb-3" style={{ color: 'var(--accent)', letterSpacing: '0.3em' }}>
-            Today&apos;s check-in
-          </div>
-          <p className="font-bold text-xl text-[#f4efe6] tracking-tight">まだ今日の記録がありません</p>
-          <p className="text-sm text-[#f4efe6]/55 mt-2 leading-relaxed">
-            今日はどんな一日でしたか。ひと言だけでも残しておきましょう。
-          </p>
-          <span className="inline-block mt-5 bg-[var(--accent)] text-[#2a2622] text-sm font-bold px-7 py-3 rounded-[2px] tracking-wide">
-            今日を記録する →
+          <span className="text-sm text-[var(--muted)]">
+            🕰 昨日の記録がありません。<span className="text-[var(--primary)] font-medium">今からでも書けます</span>
           </span>
+          <span className="text-[var(--muted-2)]">›</span>
         </Link>
-      ) : (
-        <Link
-          href={`/entries/${today}`}
-          className="block w-full p-7 rounded-[3px] bg-[#e7dcc7] border border-[#ddd0b8] active:scale-[0.99] transition-transform dark:bg-[var(--surface)] dark:border-[var(--border)]"
-        >
-          <div className="eyebrow mb-3" style={{ letterSpacing: '0.3em' }}>Today&apos;s check-in</div>
-          <p className="font-bold text-xl text-[var(--foreground)] tracking-tight">今日の記録、完了しました</p>
-          <p className="text-sm text-[var(--muted)] mt-2 leading-relaxed">
-            {todayEntry.summary ?? '記録済み'}
-          </p>
-        </Link>
+      )}
+
+      {/* フラッシュバック: 過去の同じ日 */}
+      {flashbacks.length > 0 && (
+        <section>
+          <div className="section-head">
+            <div className="eyebrow">Flashback</div>
+            <h2 className="text-base font-bold text-[var(--foreground)]">あの日の自分</h2>
+          </div>
+          <div className="mt-4 space-y-2.5">
+            {flashbacks.map(({ label, entry }) => (
+              <Link
+                key={entry.id}
+                href={`/entries/${entry.entry_date}`}
+                className="card flex items-start gap-4 active:opacity-70 transition-opacity"
+              >
+                <span className="text-2xl flex-shrink-0">🕰</span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-bold text-[var(--primary)] tracking-wide">{label}</p>
+                  <p className="text-sm text-[var(--foreground)] mt-1 truncate">
+                    {entry.summary ?? entry.dominant_emotion ?? 'この日の記録を見る'}
+                  </p>
+                </div>
+                <span className="text-[var(--muted-2)] text-lg flex-shrink-0">›</span>
+              </Link>
+            ))}
+          </div>
+        </section>
       )}
 
       {/* 統計カード */}

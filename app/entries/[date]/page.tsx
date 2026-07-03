@@ -2,6 +2,7 @@ import { createServerSupabaseClient } from '@/lib/supabase-server'
 import { redirect, notFound } from 'next/navigation'
 import Link from 'next/link'
 import EditableContent from '@/components/entry/EditableContent'
+import DeleteEntryButton from '@/components/entry/DeleteEntryButton'
 
 interface Props {
   params: Promise<{ date: string }>
@@ -41,7 +42,8 @@ export default async function EntryDetailPage({ params }: Props) {
     notFound()
   }
 
-  const displayContent = entry.edited_draft ?? entry.ai_draft
+  // || を使う: edited_draft が空文字のときも ai_draft にフォールバックさせる
+  const displayContent = entry.edited_draft || entry.ai_draft
 
   return (
     <div className="px-4 pt-6 pb-8">
@@ -145,6 +147,9 @@ export default async function EntryDetailPage({ params }: Props) {
           ✓ Notionに同期済み ({new Date(entry.notion_synced_at as string).toLocaleDateString('ja-JP')})
         </p>
       )}
+
+      {/* 削除（データの所有権はユーザーにある） */}
+      <DeleteEntryButton entryId={entry.id as string} notionSynced={!!entry.notion_page_id} />
     </div>
   )
 }

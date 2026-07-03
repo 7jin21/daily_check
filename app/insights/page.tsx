@@ -18,11 +18,13 @@ interface AnalysisResult {
   strengths: string[]
   growthAreas: string[]
   emotionalPatterns: string[]
+  coreValues?: string[]
   recommendations: string[]
   emotionTriggers: EmotionTrigger[]
   moodTrend: 'improving' | 'stable' | 'declining'
   averageMood: number
   totalEntries: number
+  isFallback?: boolean
 }
 
 interface WeeklyReport {
@@ -31,8 +33,10 @@ interface WeeklyReport {
   challenge: string
   nextFocus: string
   weekMood: string
+  focusReview?: string
   entryCount: number
   avgMood: number
+  isFallback?: boolean
 }
 
 interface CachedAnalysis {
@@ -51,6 +55,9 @@ interface LocalStats {
   moodDist: Record<number, number>
   topEmotions: { emotion: string; count: number }[]
   recentMoods: { date: string; mood: number }[]
+  weekdayMoods: { label: string; avg: number; count: number }[]
+  tagMoods: { tag: string; avg: number; diff: number; count: number }[]
+  avgMood: number
 }
 
 const CACHE_KEY = STORAGE_KEYS.INSIGHTS_CACHE
@@ -64,6 +71,8 @@ const MOOD_COLOR = ['', '#b5654a', '#c5895f', '#cdbf9a', '#9caa7e', '#6f8a5f']
 const TREND_ICON = { improving: '📈', stable: '➡️', declining: '📉' }
 const TREND_LABEL = { improving: '改善傾向', stable: '安定', declining: '要注意' }
 
+const WEEKDAY_LABELS = ['日', '月', '火', '水', '木', '金', '土']
+
 function formatAge(ts: number) {
   const m = Math.floor((Date.now() - ts) / 60000)
   if (m < 1) return 'たった今'
@@ -71,6 +80,11 @@ function formatAge(ts: number) {
   const h = Math.floor(m / 60)
   if (h < 24) return `${h}時間前`
   return `${Math.floor(h / 24)}日前`
+}
+
+function moodColorFor(avg: number): string {
+  const idx = Math.min(5, Math.max(1, Math.round(avg)))
+  return MOOD_COLOR[idx]
 }
 
 export default function InsightsPage() {
@@ -84,6 +98,13 @@ export default function InsightsPage() {
   const [isWeeklyLoading, setIsWeeklyLoading] = useState(false)
   const [weeklyError, setWeeklyError] = useState<string | null>(null)
   const [weeklyCachedAt, setWeeklyCachedAt] = useState<number | null>(null)
+
+  // 「AIに聞いてみる」
+  const [question, setQuestion] = useState('')
+  const [answer, setAnswer] = useState<string | null>(null)
+  const [askedQuestion, setAskedQuestion] = useState<string | null>(null)
+  const [isAsking, setIsAsking] = useState(false)
+  const [askError, setAskError] = useState<string | null>(null)
 
   useEffect(() => {
     loadLocalStats()
@@ -107,6 +128,7 @@ export default function InsightsPage() {
         }
       }
     } catch { /* ignore */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const loadLocalStats = async () => {
@@ -121,7 +143,7 @@ export default function InsightsPage() {
 
       const { data } = await supabase
         .from('diary_entries')
-        .select('entry_date, mood, dominant_emotion')
+        .select('entry_date, mood, dominant_emotion, tags')
         .eq('user_id', user.id)
         .gte('entry_date', from)
         .order('entry_date', { ascending: false })
@@ -131,12 +153,57 @@ export default function InsightsPage() {
 
       const moodDist: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 }
       const emotionCounts: Record<string, number> = {}
+      const weekdayAgg: Record<number, { sum: number; count: number }> = {}
+      const tagAgg: Record<string, { sum: number; count: number }> = {}
+      let moodSum = 0
+      let moodCount = 0
+
       for (const e of data) {
-        if (e.mood >= 1 && e.mood <= 5) moodDist[e.mood]++
+        if (e.mood >= 1 && e.mood <= 5) {
+          moodDist[e.mood]++
+          moodSum += e.mood
+          moodCount++
+          // 曜日別（JST）
+          const dow = new Date(`${e.entry_date}T12:00:00+09:00`).getDay()
+          weekdayAgg[dow] = { sum: (weekdayAgg[dow]?.sum ?? 0) + e.mood, count: (weekdayAgg[dow]?.count ?? 0) + 1 }
+          // タグ別
+          if (Array.isArray(e.tags)) {
+            for (const tag of e.tags as string[]) {
+              if (typeof tag !== 'string' || !tag.trim()) continue
+              tagAgg[tag] = { sum: (tagAgg[tag]?.sum ?? 0) + e.mood, count: (tagAgg[tag]?.count ?? 0) + 1 }
+            }
+          }
+        }
         if (e.dominant_emotion?.trim()) {
           emotionCounts[e.dominant_emotion] = (emotionCounts[e.dominant_emotion] ?? 0) + 1
         }
       }
+
+      const avgMood = moodCount > 0 ? moodSum / moodCount : 0
+
+      // 曜日×気分（記録がある曜日のみ、月曜始まり）
+      const weekdayMoods = [1, 2, 3, 4, 5, 6, 0]
+        .filter((dow) => weekdayAgg[dow])
+        .map((dow) => ({
+          label: WEEKDAY_LABELS[dow],
+          avg: Math.round((weekdayAgg[dow].sum / weekdayAgg[dow].count) * 10) / 10,
+          count: weekdayAgg[dow].count,
+        }))
+
+      // タグ×気分（2回以上出たタグのみ、全体平均との差が大きい順）
+      const tagMoods = Object.entries(tagAgg)
+        .filter(([, v]) => v.count >= 2)
+        .map(([tag, v]) => {
+          const avg = v.sum / v.count
+          return {
+            tag,
+            avg: Math.round(avg * 10) / 10,
+            diff: Math.round((avg - avgMood) * 10) / 10,
+            count: v.count,
+          }
+        })
+        .sort((a, b) => Math.abs(b.diff) - Math.abs(a.diff))
+        .slice(0, 6)
 
       setLocalStats({
         recorded: data.length,
@@ -147,6 +214,9 @@ export default function InsightsPage() {
           .slice(0, 6)
           .map(([emotion, count]) => ({ emotion, count })),
         recentMoods: data.slice(0, 7).map((e) => ({ date: e.entry_date, mood: e.mood })).reverse(),
+        weekdayMoods,
+        tagMoods,
+        avgMood: Math.round(avgMood * 10) / 10,
       })
     } catch { /* ignore */ }
   }
@@ -155,12 +225,20 @@ export default function InsightsPage() {
     setIsWeeklyLoading(true)
     setWeeklyError(null)
     try {
-      const result = await apiPost<WeeklyReport | { status: string }>('/api/weekly-report', {})
+      // 前回レポートの「来週のフォーカス」を渡すと、AI がそのふり返りも書いてくれる
+      const result = await apiPost<WeeklyReport | { status: string }>(
+        '/api/weekly-report',
+        { previousFocus: weeklyReport?.nextFocus ?? undefined },
+        { retry: false }
+      )
       if ('status' in result) {
         setWeeklyError(result.status === 'no_data' ? '今週の記録がありません' : '取得に失敗しました')
       } else {
         const now = Date.now()
-        try { localStorage.setItem(WEEKLY_CACHE_KEY, JSON.stringify({ result, timestamp: now })) } catch { /* ignore */ }
+        // フォールバック（AI不通時の簡易版）はキャッシュしない — 次回は本物を試す
+        if (!result.isFallback) {
+          try { localStorage.setItem(WEEKLY_CACHE_KEY, JSON.stringify({ result, timestamp: now })) } catch { /* ignore */ }
+        }
         setWeeklyReport(result)
         setWeeklyCachedAt(now)
       }
@@ -175,13 +253,16 @@ export default function InsightsPage() {
     setIsLoading(true)
     setError(null)
     try {
-      const result = await apiPost<AnalysisResult | { status: string }>('/api/analyze', {})
+      const result = await apiPost<AnalysisResult | { status: string }>('/api/analyze', {}, { retry: false })
       if ('status' in result) {
         if (result.status === 'insufficient_data') setHasEnoughData(false)
         else setError('データの取得に失敗しました')
       } else {
         const now = Date.now()
-        try { localStorage.setItem(CACHE_KEY, JSON.stringify({ result, timestamp: now })) } catch { /* ignore */ }
+        // フォールバック（AI不通時の簡易版）はキャッシュしない
+        if (!result.isFallback) {
+          try { localStorage.setItem(CACHE_KEY, JSON.stringify({ result, timestamp: now })) } catch { /* ignore */ }
+        }
         setAnalysis(result)
         setCachedAt(now)
       }
@@ -189,6 +270,24 @@ export default function InsightsPage() {
       setError(err instanceof Error ? err.message : 'データの取得に失敗しました')
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const handleAsk = async () => {
+    const q = question.trim()
+    if (!q || isAsking) return
+    setIsAsking(true)
+    setAskError(null)
+    setAnswer(null)
+    try {
+      const result = await apiPost<{ answer: string }>('/api/ask', { question: q }, { retry: false })
+      setAnswer(result.answer)
+      setAskedQuestion(q)
+      setQuestion('')
+    } catch (err) {
+      setAskError(err instanceof Error ? err.message : '回答の生成に失敗しました')
+    } finally {
+      setIsAsking(false)
     }
   }
 
@@ -246,6 +345,54 @@ export default function InsightsPage() {
             </div>
           </div>
 
+          {/* 曜日×気分 */}
+          {localStats.weekdayMoods.length >= 3 && (
+            <div className="card">
+              <h2 className="font-bold text-[var(--foreground)] mb-1">曜日と気分</h2>
+              <p className="text-xs text-[var(--muted-2)] mb-4">過去30日の曜日別平均</p>
+              <div className="flex items-end justify-between gap-1.5" style={{ height: 88 }}>
+                {localStats.weekdayMoods.map((w) => (
+                  <div key={w.label} className="flex-1 flex flex-col items-center justify-end gap-1">
+                    <span className="text-[10px] text-[var(--muted)] tabular-nums">{w.avg}</span>
+                    <div
+                      className="w-full rounded-t-sm transition-all"
+                      style={{
+                        height: `${(w.avg / 5) * 56}px`,
+                        backgroundColor: moodColorFor(w.avg),
+                        borderRadius: 4,
+                      }}
+                    />
+                    <span className="text-[10px] text-[var(--muted-2)]">{w.label}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* タグ×気分 */}
+          {localStats.tagMoods.length > 0 && (
+            <div className="card">
+              <h2 className="font-bold text-[var(--foreground)] mb-1">タグと気分の関係</h2>
+              <p className="text-xs text-[var(--muted-2)] mb-3">
+                そのタグが付いた日の平均気分（全体平均 {localStats.avgMood} との差）
+              </p>
+              <ul className="space-y-2">
+                {localStats.tagMoods.map((t) => (
+                  <li key={t.tag} className="flex items-center gap-3">
+                    <span className="text-sm text-[var(--primary)] flex-1 min-w-0 truncate">#{t.tag}</span>
+                    <span className="text-sm font-semibold text-[var(--foreground)] tabular-nums">{t.avg}</span>
+                    <span
+                      className="text-xs font-medium tabular-nums w-12 text-right"
+                      style={{ color: t.diff >= 0 ? '#5a7350' : '#9c4a2f' }}
+                    >
+                      {t.diff >= 0 ? `+${t.diff}` : t.diff}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
           {/* 直近7日の気分 */}
           {localStats.recentMoods.length > 0 && (
             <div className="card">
@@ -294,6 +441,51 @@ export default function InsightsPage() {
         </>
       )}
 
+      {/* ─── AIに聞いてみる ─── */}
+      <div>
+        <h2 className="text-lg font-bold text-[var(--foreground)] mb-4">AIに聞いてみる</h2>
+        <div className="card">
+          <p className="text-xs text-[var(--muted-2)] mb-3">
+            直近の日記をもとに答えます。例:「最近気分がいい日の共通点は？」「今週なんで疲れてたんだろう」
+          </p>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={question}
+              onChange={(e) => setQuestion(e.target.value.slice(0, 200))}
+              onKeyDown={(e) => { if (e.key === 'Enter') handleAsk() }}
+              placeholder="日記について質問..."
+              className="flex-1 px-4 py-3 rounded-[3px] border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
+            />
+            <button
+              onClick={handleAsk}
+              disabled={isAsking || !question.trim()}
+              className="px-4 py-3 rounded-[3px] bg-[var(--accent)] text-[#2a2622] text-sm font-bold disabled:opacity-40 active:scale-95 transition-transform flex-shrink-0"
+            >
+              {isAsking ? '...' : '質問'}
+            </button>
+          </div>
+
+          {isAsking && (
+            <div className="flex items-center gap-3 mt-4">
+              <div className="spinner" style={{ width: 18, height: 18 }} />
+              <p className="text-sm text-[var(--muted)]">日記を読み返しています...</p>
+            </div>
+          )}
+
+          {askError && <p className="mt-3 text-xs" style={{ color: '#9c4a2f' }}>{askError}</p>}
+
+          {answer && !isAsking && (
+            <div className="mt-4 p-4 rounded-[3px] bg-[var(--surface-secondary)] animate-fade-in">
+              {askedQuestion && (
+                <p className="text-xs text-[var(--muted-2)] mb-2">Q. {askedQuestion}</p>
+              )}
+              <p className="text-sm text-[var(--foreground)] leading-relaxed whitespace-pre-wrap">{answer}</p>
+            </div>
+          )}
+        </div>
+      </div>
+
       {/* ─── 週次レポートセクション ─── */}
       <div>
         <div className="flex items-center justify-between mb-4">
@@ -341,6 +533,11 @@ export default function InsightsPage() {
 
         {!isWeeklyLoading && weeklyReport && (
           <div className="space-y-3">
+            {weeklyReport.isFallback && (
+              <p className="p-3 rounded-[3px] text-xs" style={{ background: 'rgba(197,137,95,0.12)', border: '1px solid rgba(197,137,95,0.35)', color: '#a4683f' }}>
+                ⚠️ AIレポートを生成できなかったため、記録データからの簡易版を表示しています。「更新」で再試行できます。
+              </p>
+            )}
             <div className="card">
               <div className="flex items-center gap-2 mb-3">
                 <span className="text-xl">🗓</span>
@@ -358,6 +555,12 @@ export default function InsightsPage() {
             </div>
 
             <div className="grid grid-cols-1 gap-3">
+              {weeklyReport.focusReview && (
+                <div className="card" style={{ background: 'rgba(205,191,154,0.14)', borderColor: 'rgba(205,191,154,0.4)' }}>
+                  <p className="text-xs font-bold mb-1" style={{ color: '#8a7c4e' }}>🔁 先週のフォーカスは…</p>
+                  <p className="text-sm text-[var(--foreground)]">{weeklyReport.focusReview}</p>
+                </div>
+              )}
               <div className="card" style={{ background: 'rgba(111,138,95,0.10)', borderColor: 'rgba(111,138,95,0.3)' }}>
                 <p className="text-xs font-bold mb-1" style={{ color: '#5a7350' }}>✨ 今週のハイライト</p>
                 <p className="text-sm text-[var(--foreground)]">{weeklyReport.highlight}</p>
@@ -421,7 +624,7 @@ export default function InsightsPage() {
           <div className="card text-center py-10">
             <p className="text-4xl mb-3">🤖</p>
             <p className="font-bold text-[var(--foreground)]">AIが日記を分析します</p>
-            <p className="text-sm text-[var(--muted)] mt-1 mb-4">あなたの傾向・強み・成長ポイントを発見</p>
+            <p className="text-sm text-[var(--muted)] mt-1 mb-4">あなたの傾向・強み・価値観を発見</p>
             <button
               onClick={loadAnalysis}
               className="px-6 py-2.5 rounded-[2px] bg-[var(--accent)] text-[#2a2622] font-bold text-sm"
@@ -433,6 +636,12 @@ export default function InsightsPage() {
 
         {!isLoading && analysis && (
           <>
+            {analysis.isFallback && (
+              <p className="mb-4 p-3 rounded-[3px] text-xs" style={{ background: 'rgba(197,137,95,0.12)', border: '1px solid rgba(197,137,95,0.35)', color: '#a4683f' }}>
+                ⚠️ AI分析を実行できなかったため、簡易分析を表示しています。「更新」で再試行できます。
+              </p>
+            )}
+
             <div className="grid grid-cols-3 gap-3 mb-4">
               <div className="card text-center">
                 <p className="text-2xl font-bold text-[var(--primary)]">{analysis.totalEntries}</p>
@@ -449,6 +658,24 @@ export default function InsightsPage() {
             </div>
 
             <PersonalityCard analysis={analysis} />
+
+            {/* 価値観（内省ガイドの回答から抽出） */}
+            {analysis.coreValues && analysis.coreValues.length > 0 && (
+              <div className="card mt-4">
+                <h3 className="font-bold text-[var(--foreground)] mb-1">🧭 あなたが大切にしているもの</h3>
+                <p className="text-xs text-[var(--muted-2)] mb-3">日記とふりかえりの回答から AI が読み取った価値観</p>
+                <div className="flex flex-wrap gap-2">
+                  {analysis.coreValues.map((v) => (
+                    <span
+                      key={v}
+                      className="px-3 py-1.5 rounded-full bg-[var(--surface-secondary)] border border-[var(--border)] text-[var(--foreground)] text-sm font-medium"
+                    >
+                      {v}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {analysis.emotionTriggers && analysis.emotionTriggers.length > 0 && (
               <div className="card mt-4">

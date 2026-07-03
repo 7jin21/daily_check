@@ -10,12 +10,17 @@ export interface DraftResult {
 }
 
 // テンプレートベースで日記ドラフトを生成（AI不使用）
-export function generateOfflineDraft(input: CheckinInput): DraftResult {
+// entryDate（YYYY-MM-DD）を渡すと、その日付の日記として生成する（過去日付の書き忘れ救済用）
+export function generateOfflineDraft(input: CheckinInput, entryDate?: string | null): DraftResult {
   const moodInfo = MOODS.find((m) => m.value === input.mood)
   const energyInfo = ENERGY.find((e) => e.value === input.energy)
 
   // API ルートのフォールバックとしてサーバー(UTC)でも実行されるため timeZone 指定は必須
-  const today = new Date().toLocaleDateString('ja-JP', {
+  const baseDate =
+    entryDate && /^\d{4}-\d{2}-\d{2}$/.test(entryDate)
+      ? new Date(`${entryDate}T12:00:00+09:00`)
+      : new Date()
+  const today = baseDate.toLocaleDateString('ja-JP', {
     timeZone: 'Asia/Tokyo',
     year: 'numeric',
     month: 'long',

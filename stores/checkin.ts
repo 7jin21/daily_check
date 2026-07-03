@@ -14,7 +14,8 @@ export interface CheckinInput {
 
 interface CheckinState extends CheckinInput {
   currentStep: number
-  checkinDate: string | null   // "YYYY-MM-DD" (JST) — 別日なら自動リセット
+  checkinDate: string | null   // "YYYY-MM-DD" (JST) — 入力を開始した日。別日なら自動リセット
+  targetDate: string | null    // 記録の対象日。null = 今日。過去日付の書き忘れ救済で使う
   draftResult: DraftResult | null
   editedDraft: string          // ユーザーが編集したドラフト（ナビゲーション間で保持）
   isGenerating: boolean
@@ -31,6 +32,7 @@ interface CheckinState extends CheckinInput {
   nextStep: () => void
   prevStep: () => void
   setCheckinDate: (date: string) => void
+  setTargetDate: (date: string | null) => void
   setDraftResult: (result: DraftResult) => void
   setEditedDraft: (text: string) => void
   setIsGenerating: (isGenerating: boolean) => void
@@ -43,7 +45,7 @@ interface CheckinState extends CheckinInput {
 const initialState: Omit<CheckinState, keyof Pick<CheckinState,
   'setMood' | 'setEnergy' | 'setEvents' | 'setChallenges' | 'setGratitude' |
   'setFreeform' | 'setCurrentStep' | 'nextStep' | 'prevStep' |
-  'setCheckinDate' | 'setDraftResult' | 'setEditedDraft' | 'setIsGenerating' |
+  'setCheckinDate' | 'setTargetDate' | 'setDraftResult' | 'setEditedDraft' | 'setIsGenerating' |
   'setReflection' | 'reset' | 'getInput'
 >> = {
   mood: null,
@@ -54,6 +56,7 @@ const initialState: Omit<CheckinState, keyof Pick<CheckinState,
   freeform: '',
   currentStep: 0,
   checkinDate: null,
+  targetDate: null,
   draftResult: null,
   editedDraft: '',
   isGenerating: false,
@@ -76,6 +79,7 @@ export const useCheckinStore = create<CheckinState>()(
       nextStep: () => set((state) => ({ currentStep: state.currentStep + 1 })),
       prevStep: () => set((state) => ({ currentStep: Math.max(0, state.currentStep - 1) })),
       setCheckinDate: (checkinDate) => set({ checkinDate }),
+      setTargetDate: (targetDate) => set({ targetDate }),
       setDraftResult: (draftResult) => set({ draftResult }),
       setEditedDraft: (editedDraft) => set({ editedDraft }),
       setIsGenerating: (isGenerating) => set({ isGenerating }),
@@ -106,6 +110,7 @@ export const useCheckinStore = create<CheckinState>()(
         freeform: state.freeform,
         currentStep: state.currentStep,
         checkinDate: state.checkinDate,
+        targetDate: state.targetDate,
         draftResult: state.draftResult,
         editedDraft: state.editedDraft,
         reflectionQ: state.reflectionQ,
