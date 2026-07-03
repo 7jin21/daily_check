@@ -34,7 +34,7 @@ export default function TextStep({ value, onChange, placeholder, rows = 6, showH
           placeholder={placeholder}
           rows={rows}
           className="
-            w-full p-4 pb-10 rounded-[3px] border border-[var(--border)]
+            w-full p-4 pb-10 rounded-2xl border border-[var(--border)]
             bg-[var(--surface)] text-[var(--foreground)]
             placeholder:text-[var(--muted-2)] text-base resize-none
             focus:outline-none focus:border-[var(--primary)] transition-colors

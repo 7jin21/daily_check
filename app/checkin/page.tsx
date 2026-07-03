@@ -139,7 +139,7 @@ export default function CheckinPage() {
 
       {/* 過去日付の記録バナー */}
       {targetDate && (
-        <div className="mb-4 px-4 py-2.5 rounded-[3px] flex items-center justify-between text-sm"
+        <div className="mb-4 px-4 py-2.5 rounded-2xl flex items-center justify-between text-sm"
           style={{ background: 'rgba(197,137,95,0.12)', border: '1px solid rgba(197,137,95,0.35)', color: '#a4683f' }}
         >
           <span>🕰 <b>{formatDateLabel(targetDate)}</b> の記録をあとから書いています</span>
@@ -173,7 +173,7 @@ export default function CheckinPage() {
         <button
           onClick={handleNext}
           disabled={!canProceed()}
-          className="w-full py-4 rounded-[2px] bg-[var(--accent)] text-[#2a2622] font-bold text-base disabled:opacity-30 active:scale-[0.99] transition-transform glow-sky"
+          className="w-full py-4 rounded-full bg-[var(--accent)] text-[#f7f4ea] font-bold text-base disabled:opacity-30 active:scale-[0.99] transition-transform glow-sky"
         >
           {stepIndex < totalSteps - 1 ? '次へ →' : 'AIに日記を書いてもらう ✨'}
         </button>

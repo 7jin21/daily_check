@@ -88,7 +88,7 @@ export default async function EntriesPage({ searchParams }: Props) {
         </div>
         <Link
           href="/checkin"
-          className="w-10 h-10 rounded-full bg-[var(--accent)] text-[#2a2622] flex items-center justify-center text-xl font-bold"
+          className="w-10 h-10 rounded-full bg-[var(--accent)] text-[#f7f4ea] flex items-center justify-center text-xl font-bold"
           aria-label="新しい記録を追加"
         >
           +
@@ -102,11 +102,11 @@ export default async function EntriesPage({ searchParams }: Props) {
           name="q"
           defaultValue={rawQuery}
           placeholder="キーワードで検索（本文・出来事・メモ）"
-          className="flex-1 px-4 py-2.5 rounded-[3px] border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
+          className="flex-1 px-4 py-2.5 rounded-2xl border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
         />
         <button
           type="submit"
-          className="px-4 py-2.5 rounded-[3px] border border-[var(--border)] bg-[var(--surface-secondary)] text-[var(--foreground)] text-sm font-medium active:scale-95 transition-transform"
+          className="px-4 py-2.5 rounded-2xl border border-[var(--border)] bg-[var(--surface-secondary)] text-[var(--foreground)] text-sm font-medium active:scale-95 transition-transform"
         >
           検索
         </button>
@@ -135,7 +135,7 @@ export default async function EntriesPage({ searchParams }: Props) {
               <p className="text-sm mt-2">チェックインして最初の日記を書こう</p>
               <Link
                 href="/checkin"
-                className="inline-block mt-6 px-7 py-3 rounded-[2px] bg-[var(--accent)] text-[#2a2622] font-bold"
+                className="inline-block mt-6 px-7 py-3 rounded-full bg-[var(--accent)] text-[#f7f4ea] font-bold"
               >
                 今日の記録をする →
               </Link>

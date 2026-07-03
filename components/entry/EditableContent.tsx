@@ -94,20 +94,20 @@ export default function EditableContent({ entryId, initialContent, entryDate, mo
             ref={textareaRef}
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
-            className="w-full min-h-36 p-3 rounded-[3px] border border-[var(--border)] bg-[var(--surface-secondary)] text-[var(--foreground)] text-base resize-none overflow-hidden focus:outline-none focus:ring-2 focus:ring-[var(--primary)] leading-relaxed"
+            className="w-full min-h-36 p-3 rounded-2xl border border-[var(--border)] bg-[var(--surface-secondary)] text-[var(--foreground)] text-base resize-none overflow-hidden focus:outline-none focus:ring-2 focus:ring-[var(--primary)] leading-relaxed"
           />
           {error && <p className="mt-1.5 text-xs" style={{ color: '#9c4a2f' }}>{error}</p>}
           <div className="flex gap-2 mt-3">
             <button
               onClick={handleSave}
               disabled={saving || !draft.trim()}
-              className="flex-1 py-2.5 rounded-[2px] bg-[var(--accent)] text-[#2a2622] text-sm font-bold disabled:opacity-50 active:scale-95 transition-transform"
+              className="flex-1 py-2.5 rounded-full bg-[var(--accent)] text-[#f7f4ea] text-sm font-bold disabled:opacity-50 active:scale-95 transition-transform"
             >
               {saving ? '保存中…' : '保存する'}
             </button>
             <button
               onClick={handleCancel}
-              className="px-4 py-2.5 rounded-[2px] border border-[var(--border)] text-[var(--muted)] text-sm active:scale-95 transition-transform"
+              className="px-4 py-2.5 rounded-full border border-[var(--border)] text-[var(--muted)] text-sm active:scale-95 transition-transform"
             >
               キャンセル
             </button>

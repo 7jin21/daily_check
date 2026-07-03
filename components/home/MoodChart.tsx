@@ -58,7 +58,7 @@ export default function MoodChart({ entries }: MoodChartProps) {
             background: '#f4efe6',
             boxShadow: '0 4px 12px rgba(42,38,34,0.08)',
             fontSize: 12,
-            color: '#2a2622',
+            color: '#32362a',
           }}
         />
         <Legend wrapperStyle={{ fontSize: 12, paddingTop: 8 }} />

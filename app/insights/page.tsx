@@ -455,12 +455,12 @@ export default function InsightsPage() {
               onChange={(e) => setQuestion(e.target.value.slice(0, 200))}
               onKeyDown={(e) => { if (e.key === 'Enter') handleAsk() }}
               placeholder="日記について質問..."
-              className="flex-1 px-4 py-3 rounded-[3px] border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
+              className="flex-1 px-4 py-3 rounded-2xl border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
             />
             <button
               onClick={handleAsk}
               disabled={isAsking || !question.trim()}
-              className="px-4 py-3 rounded-[3px] bg-[var(--accent)] text-[#2a2622] text-sm font-bold disabled:opacity-40 active:scale-95 transition-transform flex-shrink-0"
+              className="px-4 py-3 rounded-2xl bg-[var(--accent)] text-[#f7f4ea] text-sm font-bold disabled:opacity-40 active:scale-95 transition-transform flex-shrink-0"
             >
               {isAsking ? '...' : '質問'}
             </button>
@@ -476,7 +476,7 @@ export default function InsightsPage() {
           {askError && <p className="mt-3 text-xs" style={{ color: '#9c4a2f' }}>{askError}</p>}
 
           {answer && !isAsking && (
-            <div className="mt-4 p-4 rounded-[3px] bg-[var(--surface-secondary)] animate-fade-in">
+            <div className="mt-4 p-4 rounded-2xl bg-[var(--surface-secondary)] animate-fade-in">
               {askedQuestion && (
                 <p className="text-xs text-[var(--muted-2)] mb-2">Q. {askedQuestion}</p>
               )}
@@ -524,7 +524,7 @@ export default function InsightsPage() {
             <p className="text-sm text-[var(--muted)] mt-1 mb-4">直近7日間の日記からナラティブレポートを生成</p>
             <button
               onClick={loadWeeklyReport}
-              className="px-6 py-2.5 rounded-[2px] bg-[var(--accent)] text-[#2a2622] font-bold text-sm"
+              className="px-6 py-2.5 rounded-full bg-[var(--accent)] text-[#f7f4ea] font-bold text-sm"
             >
               レポートを作成
             </button>
@@ -534,7 +534,7 @@ export default function InsightsPage() {
         {!isWeeklyLoading && weeklyReport && (
           <div className="space-y-3">
             {weeklyReport.isFallback && (
-              <p className="p-3 rounded-[3px] text-xs" style={{ background: 'rgba(197,137,95,0.12)', border: '1px solid rgba(197,137,95,0.35)', color: '#a4683f' }}>
+              <p className="p-3 rounded-2xl text-xs" style={{ background: 'rgba(197,137,95,0.12)', border: '1px solid rgba(197,137,95,0.35)', color: '#a4683f' }}>
                 ⚠️ AIレポートを生成できなかったため、記録データからの簡易版を表示しています。「更新」で再試行できます。
               </p>
             )}
@@ -627,7 +627,7 @@ export default function InsightsPage() {
             <p className="text-sm text-[var(--muted)] mt-1 mb-4">あなたの傾向・強み・価値観を発見</p>
             <button
               onClick={loadAnalysis}
-              className="px-6 py-2.5 rounded-[2px] bg-[var(--accent)] text-[#2a2622] font-bold text-sm"
+              className="px-6 py-2.5 rounded-full bg-[var(--accent)] text-[#f7f4ea] font-bold text-sm"
             >
               分析を開始
             </button>
@@ -637,7 +637,7 @@ export default function InsightsPage() {
         {!isLoading && analysis && (
           <>
             {analysis.isFallback && (
-              <p className="mb-4 p-3 rounded-[3px] text-xs" style={{ background: 'rgba(197,137,95,0.12)', border: '1px solid rgba(197,137,95,0.35)', color: '#a4683f' }}>
+              <p className="mb-4 p-3 rounded-2xl text-xs" style={{ background: 'rgba(197,137,95,0.12)', border: '1px solid rgba(197,137,95,0.35)', color: '#a4683f' }}>
                 ⚠️ AI分析を実行できなかったため、簡易分析を表示しています。「更新」で再試行できます。
               </p>
             )}

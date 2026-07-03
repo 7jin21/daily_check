@@ -10,26 +10,26 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        // 暖色エディトリアル: テラコッタ／山吹のアクセント階調
+        // ボタニカル・セレニティ: セージグリーンのアクセント階調
         primary: {
-          50: '#f6efe7',
-          100: '#ecddcb',
-          200: '#dcc2a3',
-          300: '#cba27a',
-          400: '#b8855c',
-          500: '#9c6b4a',
-          600: '#86583c',
-          700: '#6c4630',
-          800: '#523526',
-          900: '#3a261b',
+          50: '#f2f4ea',
+          100: '#e2e8d3',
+          200: '#c8d3b0',
+          300: '#acbb8d',
+          400: '#8ba375',
+          500: '#5f7a4c',
+          600: '#4f673f',
+          700: '#405434',
+          800: '#324128',
+          900: '#242f1d',
         },
         surface: {
-          DEFAULT: '#f4efe6',
-          dark: '#2a2622',
+          DEFAULT: '#faf8f1',
+          dark: '#2a2f23',
         },
       },
       fontFamily: {
-        sans: ['var(--font-sans)', 'Schibsted Grotesk', 'Zen Kaku Gothic New', 'system-ui', 'sans-serif'],
+        sans: ['Cormorant Garamond', 'Shippori Mincho', 'Hiragino Mincho ProN', 'serif'],
       },
       spacing: {
         'safe-bottom': 'env(safe-area-inset-bottom)',

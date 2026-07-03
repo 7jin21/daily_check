@@ -52,8 +52,8 @@ npm run dev
 | AI | GROQ API（gpt-oss-120b / gpt-oss-20b、日本語で選定。音声文字起こしは Whisper） |
 | 外部同期 | Notion API / Google Calendar API |
 | 状態管理 | Zustand |
-| スタイリング | Tailwind CSS ＋ CSS 変数（暖色エディトリアル基調 / トークン一元管理） |
-| フォント | Schibsted Grotesk（欧文）＋ Zen Kaku Gothic New（和文） |
+| スタイリング | Tailwind CSS ＋ CSS 変数（ボタニカル・セレニティ基調 / トークン一元管理） |
+| フォント | Cormorant Garamond（欧文セリフ）＋ Shippori Mincho（和文明朝） |
 | PWA | Web App Manifest + Service Worker |
 
 ---
@@ -526,17 +526,19 @@ GROQ_MODEL_TRANSCRIBE=whisper-large-v3-turbo           # 音声入力の文字�
 
 ### 見た目（配色・フォント）を変えたい
 
-外観は「**暖色エディトリアル**」基調 — 紙色の背景＋エスプレッソの文字＋テラコッタ／山吹のアクセント、フラットで角丸 3px のカード。配色は **CSS 変数で一元管理**しているので、コンポーネントを触らずトークンだけ変えれば全画面に反映されます。
+外観は「**ボタニカル・セレニティ**」基調 — クリームの背景＋深いオリーブの文字＋セージグリーン／ゴールド／ダスティブルーのアクセント、大きな角丸（カード 20〜26px）とピル型ボタン、明朝体。配色は **CSS 変数で一元管理**しているので、コンポーネントを触らずトークンだけ変えれば全画面に反映されます。
 
 | 変えたいもの | 触る場所 |
 |------|------|
-| ページ／カード／文字色・罫線（紙・エスプレッソ・テラコッタ・山吹） | `app/globals.css` の `:root`（ダークは `@media (prefers-color-scheme: dark)` と `.dark`） |
+| ページ／カード／文字色・罫線（クリーム・オリーブ・セージ・ゴールド・ブルー） | `app/globals.css` の `:root`（ダークは `@media (prefers-color-scheme: dark)` と `.dark`） |
+| ホームのヒーロー背景・CTA カードの紙面・ピルボタン | `app/globals.css` の `.hero-botanical` / `.cta-paper` / `.btn-pill` |
 | Tailwind の `primary` / `surface` 階調 | `tailwind.config.ts` |
 | 気分・エネルギーの色ランプ（アース系 `#b5654a`→`#6f8a5f`） | `lib/constants.ts` の `MOODS` / `ENERGY` |
-| フォント（欧文 Schibsted Grotesk ＋ 和文 Zen Kaku Gothic New） | `app/layout.tsx`（Google Fonts の `link`）＋ `app/globals.css` / `tailwind.config.ts` |
+| フォント（欧文 Cormorant Garamond ＋ 和文 Shippori Mincho） | `app/layout.tsx`（Google Fonts の `link`）＋ `app/globals.css` / `tailwind.config.ts` |
+| 統計カードのアイコン・モチーフ / ヒーローの葉の線画 | `components/home/StatsCards.tsx` / `app/page.tsx`（インライン SVG） |
 | iOS ステータスバー色（theme-color） | `app/layout.tsx` の `<meta name="theme-color">` |
 
-> ダークモードは OS のカラースキームに自動追従します（暖色エスプレッソ系）。`.dark` クラスによる手動オーバーライドの口は用意済みですが、切り替え UI は未実装です（[今後の実装予定](#今後の実装予定)）。
+> ダークモードは OS のカラースキームに自動追従します（深い森のグリーン系）。`.dark` クラスによる手動オーバーライドの口は用意済みですが、切り替え UI は未実装です（[今後の実装予定](#今後の実装予定)）。
 
 ### ログイン方法を追加・変更したい
 

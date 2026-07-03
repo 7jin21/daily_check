@@ -2,64 +2,70 @@
 @tailwind components;
 @tailwind utilities;
 
-/* CSS カスタムプロパティ — 暖色エディトリアル（紙・エスプレッソ・山吹・テラコッタ） */
+/* CSS カスタムプロパティ — ボタニカル・セレニティ（クリーム・セージグリーン・ゴールド・ダスティブルー） */
 :root {
-  --background: #ece6da;       /* 紙色（ページ背景） */
-  --foreground: #2a2622;       /* エスプレッソ（本文・見出し） */
-  --surface: #f4efe6;          /* カードの紙 */
-  --surface-secondary: #e7dcc7;/* やや濃い紙（スケルトン等） */
-  --border: #e0d6c5;           /* カード・リストの細罫 */
-  --divider: #ddd2c0;          /* セクション区切り罫 */
-  --divider-strong: #2a2622;   /* 強い区切り罫（ヘッダー等） */
-  --primary: #9c6b4a;          /* テラコッタ（リンク・アクセント） */
-  --primary-foreground: #f4efe6;
-  --accent: #c89a6a;           /* 山吹（CTA） */
-  --accent-hover: #d8ab78;
-  --muted: #9a9085;            /* 補助テキスト */
-  --muted-2: #b3a892;          /* さらに淡い補助テキスト */
+  --background: #f2efe6;       /* クリーム（ページ背景） */
+  --foreground: #32362a;       /* 深いオリーブインク（本文・見出し） */
+  --surface: #faf8f1;          /* カードのクリーム */
+  --surface-secondary: #eae6d8;/* やや濃いクリーム（スケルトン等） */
+  --border: #e4dfd0;           /* カード・リストの細罫 */
+  --divider: #ded9c8;          /* セクション区切り罫 */
+  --divider-strong: #4a4f3c;   /* 強い区切り罫（ヘッダー等） */
+  --primary: #5f7a4c;          /* セージグリーン（リンク・アクセント） */
+  --primary-foreground: #faf8f1;
+  --accent: #6b8756;           /* 深めのセージ（CTA ピルボタン） */
+  --accent-hover: #7a9464;
+  --gold: #ab8b4e;             /* ゴールド（アイキャッチ・リング） */
+  --blue: #8ba3b5;             /* ダスティブルー（統計・気分） */
+  --muted: #8b8877;            /* 補助テキスト */
+  --muted-2: #aaa68f;          /* さらに淡い補助テキスト */
   /* Safe area insets (iPhone対応) */
   --safe-area-top: env(safe-area-inset-top);
   --safe-area-bottom: env(safe-area-inset-bottom);
   --safe-area-left: env(safe-area-inset-left);
   --safe-area-right: env(safe-area-inset-right);
   /* BottomNavの高さ */
-  --bottom-nav-height: 60px;
+  --bottom-nav-height: 68px;
 }
 
-/* ダークモード（OSのカラースキーム設定に自動追従）— 暖色エスプレッソ系で統一 */
+/* ダークモード（OSのカラースキーム設定に自動追従）— 深い森のグリーン系で統一 */
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #1c1916;
-    --foreground: #f4efe6;
-    --surface: #2a2622;
-    --surface-secondary: #34302a;
-    --border: #3a352e;
-    --divider: #3a352e;
-    --divider-strong: #5a5147;
-    --primary: #d8ab78;
-    --primary-foreground: #2a2622;
-    --accent: #c89a6a;
-    --accent-hover: #d8ab78;
-    --muted: #9a9085;
-    --muted-2: #7a7164;
+    --background: #20241b;
+    --foreground: #efece0;
+    --surface: #2a2f23;
+    --surface-secondary: #353b2c;
+    --border: #3d4433;
+    --divider: #3d4433;
+    --divider-strong: #6a7257;
+    --primary: #9db884;
+    --primary-foreground: #20241b;
+    --accent: #7a9464;
+    --accent-hover: #8aa673;
+    --gold: #c9a86a;
+    --blue: #93aabb;
+    --muted: #999682;
+    --muted-2: #6f7060;
   }
 }
 
 /* .dark クラスによる手動オーバーライド */
 .dark {
-  --background: #1c1916;
-  --foreground: #f4efe6;
-  --surface: #2a2622;
-  --surface-secondary: #34302a;
-  --border: #3a352e;
-  --divider: #3a352e;
-  --divider-strong: #5a5147;
-  --primary: #d8ab78;
-  --primary-foreground: #2a2622;
-  --accent: #c89a6a;
-  --accent-hover: #d8ab78;
-  --muted: #9a9085;
-  --muted-2: #7a7164;
+  --background: #20241b;
+  --foreground: #efece0;
+  --surface: #2a2f23;
+  --surface-secondary: #353b2c;
+  --border: #3d4433;
+  --divider: #3d4433;
+  --divider-strong: #6a7257;
+  --primary: #9db884;
+  --primary-foreground: #20241b;
+  --accent: #7a9464;
+  --accent-hover: #8aa673;
+  --gold: #c9a86a;
+  --blue: #93aabb;
+  --muted: #999682;
+  --muted-2: #6f7060;
 }
 
 /* ベーススタイル */
@@ -79,7 +85,8 @@ body {
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: 'Schibsted Grotesk', 'Zen Kaku Gothic New', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+  /* 明朝体を基調にした「上質な日記帳」の書体。欧文・数字はガラモン系セリフ */
+  font-family: 'Cormorant Garamond', 'Shippori Mincho', 'Hiragino Mincho ProN', 'Yu Mincho', serif;
   /* iOS のフォントサイズ自動調整を無効化 */
   -webkit-text-size-adjust: 100%;
   /* テキスト選択のレンダリング最適化 */
@@ -135,17 +142,25 @@ select {
   display: none;
 }
 
-/* カード共通スタイル（フラットな紙＋細罫・硬めの角丸） */
+/* 明朝体は細く見えやすいので、基本ウェイトをやや強めに */
+body {
+  font-weight: 500;
+}
+
+/* カード共通スタイル（大きくやわらかい角丸＋淡い影） */
 .card {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 3px;
+  border-radius: 22px;
   padding: 20px;
+  box-shadow: 0 6px 22px rgba(72, 70, 52, 0.06);
 }
 
-/* セクション見出しの装飾ラベル（Today's check-in 等の小キャップス） */
+/* セクション見出しの装飾ラベル（Today's check-in 等の小キャップス・ガラモン） */
 .eyebrow {
-  font-size: 11px;
+  font-family: 'Cormorant Garamond', 'Shippori Mincho', serif;
+  font-size: 12px;
+  font-weight: 600;
   letter-spacing: 0.26em;
   text-transform: uppercase;
   color: var(--primary);
@@ -160,17 +175,52 @@ select {
   border-bottom: 1px solid var(--divider);
 }
 
-/* グラデーションテキスト → 暖色（テラコッタ→山吹） */
+/* グラデーションテキスト（セージ→ゴールド） */
 .gradient-text {
-  background: linear-gradient(135deg, #9c6b4a, #c89a6a);
+  background: linear-gradient(135deg, #5f7a4c, #ab8b4e);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
 
-/* ヒーロー等のアクセント面（エスプレッソ） */
+/* ヒーロー等のアクセント面（深い森＋夕方の光） */
 .animated-gradient {
-  background: linear-gradient(135deg, #2a2622 0%, #3a332c 100%);
+  background: linear-gradient(135deg, #262b1d 0%, #3a3f2c 60%, #57503a 100%);
+}
+
+/* ホームのヒーロー背景（暗い植物写真の雰囲気を CSS グラデーションで再現） */
+.hero-botanical {
+  background:
+    radial-gradient(120% 90% at 85% 0%, rgba(171, 139, 78, 0.28) 0%, rgba(171, 139, 78, 0) 55%),
+    radial-gradient(80% 60% at 10% 100%, rgba(95, 122, 76, 0.35) 0%, rgba(95, 122, 76, 0) 60%),
+    linear-gradient(150deg, #23281b 0%, #2e3423 45%, #4a4531 100%);
+}
+
+/* CTA カードのクリーム面（紙の温かみ＋淡い緑の差し込み） */
+.cta-paper {
+  background:
+    radial-gradient(90% 120% at 100% 100%, rgba(139, 163, 117, 0.20) 0%, rgba(139, 163, 117, 0) 55%),
+    linear-gradient(160deg, #fbf9f2 0%, #f1eddd 100%);
+}
+.dark .cta-paper {
+  background:
+    radial-gradient(90% 120% at 100% 100%, rgba(139, 163, 117, 0.16) 0%, rgba(139, 163, 117, 0) 55%),
+    linear-gradient(160deg, #2e3426 0%, #272c1f 100%);
+}
+@media (prefers-color-scheme: dark) {
+  .cta-paper {
+    background:
+      radial-gradient(90% 120% at 100% 100%, rgba(139, 163, 117, 0.16) 0%, rgba(139, 163, 117, 0) 55%),
+      linear-gradient(160deg, #2e3426 0%, #272c1f 100%);
+  }
+}
+
+/* ピル型 CTA ボタン（セージのグラデーション＋やわらかい影） */
+.btn-pill {
+  border-radius: 9999px;
+  background: linear-gradient(150deg, #7a9464 0%, #5d7a4a 100%);
+  color: #f7f4ea;
+  box-shadow: 0 10px 22px rgba(95, 122, 76, 0.35);
 }
 
 @keyframes gradient-shift {
@@ -220,15 +270,15 @@ select {
   animation: confetti-fall linear forwards;
 }
 
-/* グロー効果（山吹のやわらかい影） */
+/* グロー効果（セージのやわらかい影） */
 .glow-sky {
-  box-shadow: 0 8px 24px rgba(156, 107, 74, 0.25);
+  box-shadow: 0 8px 24px rgba(95, 122, 76, 0.3);
 }
 
 /* プログレスバー輝き */
 @keyframes progress-glow {
-  0%, 100% { box-shadow: 0 0 8px rgba(156, 107, 74, 0.45); }
-  50%       { box-shadow: 0 0 16px rgba(200, 154, 106, 0.55); }
+  0%, 100% { box-shadow: 0 0 8px rgba(95, 122, 76, 0.45); }
+  50%       { box-shadow: 0 0 16px rgba(139, 163, 117, 0.55); }
 }
 
 .progress-bar-glow {

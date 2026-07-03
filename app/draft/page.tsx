@@ -367,7 +367,7 @@ export default function DraftPage() {
           <div className="pb-6">
             <button
               onClick={handleCancel}
-              className="w-full py-3 rounded-[2px] border border-[var(--border)] text-[var(--muted)] text-sm"
+              className="w-full py-3 rounded-full border border-[var(--border)] text-[var(--muted)] text-sm"
             >
               キャンセルして入力に戻る
             </button>
@@ -386,7 +386,7 @@ export default function DraftPage() {
         </div>
         <button
           onClick={handleCancel}
-          className="px-6 py-3 rounded-[2px] border border-[var(--border)] text-[var(--muted)] text-sm"
+          className="px-6 py-3 rounded-full border border-[var(--border)] text-[var(--muted)] text-sm"
         >
           キャンセルして入力に戻る
         </button>
@@ -407,13 +407,13 @@ export default function DraftPage() {
           <div className="w-full space-y-3">
             <Link
               href={`/entries/${savedEntryDate}`}
-              className="block w-full py-4 text-center rounded-[2px] bg-[var(--accent)] text-[#2a2622] font-bold text-base active:scale-[0.99] transition-transform glow-sky"
+              className="block w-full py-4 text-center rounded-full bg-[var(--accent)] text-[#f7f4ea] font-bold text-base active:scale-[0.99] transition-transform glow-sky"
             >
               日記を見る
             </Link>
             <Link
               href="/"
-              className="block w-full py-3 text-center rounded-[2px] border border-[var(--border)] text-[var(--muted)] text-base active:scale-95 transition-transform"
+              className="block w-full py-3 text-center rounded-full border border-[var(--border)] text-[var(--muted)] text-base active:scale-95 transition-transform"
             >
               ホームに戻る
             </Link>
@@ -452,7 +452,7 @@ export default function DraftPage() {
       </div>
 
       {isOffline && (
-        <div className="mb-4 p-3 rounded-[3px] text-sm" style={{ background: 'rgba(197,137,95,0.12)', border: '1px solid rgba(197,137,95,0.35)', color: '#a4683f' }}>
+        <div className="mb-4 p-3 rounded-2xl text-sm" style={{ background: 'rgba(197,137,95,0.12)', border: '1px solid rgba(197,137,95,0.35)', color: '#a4683f' }}>
           <p className="font-semibold">⚠️ AI生成に失敗しました</p>
           <p className="mt-0.5 text-xs">ネットワーク接続を確認のうえ「書き直す」を試してください。以下はオフライン生成のドラフトです。</p>
         </div>
@@ -482,7 +482,7 @@ export default function DraftPage() {
           ref={textareaRef}
           value={editedDraft}
           onChange={(e) => setEditedDraft(e.target.value)}
-          className="w-full min-h-40 p-4 rounded-[3px] border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] text-base resize-none overflow-hidden focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
+          className="w-full min-h-40 p-4 rounded-2xl border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] text-base resize-none overflow-hidden focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
         />
 
         {/* AI書き直しボタン */}
@@ -507,7 +507,7 @@ export default function DraftPage() {
       </div>
 
       {saveError && (
-        <div className="mb-4 p-3 rounded-[3px] text-sm" style={{ background: 'rgba(181,101,74,0.12)', border: '1px solid rgba(181,101,74,0.35)', color: '#9c4a2f' }}>
+        <div className="mb-4 p-3 rounded-2xl text-sm" style={{ background: 'rgba(181,101,74,0.12)', border: '1px solid rgba(181,101,74,0.35)', color: '#9c4a2f' }}>
           <p className="font-semibold">保存できませんでした</p>
           <p className="mt-0.5 text-xs">{saveError}</p>
         </div>
@@ -517,14 +517,14 @@ export default function DraftPage() {
         <button
           onClick={handleSave}
           disabled={isSaving || !editedDraft.trim()}
-          className="w-full py-4 rounded-[2px] bg-[var(--accent)] text-[#2a2622] font-bold text-base disabled:opacity-40 active:scale-[0.99] transition-transform"
+          className="w-full py-4 rounded-full bg-[var(--accent)] text-[#f7f4ea] font-bold text-base disabled:opacity-40 active:scale-[0.99] transition-transform"
         >
           {isSaving ? '保存中...' : '保存する 💾'}
         </button>
         <button
           onClick={handleRegenerate}
           disabled={isGenerating || isSaving}
-          className="w-full py-3 rounded-[2px] border border-[var(--border)] text-[var(--muted)] text-base disabled:opacity-40"
+          className="w-full py-3 rounded-full border border-[var(--border)] text-[var(--muted)] text-base disabled:opacity-40"
         >
           🔄 AIに書き直してもらう
         </button>

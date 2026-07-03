@@ -130,29 +130,41 @@ export default async function HomePage() {
   const MOOD_DOT = ['', '#b5654a', '#c5895f', '#cdbf9a', '#9caa7e', '#6f8a5f']
 
   return (
-    <div className="px-5 pt-8 pb-8 space-y-11">
+    <div className="pb-8">
       {/* ストリーク達成バナー（マイルストーン時のみ） */}
       {stats && <StreakCelebration streak={stats.streak} />}
 
-      {/* ヘッダー */}
-      <div className="flex items-start justify-between pb-6 border-b border-[var(--divider-strong)]">
-        <div>
-          <h1 className="text-3xl font-bold text-[var(--foreground)] tracking-tight">{greeting}</h1>
-          <p className="text-[var(--muted)] text-xs tracking-[0.16em] mt-2">
-            {new Date().toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo', year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' })}
-          </p>
-        </div>
-        <div className="flex items-center gap-3 pt-1">
-          <div className="text-right">
-            <div className="eyebrow" style={{ letterSpacing: '0.24em' }}>Diary</div>
-            <div className="text-xs text-[var(--muted)] mt-0.5">全{stats?.total ?? 0}件</div>
+      {/* ヒーロー（暗いボタニカル背景に白の明朝・ゴールドの差し色） */}
+      <header
+        className="hero-botanical relative overflow-hidden px-5 pb-24"
+        style={{
+          marginTop: 'calc(env(safe-area-inset-top) * -1)',
+          paddingTop: 'calc(env(safe-area-inset-top) + 44px)',
+        }}
+      >
+        {/* 装飾の葉（ゴールドの線画） */}
+        <LeafOrnament className="absolute right-24 top-10 w-16 h-16 opacity-50" />
+        <div className="relative flex items-start justify-between">
+          <div>
+            <h1 className="text-[32px] font-bold text-[#f5f1e4] tracking-wide leading-tight">{greeting}</h1>
+            <p className="text-[#d9d2bb] text-sm tracking-[0.14em] mt-2">
+              {new Date().toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo', year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' })}
+            </p>
           </div>
-          <div className="w-10 h-10 rounded-full bg-[#2a2622] border border-[var(--accent)] flex items-center justify-center text-[#e9ddc7] text-sm">
-            私
+          <div className="flex items-center gap-3 pt-1">
+            <div className="text-right">
+              <div className="eyebrow" style={{ color: 'var(--gold)', letterSpacing: '0.3em' }}>Diary</div>
+              <div className="text-xs text-[#d9d2bb] mt-1">全{stats?.total ?? 0}件</div>
+            </div>
+            <div className="w-12 h-12 rounded-full bg-[#3a412c]/90 border-2 border-[var(--gold)] flex items-center justify-center text-[#efe9d3] text-base shadow-lg">
+              私
+            </div>
           </div>
         </div>
-      </div>
+      </header>
 
+      {/* 本文（CTA カードはヒーローの裾に重なる） */}
+      <div className="px-5 -mt-16 space-y-11 relative">
       {/* チェックインCTA（入力途中なら「続きから再開」に切り替わる） */}
       <CheckinCTA today={today} todayEntry={todayEntry ? { summary: todayEntry.summary } : null} />
 
@@ -160,7 +172,7 @@ export default async function HomePage() {
       {missedYesterday && (
         <Link
           href={`/checkin?date=${yesterday}`}
-          className="flex items-center justify-between px-5 py-4 rounded-[3px] border border-dashed border-[var(--border)] bg-[var(--surface)] active:opacity-70 transition-opacity -mt-6"
+          className="flex items-center justify-between px-5 py-4 rounded-2xl border border-dashed border-[var(--border)] bg-[var(--surface)] active:opacity-70 transition-opacity -mt-6"
         >
           <span className="text-sm text-[var(--muted)]">
             🕰 昨日の記録がありません。<span className="text-[var(--primary)] font-medium">今からでも書けます</span>
@@ -203,8 +215,13 @@ export default async function HomePage() {
       {/* 今週の記録 */}
       <section>
         <div className="section-head">
-          <div className="eyebrow">This week</div>
-          <h2 className="text-base font-bold text-[var(--foreground)]">今週の記録</h2>
+          <div className="flex items-center gap-2">
+            <span className="eyebrow" style={{ fontSize: 14, letterSpacing: '0.22em', color: 'var(--foreground)' }}>This week</span>
+            <LeafOrnament className="w-5 h-5 opacity-70" />
+          </div>
+          <Link href="/entries" className="text-sm text-[var(--foreground)] flex items-center gap-1">
+            今週の記録 <span className="text-[var(--muted-2)]">›</span>
+          </Link>
         </div>
         <div className="mt-6">
           <WeekStrip entries={entries} />
@@ -286,7 +303,25 @@ export default async function HomePage() {
         </section>
       )}
 
+      </div>
     </div>
+  )
+}
+
+/** ヒーローの装飾（ゴールドの葉の線画） */
+function LeafOrnament({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 64 64" fill="none" className={className} aria-hidden="true">
+      <path
+        d="M32 54 C32 34 38 20 54 10 C50 30 44 44 32 54 Z"
+        stroke="#c9a86a" strokeWidth="1.4" strokeLinejoin="round"
+      />
+      <path d="M32 54 C36 40 42 28 54 10" stroke="#c9a86a" strokeWidth="1" opacity="0.7" />
+      <path
+        d="M30 50 C24 44 14 42 8 44 C14 50 22 53 30 50 Z"
+        stroke="#c9a86a" strokeWidth="1.2" strokeLinejoin="round" opacity="0.8"
+      />
+    </svg>
   )
 }
 
@@ -314,8 +349,8 @@ function Onboarding() {
     <div className="min-h-dvh flex flex-col px-6 pt-14 pb-8">
       {/* ヒーロー */}
       <div className="text-center mb-12 animate-slide-up">
-        <div className="w-16 h-16 mx-auto mb-6 rounded-full bg-[#2a2622] border border-[var(--accent)] flex items-center justify-center">
-          <span className="text-[#e9ddc7] text-xl tracking-wide">私</span>
+        <div className="w-16 h-16 mx-auto mb-6 rounded-full bg-[#333a28] border border-[var(--gold)] flex items-center justify-center">
+          <span className="text-[#efe9d3] text-xl tracking-wide">私</span>
         </div>
         <div className="eyebrow mb-3" style={{ letterSpacing: '0.3em' }}>Welcome</div>
         <h1 className="text-2xl font-bold text-[var(--foreground)] tracking-tight">
@@ -349,7 +384,7 @@ function Onboarding() {
       <div className="mt-auto animate-slide-up" style={{ animationDelay: '0.35s', animationFillMode: 'backwards' }}>
         <Link
           href="/checkin"
-          className="block w-full py-4 text-center rounded-[2px] bg-[var(--accent)] text-[#2a2622] font-bold text-base active:scale-[0.99] transition-transform glow-sky"
+          className="block w-full py-4 text-center rounded-full bg-[var(--accent)] text-[#f7f4ea] font-bold text-base active:scale-[0.99] transition-transform glow-sky"
         >
           最初のチェックインを始める →
         </Link>

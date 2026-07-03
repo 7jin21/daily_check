@@ -160,7 +160,7 @@ export default function SettingsPage() {
       <div className="card">
         <h2 className="font-bold text-[var(--foreground)] mb-4">アカウント</h2>
         <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-full bg-[#2a2622] border border-[var(--accent)] flex items-center justify-center text-[#e9ddc7] text-xl">
+          <div className="w-12 h-12 rounded-full bg-[#333a28] border border-[var(--gold)] flex items-center justify-center text-[#efe9d3] text-xl">
             👤
           </div>
           <div>
@@ -203,7 +203,7 @@ export default function SettingsPage() {
         </div>
 
         {pushMessage && (
-          <p className="mb-4 p-3 rounded-[3px] bg-[var(--surface-secondary)] text-xs text-[var(--muted)] leading-relaxed">
+          <p className="mb-4 p-3 rounded-2xl bg-[var(--surface-secondary)] text-xs text-[var(--muted)] leading-relaxed">
             {pushMessage}
           </p>
         )}
@@ -217,7 +217,7 @@ export default function SettingsPage() {
               type="time"
               value={notificationTime}
               onChange={(e) => setNotificationTime(e.target.value)}
-              className="w-full px-4 py-3 rounded-[3px] border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] text-base focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
+              className="w-full px-4 py-3 rounded-2xl border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] text-base focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
             />
             <p className="mt-1.5 text-xs text-[var(--muted-2)]">
               ※ 現在は毎日21時ごろの一斉配信です（時刻指定配信は準備中）
@@ -254,7 +254,7 @@ export default function SettingsPage() {
               value={notionTokenInput}
               onChange={(e) => setNotionTokenInput(e.target.value)}
               placeholder={hasNotionToken ? '設定済み（変更する場合のみ入力）' : 'secret_...'}
-              className="w-full px-4 py-3 rounded-[3px] border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] text-base focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
+              className="w-full px-4 py-3 rounded-2xl border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] text-base focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
             />
           </div>
           <div>
@@ -266,12 +266,12 @@ export default function SettingsPage() {
               value={notionDatabaseId}
               onChange={(e) => setNotionDatabaseId(e.target.value)}
               placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-              className="w-full px-4 py-3 rounded-[3px] border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] text-base focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
+              className="w-full px-4 py-3 rounded-2xl border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] text-base focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
             />
           </div>
         </div>
 
-        <div className="mt-3 p-3 rounded-[3px] bg-[var(--surface-secondary)] text-[var(--muted)] text-xs">
+        <div className="mt-3 p-3 rounded-2xl bg-[var(--surface-secondary)] text-[var(--muted)] text-xs">
           📝 Notion API トークンは{' '}
           <a href="https://www.notion.so/my-integrations" target="_blank" rel="noopener noreferrer" className="underline">
             notion.so/my-integrations
@@ -300,14 +300,14 @@ export default function SettingsPage() {
           <a
             href="/api/export?format=json"
             download
-            className="flex-1 py-3 text-center rounded-[3px] border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] text-sm font-medium active:scale-95 transition-transform"
+            className="flex-1 py-3 text-center rounded-2xl border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] text-sm font-medium active:scale-95 transition-transform"
           >
             📦 JSON で保存
           </a>
           <a
             href="/api/export?format=csv"
             download
-            className="flex-1 py-3 text-center rounded-[3px] border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] text-sm font-medium active:scale-95 transition-transform"
+            className="flex-1 py-3 text-center rounded-2xl border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] text-sm font-medium active:scale-95 transition-transform"
           >
             📊 CSV で保存
           </a>
@@ -321,7 +321,7 @@ export default function SettingsPage() {
       <button
         onClick={handleSave}
         disabled={isSaving}
-        className="w-full py-4 rounded-[2px] bg-[var(--accent)] text-[#2a2622] font-bold text-base disabled:opacity-40 active:scale-[0.99] transition-transform"
+        className="w-full py-4 rounded-full bg-[var(--accent)] text-[#f7f4ea] font-bold text-base disabled:opacity-40 active:scale-[0.99] transition-transform"
       >
         {isSaving ? '保存中...' : '設定を保存'}
       </button>
@@ -333,7 +333,7 @@ export default function SettingsPage() {
       {/* サインアウト */}
       <button
         onClick={handleSignOut}
-        className="w-full py-4 rounded-[2px] border border-[#b5654a]/40 text-[#9c4a2f] dark:text-[#d39177] font-medium text-base active:scale-[0.99] transition-transform"
+        className="w-full py-4 rounded-full border border-[#b5654a]/40 text-[#9c4a2f] dark:text-[#d39177] font-medium text-base active:scale-[0.99] transition-transform"
       >
         サインアウト
       </button>

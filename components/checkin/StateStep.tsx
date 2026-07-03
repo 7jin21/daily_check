@@ -32,7 +32,7 @@ export default function StateStep() {
               key={m.value}
               onClick={() => handleMood(m.value)}
               className={`
-                flex flex-col items-center gap-2 p-3 rounded-[3px] border transition-all duration-150 active:scale-95
+                flex flex-col items-center gap-2 p-3 rounded-2xl border transition-all duration-150 active:scale-95
                 ${mood === m.value ? 'scale-105' : 'border-[var(--border)] bg-[var(--surface)]'}
               `}
               style={mood === m.value ? { borderColor: m.color, background: `${m.color}1f` } : {}}
@@ -63,7 +63,7 @@ export default function StateStep() {
               key={e.value}
               onClick={() => handleEnergy(e.value)}
               className={`
-                flex flex-col items-center justify-end gap-2 p-3 pt-2 rounded-[3px] border transition-all duration-150 active:scale-95
+                flex flex-col items-center justify-end gap-2 p-3 pt-2 rounded-2xl border transition-all duration-150 active:scale-95
                 ${energy === e.value ? 'scale-105' : 'border-[var(--border)] bg-[var(--surface)]'}
               `}
               style={energy === e.value ? { borderColor: e.color, background: `${e.color}1f` } : {}}

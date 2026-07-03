@@ -35,7 +35,7 @@ export default function StreakCelebration({ streak }: { streak: number }) {
       className="fixed top-safe left-1/2 z-50 animate-slide-up"
       style={{ transform: 'translateX(-50%)', top: 'calc(env(safe-area-inset-top) + 16px)' }}
     >
-      <div className="px-6 py-3 rounded-[3px] bg-[#2a2622] text-[#f4efe6] font-semibold text-sm shadow-xl shadow-[rgba(42,38,34,0.3)] whitespace-nowrap border border-[var(--accent)]">
+      <div className="px-6 py-3 rounded-2xl bg-[#333a28] text-[#f5f2e7] font-semibold text-sm shadow-xl shadow-[rgba(42,38,34,0.3)] whitespace-nowrap border border-[var(--gold)]">
         {message}
       </div>
     </div>

@@ -225,7 +225,7 @@ export default function VoiceInputButton({ onResult }: VoiceInputButtonProps) {
       {errorMsg && (
         <span
           role="status"
-          className="absolute bottom-full right-0 mb-2 whitespace-nowrap rounded-[3px] bg-[#2a2622] px-2 py-1 text-xs text-[#f4efe6] shadow-lg"
+          className="absolute bottom-full right-0 mb-2 whitespace-nowrap rounded-2xl bg-[#333a28] px-2 py-1 text-xs text-[#f5f2e7] shadow-lg"
         >
           {errorMsg}
         </span>

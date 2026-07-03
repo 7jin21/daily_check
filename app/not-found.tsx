@@ -10,7 +10,7 @@ export default function NotFound() {
       </p>
       <Link
         href="/"
-        className="mt-8 w-full max-w-xs py-3.5 rounded-[2px] bg-[var(--accent)] text-[#2a2622] font-bold text-center active:scale-[0.99] transition-transform"
+        className="mt-8 w-full max-w-xs py-3.5 rounded-full bg-[var(--accent)] text-[#f7f4ea] font-bold text-center active:scale-[0.99] transition-transform"
       >
         ホームに戻る
       </Link>

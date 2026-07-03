@@ -24,13 +24,13 @@ export default function Error({
       <div className="w-full max-w-xs mt-8 space-y-3">
         <button
           onClick={reset}
-          className="w-full py-3.5 rounded-[2px] bg-[var(--accent)] text-[#2a2622] font-bold active:scale-[0.99] transition-transform"
+          className="w-full py-3.5 rounded-full bg-[var(--accent)] text-[#f7f4ea] font-bold active:scale-[0.99] transition-transform"
         >
           もう一度試す
         </button>
         <Link
           href="/"
-          className="block w-full py-3 rounded-[2px] border border-[var(--border)] text-[var(--muted)] text-sm active:scale-95 transition-transform"
+          className="block w-full py-3 rounded-full border border-[var(--border)] text-[var(--muted)] text-sm active:scale-95 transition-transform"
         >
           ホームに戻る
         </Link>

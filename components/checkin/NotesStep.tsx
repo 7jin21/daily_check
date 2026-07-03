@@ -127,7 +127,7 @@ export default function NotesStep() {
           const isOpen = openSections[id]
           const value = values[id]
           return (
-            <section key={id} className="border border-[var(--border)] rounded-[3px] bg-[var(--surface)]">
+            <section key={id} className="border border-[var(--border)] rounded-2xl bg-[var(--surface)]">
               <button
                 type="button"
                 onClick={() => toggleSection(id)}

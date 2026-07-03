@@ -26,7 +26,7 @@ export default function AddToHomeScreenBanner() {
 
   return (
     <div
-      className="fixed left-4 right-4 z-50 bg-[var(--surface)] rounded-[3px] shadow-xl border border-[var(--border)] p-4"
+      className="fixed left-4 right-4 z-50 bg-[var(--surface)] rounded-2xl shadow-xl border border-[var(--border)] p-4"
       style={{ bottom: 'calc(var(--bottom-nav-height) + env(safe-area-inset-bottom) + 12px)' }}
     >
       <div className="flex items-start gap-3">

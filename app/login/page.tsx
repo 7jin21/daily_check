@@ -48,7 +48,7 @@ export default function LoginPage() {
 
       {/* ロゴ */}
       <div className="mb-10 text-center animate-slide-up">
-        <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-[#2a2622] border border-[var(--accent)] flex items-center justify-center shadow-xl glow-sky">
+        <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-[#333a28] border border-[var(--gold)] flex items-center justify-center shadow-xl glow-sky">
           <span className="text-3xl">🪞</span>
         </div>
         <div className="eyebrow mb-3" style={{ letterSpacing: '0.3em' }}>Diary</div>
@@ -79,7 +79,7 @@ export default function LoginPage() {
         <button
           onClick={() => handleOAuthLogin('apple')}
           disabled={isLoading !== null}
-          className="w-full flex items-center justify-center gap-3 px-6 py-4 rounded-[2px] bg-[#2a2622] text-[#f4efe6] font-semibold text-base disabled:opacity-60 active:scale-[0.99] transition-transform shadow-lg"
+          className="w-full flex items-center justify-center gap-3 px-6 py-4 rounded-full bg-[#333a28] text-[#f5f2e7] font-semibold text-base disabled:opacity-60 active:scale-[0.99] transition-transform shadow-lg"
         >
           {isLoading === 'apple' ? (
             <div className="spinner border-white/30 border-t-white" />
@@ -94,7 +94,7 @@ export default function LoginPage() {
         <button
           onClick={() => handleOAuthLogin('google')}
           disabled={isLoading !== null}
-          className="w-full flex items-center justify-center gap-3 px-6 py-4 rounded-[2px] bg-[var(--surface)] border border-[var(--border)] text-[var(--foreground)] font-semibold text-base disabled:opacity-60 active:scale-[0.99] transition-transform"
+          className="w-full flex items-center justify-center gap-3 px-6 py-4 rounded-full bg-[var(--surface)] border border-[var(--border)] text-[var(--foreground)] font-semibold text-base disabled:opacity-60 active:scale-[0.99] transition-transform"
         >
           {isLoading === 'google' ? (
             <div className="spinner" />
@@ -108,7 +108,7 @@ export default function LoginPage() {
       </div>
 
       {error && (
-        <div className="mt-4 w-full max-w-sm p-4 rounded-[3px] bg-[#b5654a]/10 border border-[#b5654a]/30 text-[#9c4a2f] dark:text-[#d39177] text-sm text-center animate-fade-in">
+        <div className="mt-4 w-full max-w-sm p-4 rounded-2xl bg-[#b5654a]/10 border border-[#b5654a]/30 text-[#9c4a2f] dark:text-[#d39177] text-sm text-center animate-fade-in">
           {error}
         </div>
       )}
