@@ -3,6 +3,7 @@ import { redirect, notFound } from 'next/navigation'
 import Link from 'next/link'
 import EditableContent from '@/components/entry/EditableContent'
 import DeleteEntryButton from '@/components/entry/DeleteEntryButton'
+import ShareEntryButton from '@/components/entry/ShareEntryButton'
 
 interface Props {
   params: Promise<{ date: string }>
@@ -139,6 +140,17 @@ export default async function EntryDetailPage({ params }: Props) {
             <p className="text-base text-[var(--foreground)] whitespace-pre-wrap leading-relaxed">{entry.freeform}</p>
           </div>
         )}
+      </div>
+
+      {/* シェア */}
+      <div className="mt-6 flex gap-3">
+        <ShareEntryButton
+          date={date}
+          mood={entry.mood as number | null}
+          summary={entry.summary as string | null}
+          dominantEmotion={entry.dominant_emotion as string | null}
+          tags={Array.isArray(entry.tags) ? (entry.tags as string[]) : []}
+        />
       </div>
 
       {/* Notion同期状態 */}

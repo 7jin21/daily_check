@@ -13,6 +13,7 @@ import {
   subscribeToPush,
   unsubscribeFromPush,
 } from '@/lib/push-client'
+import ThemeToggle from '@/components/ui/ThemeToggle'
 
 interface ServerSettings {
   hasNotionToken: boolean
@@ -168,6 +169,15 @@ export default function SettingsPage() {
             <p className="text-sm text-[var(--muted)]">Inner Mirrorユーザー</p>
           </div>
         </div>
+      </div>
+
+      {/* 外観（テーマ） */}
+      <div className="card">
+        <h2 className="font-bold text-[var(--foreground)] mb-1">外観</h2>
+        <p className="text-xs text-[var(--muted)] mb-4">
+          この端末での表示テーマを選べます
+        </p>
+        <ThemeToggle />
       </div>
 
       {/* 通知設定 */}
