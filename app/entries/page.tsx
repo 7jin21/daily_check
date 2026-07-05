@@ -1,6 +1,7 @@
 import { createServerSupabaseClient } from '@/lib/supabase-server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
+import MonthCalendar from '@/components/entries/MonthCalendar'
 
 interface Entry {
   id: string
@@ -12,7 +13,19 @@ interface Entry {
 }
 
 interface Props {
-  searchParams: Promise<{ q?: string; page?: string }>
+  searchParams: Promise<{ q?: string; page?: string; view?: string; month?: string }>
+}
+
+/** Asia/Tokyo の今日の日付を YYYY-MM-DD で返す */
+function getTodayJST(): string {
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Tokyo' })
+}
+
+/** "YYYY-MM" を delta ヶ月分ずらす */
+function shiftMonth(monthStr: string, delta: number): string {
+  const [y, m] = monthStr.split('-').map(Number)
+  const d = new Date(y, m - 1 + delta, 1)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
 }
 
 const PAGE_SIZE = 60
@@ -31,6 +44,29 @@ function sanitizeQuery(raw: string): string {
   return raw.replace(/[,()]/g, ' ').replace(/[%_\\]/g, '\\$&').trim().slice(0, 50)
 }
 
+function ViewToggle({ view }: { view: 'list' | 'calendar' }) {
+  return (
+    <div className="flex gap-1 p-1 mb-6 rounded-full bg-[var(--surface-secondary)] border border-[var(--border)] w-fit">
+      <Link
+        href="/entries"
+        className={`px-5 py-2 rounded-full text-sm font-medium transition-colors ${
+          view === 'list' ? 'bg-[var(--accent)] text-[#f7f4ea]' : 'text-[var(--muted)]'
+        }`}
+      >
+        リスト
+      </Link>
+      <Link
+        href="/entries?view=calendar"
+        className={`px-5 py-2 rounded-full text-sm font-medium transition-colors ${
+          view === 'calendar' ? 'bg-[var(--accent)] text-[#f7f4ea]' : 'text-[var(--muted)]'
+        }`}
+      >
+        カレンダー
+      </Link>
+    </div>
+  )
+}
+
 export default async function EntriesPage({ searchParams }: Props) {
   const supabase = await createServerSupabaseClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -38,6 +74,58 @@ export default async function EntriesPage({ searchParams }: Props) {
   if (!user) redirect('/login')
 
   const params = await searchParams
+  const view = params.view === 'calendar' ? 'calendar' : 'list'
+  const todayJST = getTodayJST()
+  const currentMonth = todayJST.slice(0, 7)
+
+  if (view === 'calendar') {
+    const monthParam = /^\d{4}-\d{2}$/.test(params.month ?? '') ? (params.month as string) : currentMonth
+    const [y, m] = monthParam.split('-').map(Number)
+    const firstDay = `${monthParam}-01`
+    const lastDay = `${monthParam}-${String(new Date(y, m, 0).getDate()).padStart(2, '0')}`
+
+    const { data: monthEntries, error } = await supabase
+      .from('diary_entries')
+      .select('entry_date, mood, summary')
+      .eq('user_id', user.id)
+      .gte('entry_date', firstDay)
+      .lte('entry_date', lastDay)
+
+    if (error) {
+      console.error('Failed to fetch month entries:', error)
+    }
+
+    return (
+      <div className="px-5 pt-8 pb-8">
+        <div className="section-head mb-5" style={{ borderBottomColor: 'var(--divider-strong)' }}>
+          <div className="flex items-baseline gap-4">
+            <div className="eyebrow">All entries</div>
+            <h1 className="text-2xl font-bold text-[var(--foreground)]">日記一覧</h1>
+          </div>
+          <Link
+            href="/checkin"
+            className="w-10 h-10 rounded-full bg-[var(--accent)] text-[#f7f4ea] flex items-center justify-center text-xl font-bold"
+            aria-label="新しい記録を追加"
+          >
+            +
+          </Link>
+        </div>
+
+        <ViewToggle view={view} />
+
+        <MonthCalendar
+          year={y}
+          month={m}
+          entries={(monthEntries ?? []) as { entry_date: string; mood: number; summary: string | null }[]}
+          todayJST={todayJST}
+          prevHref={`/entries?view=calendar&month=${shiftMonth(monthParam, -1)}`}
+          nextHref={monthParam < currentMonth ? `/entries?view=calendar&month=${shiftMonth(monthParam, 1)}` : null}
+          todayHref={monthParam !== currentMonth ? `/entries?view=calendar&month=${currentMonth}` : null}
+        />
+      </div>
+    )
+  }
+
   const rawQuery = (params.q ?? '').trim().slice(0, 50)
   const q = sanitizeQuery(rawQuery)
   const page = Math.max(1, parseInt(params.page ?? '1', 10) || 1)
@@ -94,6 +182,8 @@ export default async function EntriesPage({ searchParams }: Props) {
           +
         </Link>
       </div>
+
+      <ViewToggle view="list" />
 
       {/* キーワード検索（GET フォーム） */}
       <form method="GET" action="/entries" className="mb-6 flex gap-2">
