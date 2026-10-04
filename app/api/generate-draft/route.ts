@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createReadonlyServerClient } from '@/lib/supabase-server'
 import { generateOfflineDraft } from '@/lib/offline-draft'
 import { getGroqClient, GROQ_MODELS } from '@/lib/groq'
-import type { CheckinInput } from '@/stores/checkin'
+import { DRAFT_SYSTEM_PROMPT, buildDraftUserPrompt, type DraftPromptInput } from '@/lib/draft-prompt'
 
 // 日記本文を text/plain でストリーミング返却する。
 // タグ・サマリー等のメタ情報は本文確定後に /api/draft-meta で取得する（クライアント側）。
@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
   }
 
   // 2. リクエストボディ検証
-  let input: CheckinInput & { reflectionQ?: string; reflectionA?: string; entryDate?: string }
+  let input: DraftPromptInput & { entryDate?: string }
   try {
     input = await req.json()
   } catch {
@@ -65,55 +65,21 @@ export async function POST(req: NextRequest) {
     })
   }
 
-  // 4. 文体学習: 直近の日記2件を文体サンプルとしてプロンプトに含める
-  let styleSamples = ''
-  try {
-    const { data: recent } = await supabase
-      .from('diary_entries')
-      .select('edited_draft, ai_draft')
-      .eq('user_id', user.id)
-      .order('entry_date', { ascending: false })
-      .limit(2)
-
-    const samples = (recent ?? [])
-      .map((r) => (r.edited_draft || r.ai_draft || '').trim().slice(0, 300))
-      .filter(Boolean)
-
-    if (samples.length > 0) {
-      styleSamples = `\n\n【参考: 過去の日記の文体サンプル】\n（口調・文体・リズムだけ真似てください。内容や出来事は絶対に流用しないこと）\n\n${samples.join('\n---\n')}`
-    }
-  } catch {
-    // 文体サンプル取得失敗は無視（通常生成にフォールバック）
-  }
-
-  // 5. GROQ API ストリーミング呼び出し
+  // 4. GROQ API ストリーミング呼び出し
+  // 本人の言葉を残す「清書」方針（lib/draft-prompt.ts）。過去の日記を文体見本に使うのはやめた
+  // （見本の大半が AI の文章で、AI 調を強める原因になっていたため）
   try {
     const groq = getGroqClient()
     const stream = await groq.chat.completions.create({
       model: GROQ_MODELS.quality,
       max_tokens: 1536, // 日本語はトークン消費が多いため余裕を持たせる
+      // 言い換えを減らすため低め。reasoning は推論トークンが max_tokens を食わないよう抑える
+      temperature: 0.3,
+      reasoning_effort: 'low',
       stream: true,
       messages: [
-        {
-          role: 'system',
-          content: `あなたは共感的な日記ライターです。ユーザーが提供した情報をもとに、
-一人称（私は）の自然な日本語の日記を書いてください。
-その日の経験に気持ちを添えて、素直で温かい語り口で表現してください。
-
-最低限のルール（必ず守る）:
-- 事実に基づいて書く。ユーザーが入力した出来事・情報だけを用い、入力にない出来事や具体的な事実を創作・脚色しない（気持ちや内省の描写は加えてよい）
-- 構成は整理して読みやすくする。話があちこちに飛ばず、自然な流れ（出来事→そのときの気持ち→ちょっとした気づき）でまとめる
-- ただしこれはあくまで日記。報告書・分析レポートのような硬い文体やビジネス口調（「〜と推測できる」「〜すべきだ」「効率を上げる」等）は使わず、日常の言葉でやわらかく書く
-
-その他のルール:
-- 500文字程度
-- 日記の本文のみを出力する（前置き・見出し・記号・JSONは一切付けない）
-- 過去の日記サンプルがあれば、その口調と文体を真似る（内容は使わない）`,
-        },
-        {
-          role: 'user',
-          content: buildPrompt(input, entryDate) + styleSamples,
-        },
+        { role: 'system', content: DRAFT_SYSTEM_PROMPT },
+        { role: 'user', content: buildDraftUserPrompt(input, entryDate) },
       ],
     })
 
@@ -141,49 +107,4 @@ export async function POST(req: NextRequest) {
       headers: { ...PLAIN_HEADERS, 'X-Draft-Fallback': '1' },
     })
   }
-}
-
-function buildPrompt(
-  input: CheckinInput & { reflectionQ?: string; reflectionA?: string },
-  entryDate: string | null
-): string {
-  const parts: string[] = []
-
-  // 過去日付の書き忘れ救済: その日の日記として書く（「今日」と書かないよう明示）
-  if (entryDate) {
-    const label = new Date(`${entryDate}T12:00:00+09:00`).toLocaleDateString('ja-JP', {
-      timeZone: 'Asia/Tokyo',
-      month: 'long',
-      day: 'numeric',
-      weekday: 'long',
-    })
-    parts.push(`この日記の対象日: ${label}（この日を振り返って書かれた日記として自然に書く）`)
-  }
-
-  parts.push(`気分スコア: ${input.mood}/5`)
-  parts.push(`エネルギースコア: ${input.energy}/5`)
-
-  if (input.events?.trim()) {
-    parts.push(`今日の出来事:\n${input.events}`)
-  }
-  if (input.challenges?.trim()) {
-    parts.push(`困ったこと・課題:\n${input.challenges}`)
-  }
-  if (input.gratitude?.trim()) {
-    parts.push(`感謝できること:\n${input.gratitude}`)
-  }
-  if (input.freeform?.trim()) {
-    parts.push(`その他メモ:\n${input.freeform}`)
-  }
-
-  // 内省の問いと答え（あれば）。気持ち・価値観として日記に自然に織り込む。
-  const q = input.reflectionQ?.trim()
-  const a = input.reflectionA?.trim()
-  if (q && a) {
-    parts.push(
-      `本人が振り返って答えたこと（ここに表れた気持ち・価値観を日記に自然に織り込む。問いや「答え:」などのラベルはそのまま書かない）:\n問い: ${q.slice(0, 300)}\n答え: ${a.slice(0, 300)}`
-    )
-  }
-
-  return parts.join('\n\n')
 }

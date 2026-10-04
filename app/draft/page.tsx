@@ -356,7 +356,7 @@ export default function DraftPage() {
         <div className="min-h-dvh flex flex-col px-4 pt-6">
           <div className="flex items-center gap-3 mb-6">
             <div className="spinner" style={{ width: 20, height: 20 }} />
-            <h1 className="text-lg font-bold text-[var(--foreground)]">AIが日記を書いています…</h1>
+            <h1 className="text-lg font-bold text-[var(--foreground)]">あなたの言葉を清書しています…</h1>
           </div>
           <div className="card flex-1 mb-4 overflow-y-auto">
             <p className="text-base text-[var(--foreground)] whitespace-pre-wrap leading-relaxed">
@@ -381,7 +381,7 @@ export default function DraftPage() {
       <div className="min-h-dvh flex flex-col items-center justify-center px-4 gap-6">
         <div className="spinner" style={{ width: 48, height: 48, borderWidth: 3 }} />
         <div className="text-center">
-          <p className="font-bold text-[var(--foreground)] text-lg">AIが日記を書いています...</p>
+          <p className="font-bold text-[var(--foreground)] text-lg">あなたの言葉を清書しています…</p>
           <p className="text-[var(--muted-2)] text-sm mt-1">少々お待ちください ✨</p>
         </div>
         <button

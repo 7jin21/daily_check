@@ -175,7 +175,7 @@ export default function CheckinPage() {
           disabled={!canProceed()}
           className="w-full py-4 rounded-full bg-[var(--accent)] text-[#f7f4ea] font-bold text-base disabled:opacity-30 active:scale-[0.99] transition-transform glow-sky"
         >
-          {stepIndex < totalSteps - 1 ? '次へ →' : 'AIに日記を書いてもらう ✨'}
+          {stepIndex < totalSteps - 1 ? '次へ →' : '日記に清書する ✨'}
         </button>
         {step.id === 'notes' && (
           <p className="text-center text-xs text-[var(--muted-2)] mt-2">入力しなくても進めます</p>
