@@ -14,6 +14,7 @@ export const metadata: Metadata = {
     title: 'Inner Mirror',
   },
   icons: {
+    icon: '/icon-192.png',
     apple: '/icon-192.png',
   },
 }
@@ -39,16 +40,16 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <meta name="apple-mobile-web-app-title" content="Inner Mirror" />
         <link rel="apple-touch-icon" href="/icon-192.png" />
-        {/* ボタニカル: 欧文 Cormorant Garamond ＋ 和文 Shippori Mincho（上質な日記帳の明朝体） */}
+        {/* 書体: 欧文・数字 Cormorant Garamond ／ 和文 Shippori Mincho（明朝）／ 小さな UI 文字 Zen Kaku Gothic New */}
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link
-          href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Shippori+Mincho:wght@500;600;700;800&display=swap"
+          href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,500&family=Shippori+Mincho:wght@500;600;700;800&family=Zen+Kaku+Gothic+New:wght@500;700&display=swap"
           rel="stylesheet"
         />
-        {/* テーマカラー: ライト＝クリーム / ダーク＝深い森 */}
-        <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f2efe6" />
-        <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#20241b" />
+        {/* テーマカラー: ライト＝和紙 / ダーク＝墨 */}
+        <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f3efe6" />
+        <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#141612" />
       </head>
       <body>
         {/* Service Worker 登録（静的アセットのオフラインキャッシュ） */}

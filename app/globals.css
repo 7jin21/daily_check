@@ -2,70 +2,67 @@
 @tailwind components;
 @tailwind utilities;
 
-/* CSS カスタムプロパティ — ボタニカル・セレニティ（クリーム・セージグリーン・ゴールド・ダスティブルー） */
+/* CSS カスタムプロパティ — 和紙と墨（クリーム・墨・セージ・金）。ホームの「水鏡」と共通の基調 */
 :root {
-  --background: #f2efe6;       /* クリーム（ページ背景） */
-  --foreground: #32362a;       /* 深いオリーブインク（本文・見出し） */
-  --surface: #faf8f1;          /* カードのクリーム */
-  --surface-secondary: #eae6d8;/* やや濃いクリーム（スケルトン等） */
-  --border: #e4dfd0;           /* カード・リストの細罫 */
-  --divider: #ded9c8;          /* セクション区切り罫 */
-  --divider-strong: #4a4f3c;   /* 強い区切り罫（ヘッダー等） */
-  --primary: #5f7a4c;          /* セージグリーン（リンク・アクセント） */
-  --primary-foreground: #faf8f1;
+  --background: #f3efe6;       /* 和紙（ページ背景） */
+  --foreground: #24271f;       /* 墨（本文・見出し） */
+  --surface: #fbf9f3;          /* カードの紙 */
+  --surface-secondary: #ebe6d8;/* やや濃い紙（スケルトン等） */
+  --border: #e2dccd;           /* カード・リストの細罫 */
+  --divider: #ddd6c5;          /* セクション区切り罫 */
+  --divider-strong: #3f4334;   /* 強い区切り罫（ヘッダー等） */
+  --primary: #5a744a;          /* セージ（リンク・アクセント）。紙の上で AA を満たす濃さ */
+  --primary-foreground: #fbf9f3;
   --accent: #6b8756;           /* 深めのセージ（CTA ピルボタン） */
   --accent-hover: #7a9464;
-  --gold: #ab8b4e;             /* ゴールド（アイキャッチ・リング） */
+  --gold: #a88746;             /* 金（アイキャッチ・リング） */
   --blue: #8ba3b5;             /* ダスティブルー（統計・気分） */
-  --muted: #8b8877;            /* 補助テキスト */
-  --muted-2: #aaa68f;          /* さらに淡い補助テキスト */
+  --muted: #6f6c5d;            /* 補助テキスト（AA 4.5:1 以上） */
+  --muted-2: #8f8b78;          /* さらに淡い補助テキスト（大きめの文字・装飾用） */
+  --hairline: rgba(36, 39, 31, 0.12); /* 極細の罫 */
   /* Safe area insets (iPhone対応) */
   --safe-area-top: env(safe-area-inset-top);
   --safe-area-bottom: env(safe-area-inset-bottom);
   --safe-area-left: env(safe-area-inset-left);
   --safe-area-right: env(safe-area-inset-right);
   /* BottomNavの高さ */
-  --bottom-nav-height: 68px;
+  --bottom-nav-height: 64px;
 }
 
-/* ダークモード（OSのカラースキーム設定に自動追従）— 深い森のグリーン系で統一 */
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #20241b;
-    --foreground: #efece0;
-    --surface: #2a2f23;
-    --surface-secondary: #353b2c;
-    --border: #3d4433;
-    --divider: #3d4433;
-    --divider-strong: #6a7257;
-    --primary: #9db884;
-    --primary-foreground: #20241b;
-    --accent: #7a9464;
-    --accent-hover: #8aa673;
-    --gold: #c9a86a;
-    --blue: #93aabb;
-    --muted: #999682;
-    --muted-2: #6f7060;
-  }
-}
-
-/* .dark クラスによる手動オーバーライド */
+/*
+ * ダークモード（墨）。<html> の .dark クラスだけで切り替える。
+ * 「自動」の場合も layout.tsx のインラインスクリプトが OS 設定を見て .dark を付ける。
+ * （以前は @media (prefers-color-scheme: dark) でも上書きしていたため、
+ *   OS がダークのとき設定で「ライト」を選んでも暗いままになっていた）
+ */
 .dark {
-  --background: #20241b;
-  --foreground: #efece0;
-  --surface: #2a2f23;
-  --surface-secondary: #353b2c;
-  --border: #3d4433;
-  --divider: #3d4433;
+  --background: #141612;
+  --foreground: #ece7da;
+  --surface: #1c1f1a;
+  --surface-secondary: #262a23;
+  --border: #30352c;
+  --divider: #30352c;
   --divider-strong: #6a7257;
-  --primary: #9db884;
-  --primary-foreground: #20241b;
+  --primary: #a9c08f;
+  --primary-foreground: #141612;
   --accent: #7a9464;
   --accent-hover: #8aa673;
-  --gold: #c9a86a;
+  --gold: #cfae6e;
   --blue: #93aabb;
-  --muted: #999682;
-  --muted-2: #6f7060;
+  --muted: #a7a393;
+  --muted-2: #807d6f;
+  --hairline: rgba(236, 231, 218, 0.12);
+}
+
+/* 書体ユーティリティ */
+.font-display {
+  font-family: 'Cormorant Garamond', 'Shippori Mincho', serif;
+}
+.font-mincho {
+  font-family: 'Shippori Mincho', 'Hiragino Mincho ProN', 'Yu Mincho', serif;
+}
+.font-ui {
+  font-family: 'Zen Kaku Gothic New', 'Hiragino Sans', 'Noto Sans JP', system-ui, sans-serif;
 }
 
 /* ベーススタイル */
@@ -103,11 +100,66 @@ body {
   padding-bottom: env(safe-area-inset-bottom);
 }
 
-/* ページコンテンツ（BottomNav分の余白） */
+/* ページコンテンツ（浮いた BottomNav の高さ＋下余白の分をあける） */
 .page-content {
-  padding-bottom: calc(var(--bottom-nav-height) + env(safe-area-inset-bottom));
+  padding-bottom: calc(var(--bottom-nav-height) + 20px + env(safe-area-inset-bottom));
   padding-top: env(safe-area-inset-top);
   min-height: 100dvh;
+}
+
+/* 浮いたカプセル型ナビゲーション（BottomNav） */
+.nav-float {
+  position: fixed;
+  z-index: 50;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: calc(env(safe-area-inset-bottom) + 12px);
+  width: min(360px, calc(100% - 32px));
+}
+.nav-capsule {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  height: var(--bottom-nav-height);
+  padding: 0 6px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--surface) 80%, transparent);
+  backdrop-filter: blur(18px) saturate(1.4);
+  -webkit-backdrop-filter: blur(18px) saturate(1.4);
+  border: 1px solid var(--hairline);
+  box-shadow: 0 14px 36px rgba(20, 22, 18, 0.16), 0 2px 6px rgba(20, 22, 18, 0.06);
+}
+.nav-item {
+  position: relative;
+  flex-direction: column;
+  gap: 3px;
+  color: var(--muted);
+  transition: color 0.2s;
+}
+.nav-item[data-active='true'] {
+  color: var(--foreground);
+}
+.nav-item[data-active='true']::after {
+  /* 現在地を示す金の点 */
+  content: '';
+  position: absolute;
+  bottom: 7px;
+  width: 4px;
+  height: 4px;
+  border-radius: 4px;
+  background: var(--gold);
+}
+.nav-item:active {
+  transform: scale(0.94);
+}
+.nav-label {
+  font-family: 'Zen Kaku Gothic New', 'Hiragino Sans', system-ui, sans-serif;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  margin-bottom: 6px;
+}
+.nav-item[data-active='true'] .nav-label {
+  font-weight: 700;
 }
 
 /* iOS タップハイライト無効化 */
@@ -181,52 +233,6 @@ body {
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
-}
-
-/* ヒーロー等のアクセント面（深い森＋夕方の光） */
-.animated-gradient {
-  background: linear-gradient(135deg, #262b1d 0%, #3a3f2c 60%, #57503a 100%);
-}
-
-/* ホームのヒーロー背景（暗い植物写真の雰囲気を CSS グラデーションで再現） */
-.hero-botanical {
-  background:
-    radial-gradient(120% 90% at 85% 0%, rgba(171, 139, 78, 0.28) 0%, rgba(171, 139, 78, 0) 55%),
-    radial-gradient(80% 60% at 10% 100%, rgba(95, 122, 76, 0.35) 0%, rgba(95, 122, 76, 0) 60%),
-    linear-gradient(150deg, #23281b 0%, #2e3423 45%, #4a4531 100%);
-}
-
-/* CTA カードのクリーム面（紙の温かみ＋淡い緑の差し込み） */
-.cta-paper {
-  background:
-    radial-gradient(90% 120% at 100% 100%, rgba(139, 163, 117, 0.20) 0%, rgba(139, 163, 117, 0) 55%),
-    linear-gradient(160deg, #fbf9f2 0%, #f1eddd 100%);
-}
-.dark .cta-paper {
-  background:
-    radial-gradient(90% 120% at 100% 100%, rgba(139, 163, 117, 0.16) 0%, rgba(139, 163, 117, 0) 55%),
-    linear-gradient(160deg, #2e3426 0%, #272c1f 100%);
-}
-@media (prefers-color-scheme: dark) {
-  .cta-paper {
-    background:
-      radial-gradient(90% 120% at 100% 100%, rgba(139, 163, 117, 0.16) 0%, rgba(139, 163, 117, 0) 55%),
-      linear-gradient(160deg, #2e3426 0%, #272c1f 100%);
-  }
-}
-
-/* ピル型 CTA ボタン（セージのグラデーション＋やわらかい影） */
-.btn-pill {
-  border-radius: 9999px;
-  background: linear-gradient(150deg, #7a9464 0%, #5d7a4a 100%);
-  color: #f7f4ea;
-  box-shadow: 0 10px 22px rgba(95, 122, 76, 0.35);
-}
-
-@keyframes gradient-shift {
-  0%   { background-position: 0% 50%; }
-  50%  { background-position: 100% 50%; }
-  100% { background-position: 0% 50%; }
 }
 
 /* フローティングアニメーション */
@@ -350,6 +356,20 @@ body {
   vertical-align: text-bottom;
   background: var(--primary);
   animation: blink 0.9s step-start infinite;
+}
+
+/* 読み込み中の小さな月（app/loading.tsx） */
+.loading-moon {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--gold);
+  box-shadow: 0 0 0 6px color-mix(in srgb, var(--gold) 14%, transparent), 0 0 28px color-mix(in srgb, var(--gold) 40%, transparent);
+  animation: loading-breathe 1.8s ease-in-out infinite;
+}
+@keyframes loading-breathe {
+  0%, 100% { opacity: 0.35; transform: scale(0.85); }
+  50% { opacity: 1; transform: scale(1); }
 }
 
 /* スケルトンローディング */

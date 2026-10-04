@@ -1,0 +1,938 @@
+/*
+ * ホーム「水鏡（みずかがみ）」
+ * 上半分 = 空（縦書きの日付と、その日の本当の月）／下半分 = 水面（空を揺らぎながら映す）。
+ * 空の色は時間帯（夜明け・昼・夕暮れ・夜）で変わる。下には和紙のシートが重なる。
+ * クラス名は im- 接頭辞でほかの画面と衝突させない。
+ */
+
+/* ───────── 時間帯ごとの空と水の色 ───────── */
+.im-mirror {
+  --sky-1: #0a0f1d;
+  --sky-2: #141c33;
+  --sky-3: #29324d;
+  --water-1: #1b233a;
+  --water-2: #070a12;
+  --ink: #efe7d4;
+  --ink-soft: rgba(239, 231, 212, 0.66);
+  --ink-faint: rgba(239, 231, 212, 0.32);
+  --moon: #f4ead0;
+  --moon-glow: rgba(244, 234, 208, 0.22);
+  --star-opacity: 0.9;
+  --cta-bg: #f3ecdc;
+  --cta-fg: #121827;
+}
+.im-mirror[data-period='dusk'] {
+  --sky-1: #241f3c;
+  --sky-2: #6b4e6d;
+  --sky-3: #df9f78;
+  --water-1: #b47d67;
+  --water-2: #231d33;
+  --ink: #fff4e6;
+  --ink-soft: rgba(255, 244, 230, 0.74);
+  --ink-faint: rgba(255, 244, 230, 0.36);
+  --moon: #fff0d8;
+  --moon-glow: rgba(255, 228, 196, 0.26);
+  --star-opacity: 0.35;
+  --cta-bg: #fff4e6;
+  --cta-fg: #2a2238;
+}
+.im-mirror[data-period='dawn'] {
+  --sky-1: #2c3756;
+  --sky-2: #8d84a6;
+  --sky-3: #efc8b2;
+  --water-1: #cfab9f;
+  --water-2: #2e3753;
+  --ink: #fffaf2;
+  --ink-soft: rgba(255, 250, 242, 0.76);
+  --ink-faint: rgba(255, 250, 242, 0.38);
+  --moon: #fffaf0;
+  --moon-glow: rgba(255, 244, 230, 0.24);
+  --star-opacity: 0.45;
+  --cta-bg: #fffaf2;
+  --cta-fg: #2c3756;
+}
+.im-mirror[data-period='day'] {
+  --sky-1: #8eaabc;
+  --sky-2: #bfd0d6;
+  --sky-3: #eceee6;
+  --water-1: #d7e0dc;
+  --water-2: #7f98a6;
+  --ink: #17242c;
+  --ink-soft: rgba(23, 36, 44, 0.68);
+  --ink-faint: rgba(23, 36, 44, 0.3);
+  --moon: #ffffff;
+  --moon-glow: rgba(255, 255, 255, 0.35);
+  --star-opacity: 0;
+  --cta-bg: #17242c;
+  --cta-fg: #f3efe6;
+}
+
+/* ───────── ヒーロー全体 ───────── */
+.im-mirror {
+  /* 高さの基準。空・水・舞台・映り込みはすべてここから計算して、鏡像がぴったり合うようにする */
+  --hero-h: clamp(620px, 88svh, 780px);
+  --sky-h: calc(var(--hero-h) * 0.54);
+  --stage-h: calc(var(--sky-h) - env(safe-area-inset-top) - 64px);
+  position: relative;
+  height: var(--hero-h);
+  /* .page-content の safe-area 分の余白を打ち消して、ステータスバーの裏まで空を伸ばす */
+  margin-top: calc(env(safe-area-inset-top) * -1);
+  color: var(--ink);
+  overflow: hidden;
+  isolation: isolate;
+  background: var(--water-2);
+}
+
+.im-sky {
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: var(--sky-h);
+  background: linear-gradient(180deg, var(--sky-1) 0%, var(--sky-2) 58%, var(--sky-3) 100%);
+}
+
+.im-water {
+  position: absolute;
+  top: var(--sky-h);
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(180deg, var(--water-1) 0%, var(--water-2) 78%);
+  overflow: hidden;
+}
+/* 水面の細かなさざ波（ごく淡い横縞） */
+.im-water::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.022) 0px,
+    rgba(255, 255, 255, 0.022) 1px,
+    transparent 1px,
+    transparent 7px
+  );
+  mask-image: linear-gradient(180deg, #000 0%, transparent 70%);
+  -webkit-mask-image: linear-gradient(180deg, #000 0%, transparent 70%);
+  pointer-events: none;
+}
+
+/* ごく淡い粒子（空気感）。静的な SVG ノイズなので負荷はほぼない */
+.im-mirror::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  opacity: 0.05;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.55 0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* 水平線 */
+.im-horizon {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: var(--sky-h);
+  height: 1px;
+  background: linear-gradient(90deg, transparent 0%, var(--ink-faint) 18%, var(--ink-soft) 50%, var(--ink-faint) 82%, transparent 100%);
+  transform-origin: 50% 50%;
+  z-index: 3;
+}
+
+/* ───────── 上部の帯（ワードマーク・月齢） ───────── */
+.im-topbar {
+  position: absolute;
+  z-index: 4;
+  top: calc(env(safe-area-inset-top) + 18px);
+  left: 24px;
+  right: 24px;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+.im-wordmark {
+  font-family: 'Cormorant Garamond', serif;
+  font-style: italic;
+  font-weight: 500;
+  font-size: 21px;
+  letter-spacing: 0.02em;
+  color: var(--ink);
+}
+.im-almanac {
+  font-family: 'Zen Kaku Gothic New', system-ui, sans-serif;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  color: var(--ink-soft);
+  text-align: right;
+  line-height: 1.6;
+}
+.im-almanac b {
+  font-variant-numeric: lining-nums;
+  font-family: 'Cormorant Garamond', serif;
+  font-weight: 500;
+  font-size: 14px;
+  letter-spacing: 0.04em;
+  color: var(--ink);
+}
+
+/* ───────── 空の舞台（月・縦書きの日付）。水面に反転して映る ───────── */
+.im-stage {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: var(--stage-h);
+}
+
+.im-moon {
+  position: absolute;
+  right: 22%;
+  top: 22%;
+  width: 104px;
+  height: 104px;
+  overflow: visible;
+}
+
+.im-stars circle {
+  fill: var(--ink);
+  opacity: var(--star-opacity);
+}
+
+.im-date {
+  position: absolute;
+  left: 26px;
+  bottom: 26px;
+  display: flex;
+  flex-direction: row-reverse;
+  align-items: flex-end;
+  gap: 14px;
+}
+.im-date-main {
+  writing-mode: vertical-rl;
+  font-family: 'Shippori Mincho', serif;
+  font-weight: 500;
+  font-size: 42px;
+  line-height: 1;
+  letter-spacing: 0.16em;
+  color: var(--ink);
+}
+.im-date-sub {
+  writing-mode: vertical-rl;
+  font-family: 'Shippori Mincho', serif;
+  font-weight: 500;
+  font-size: 15px;
+  letter-spacing: 0.32em;
+  color: var(--ink-soft);
+  padding-bottom: 2px;
+}
+.im-date-main .im-ch {
+  display: inline-block;
+}
+.im-date-main[data-long='true'] {
+  font-size: 38px;
+  line-height: 1.3;
+}
+
+/* 水面の映り込み */
+.im-reflection {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  /* 空の舞台と同じ高さの箱を上下反転 → 水平線をはさんだ鏡像になる */
+  height: var(--stage-h);
+  transform: scaleY(-1);
+  opacity: 0.5;
+  filter: url(#im-ripple) blur(0.7px);
+  mask-image: linear-gradient(0deg, #000 0%, rgba(0, 0, 0, 0.42) 14%, transparent 34%);
+  -webkit-mask-image: linear-gradient(0deg, #000 0%, rgba(0, 0, 0, 0.42) 14%, transparent 34%);
+  pointer-events: none;
+}
+
+/* 月の道（水面にきらめく光の帯） */
+.im-glints {
+  position: absolute;
+  top: 0;
+  right: calc(22% + 52px);
+  width: 0;
+  height: 46%;
+  pointer-events: none;
+}
+.im-glint {
+  position: absolute;
+  height: 2px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, transparent 0%, var(--moon) 35%, var(--moon) 65%, transparent 100%);
+  filter: blur(0.5px);
+  transform: translateX(-50%);
+  animation: im-glint var(--dur, 4.2s) ease-in-out infinite alternate;
+}
+@keyframes im-glint {
+  0% { opacity: calc(var(--o, 0.4) * 0.2); translate: -4px 0; }
+  55% { opacity: var(--o, 0.4); }
+  100% { opacity: calc(var(--o, 0.4) * 0.45); translate: 5px 0; }
+}
+
+/* 水面に触れたときの波紋 */
+.im-touch {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  overflow: hidden;
+  touch-action: pan-y;
+}
+.im-ripple {
+  position: absolute;
+  width: 160px;
+  height: 160px;
+  margin: -80px 0 0 -80px;
+  border-radius: 50%;
+  border: 1.2px solid var(--ink-soft);
+  pointer-events: none;
+  /* 水面を斜めから見ているので、横長の楕円にする */
+  transform: scale(0.05, 0.016);
+  opacity: 0;
+  animation: im-ripple 1.6s cubic-bezier(0.2, 0.6, 0.3, 1) forwards;
+}
+@keyframes im-ripple {
+  0% { transform: scale(0.05, 0.016); opacity: 0.9; }
+  100% { transform: scale(1.6, 0.5); opacity: 0; }
+}
+
+/* ───────── 水面の上の CTA ───────── */
+.im-cta {
+  position: absolute;
+  z-index: 5;
+  left: 24px;
+  right: 24px;
+  bottom: 62px; /* シートの重なり（28px）＋余白 */
+}
+.im-cta-eyebrow {
+  font-family: 'Zen Kaku Gothic New', system-ui, sans-serif;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.24em;
+  color: var(--ink-soft);
+}
+.im-cta-title {
+  font-family: 'Shippori Mincho', serif;
+  font-weight: 500;
+  font-size: 23px;
+  line-height: 1.6;
+  letter-spacing: 0.06em;
+  color: var(--ink);
+  margin-top: 10px;
+}
+.im-cta-quote {
+  font-family: 'Shippori Mincho', serif;
+  font-weight: 500;
+  font-size: 19px;
+  line-height: 1.75;
+  letter-spacing: 0.04em;
+  color: var(--ink);
+  margin-top: 10px;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.im-cta-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 22px;
+}
+.im-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+  height: 54px;
+  padding: 0 10px 0 26px;
+  border-radius: 999px;
+  background: var(--cta-bg);
+  color: var(--cta-fg);
+  font-family: 'Zen Kaku Gothic New', system-ui, sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.28);
+  transition: transform 0.25s cubic-bezier(0.2, 0.7, 0.2, 1), box-shadow 0.25s;
+}
+.im-pill:active {
+  transform: scale(0.97);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.24);
+}
+.im-pill-arrow {
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--cta-fg);
+  color: var(--cta-bg);
+  min-width: 0;
+  min-height: 0;
+}
+.im-textlink {
+  font-family: 'Zen Kaku Gothic New', system-ui, sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  color: var(--ink-soft);
+  min-height: 44px;
+  padding: 0;
+  text-decoration: underline;
+  text-decoration-color: var(--ink-faint);
+  text-underline-offset: 5px;
+}
+
+/* 連続記録の節目の知らせ（ヒーローの上に浮かぶガラスの帯） */
+.im-toast {
+  position: fixed;
+  z-index: 60;
+  left: 50%;
+  top: calc(env(safe-area-inset-top) + 64px);
+  translate: -50% 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: calc(100% - 40px);
+  padding: 11px 20px 11px 16px;
+  border-radius: 999px;
+  background: rgba(12, 16, 26, 0.55);
+  border: 1px solid rgba(239, 231, 212, 0.22);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  color: #efe7d4;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.25);
+  animation: im-toast 5.2s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+.im-toast-mark {
+  color: #d8b878;
+  font-size: 12px;
+}
+.im-toast-count {
+  font-family: 'Cormorant Garamond', serif;
+  font-variant-numeric: lining-nums;
+  font-size: 22px;
+  line-height: 1;
+}
+.im-toast-text {
+  font-family: 'Shippori Mincho', serif;
+  font-size: 13px;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+@keyframes im-toast {
+  0% { opacity: 0; transform: translateY(-8px); }
+  10%, 86% { opacity: 1; transform: none; }
+  100% { opacity: 0; transform: translateY(-6px); }
+}
+
+/* ───────── 和紙のシート ───────── */
+.im-sheet {
+  position: relative;
+  z-index: 6;
+  margin-top: -28px;
+  border-radius: 28px 28px 0 0;
+  background: var(--background);
+  padding: 36px 22px 8px;
+  box-shadow: 0 -18px 40px rgba(0, 0, 0, 0.12);
+}
+
+.im-section + .im-section {
+  margin-top: 46px;
+}
+.im-sec-head {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--hairline);
+  margin-bottom: 20px;
+}
+.im-sec-idx {
+  font-family: 'Cormorant Garamond', serif;
+  font-style: italic;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--muted-2);
+  width: 20px;
+}
+.im-sec-title {
+  font-family: 'Shippori Mincho', serif;
+  font-weight: 600;
+  font-size: 18px;
+  letter-spacing: 0.08em;
+  color: var(--foreground);
+}
+.im-sec-meta {
+  margin-left: auto;
+  font-family: 'Zen Kaku Gothic New', system-ui, sans-serif;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+a.im-sec-meta {
+  min-height: 0;
+  color: var(--primary);
+}
+
+/* 小さな UI 文字 */
+.im-label {
+  font-family: 'Zen Kaku Gothic New', system-ui, sans-serif;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  color: var(--muted);
+}
+
+/* 昨日の書き忘れ */
+.im-missed {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 18px;
+  border-radius: 16px;
+  border: 1px dashed var(--border);
+  font-family: 'Zen Kaku Gothic New', system-ui, sans-serif;
+  font-size: 13px;
+  color: var(--muted);
+  margin-bottom: 34px;
+}
+.im-missed b {
+  color: var(--primary);
+  font-weight: 700;
+}
+
+/* ───────── この一週間 ───────── */
+.im-week {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+}
+.im-day {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 9px;
+  padding: 2px 0;
+  min-width: 0;
+}
+.im-day-wd {
+  font-family: 'Zen Kaku Gothic New', system-ui, sans-serif;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--muted);
+}
+.im-day[data-today='true'] .im-day-wd {
+  color: var(--foreground);
+  font-weight: 700;
+}
+.im-day-dot {
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.im-day-dot[data-state='recorded'] {
+  background: var(--mood);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18), inset 0 -6px 10px rgba(0, 0, 0, 0.08);
+}
+.im-day-dot[data-state='empty'] {
+  border: 1px solid var(--border);
+}
+.im-day-dot[data-state='empty']::after {
+  content: '';
+  width: 3px;
+  height: 3px;
+  border-radius: 9px;
+  background: var(--muted-2);
+  opacity: 0.6;
+}
+.im-day-dot[data-state='future'] {
+  border: 1px dashed var(--hairline);
+}
+.im-day[data-today='true'] .im-day-dot {
+  box-shadow: 0 0 0 3px var(--background), 0 0 0 4.5px var(--foreground);
+}
+.im-day[data-today='true'] .im-day-dot[data-state='empty'] {
+  border-color: transparent;
+}
+.im-day-num {
+  font-variant-numeric: lining-nums;
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--muted);
+  line-height: 1;
+}
+.im-day[data-today='true'] .im-day-num {
+  color: var(--foreground);
+}
+
+/* ───────── 数字の帯 ───────── */
+.im-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  border-top: 1px solid var(--hairline);
+  border-bottom: 1px solid var(--hairline);
+}
+.im-stat {
+  padding: 18px 0 16px;
+  text-align: center;
+}
+.im-stat + .im-stat {
+  border-left: 1px solid var(--hairline);
+}
+.im-stat-value {
+  font-family: 'Cormorant Garamond', serif;
+  font-weight: 400;
+  font-size: 46px;
+  line-height: 1;
+  letter-spacing: -0.01em;
+  color: var(--foreground);
+  margin-top: 10px;
+  font-variant-numeric: lining-nums;
+}
+.im-stat-unit {
+  font-family: 'Shippori Mincho', serif;
+  font-size: 13px;
+  font-weight: 500;
+  margin-left: 3px;
+  color: var(--muted);
+  letter-spacing: 0;
+}
+
+/* ───────── 記録の軌跡（90日） ───────── */
+.im-trace {
+  display: grid;
+  grid-template-columns: 18px repeat(13, 1fr);
+  row-gap: 6px;
+  align-items: center;
+}
+.im-trace-month {
+  font-family: 'Zen Kaku Gothic New', system-ui, sans-serif;
+  font-size: 10px;
+  color: var(--muted);
+  white-space: nowrap;
+  height: 14px;
+}
+.im-trace-wd {
+  font-family: 'Zen Kaku Gothic New', system-ui, sans-serif;
+  font-size: 9px;
+  color: var(--muted-2);
+}
+.im-trace-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 18px;
+}
+.im-trace-cell i {
+  display: block;
+  border-radius: 99px;
+}
+.im-trace-cell[data-state='recorded'] i {
+  width: 15px;
+  height: 15px;
+  background: var(--mood);
+}
+.im-trace-cell[data-state='empty'] i {
+  width: 4px;
+  height: 4px;
+  background: var(--border);
+}
+.im-trace-cell[data-today='true'] i {
+  box-shadow: 0 0 0 2px var(--background), 0 0 0 3px var(--foreground);
+}
+.im-trace-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 18px;
+}
+.im-trace-count {
+  font-family: 'Zen Kaku Gothic New', system-ui, sans-serif;
+  font-size: 12px;
+  color: var(--muted);
+}
+.im-trace-count b {
+  font-variant-numeric: lining-nums;
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 22px;
+  font-weight: 500;
+  color: var(--foreground);
+  margin: 0 3px;
+}
+.im-legend {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.im-legend i {
+  width: 9px;
+  height: 9px;
+  border-radius: 9px;
+  background: var(--mood);
+}
+
+/* ───────── 気分の波 ───────── */
+.im-curve {
+  width: 100%;
+  height: auto;
+  display: block;
+  overflow: visible;
+}
+.im-curve-guide {
+  stroke: var(--hairline);
+  stroke-width: 1;
+}
+.im-curve-guide-label {
+  font-family: 'Zen Kaku Gothic New', system-ui, sans-serif;
+  font-size: 9px;
+  fill: var(--muted-2);
+}
+.im-curve-x {
+  font-family: 'Cormorant Garamond', serif;
+  font-variant-numeric: lining-nums;
+  font-size: 12px;
+  fill: var(--muted);
+}
+.im-curve-mood {
+  fill: none;
+  stroke: var(--foreground);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.im-curve-energy {
+  fill: var(--muted-2);
+  opacity: 0.42;
+}
+.im-curve-dot {
+  stroke: var(--background);
+  stroke-width: 2;
+}
+.im-curve-legend {
+  display: flex;
+  gap: 18px;
+  margin-top: 14px;
+}
+.im-curve-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+.im-curve-legend i {
+  display: inline-block;
+  width: 18px;
+  border-top: 1.6px solid var(--foreground);
+}
+.im-curve-legend i[data-kind='energy'] {
+  width: 6px;
+  height: 12px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--muted-2);
+  opacity: 0.55;
+}
+
+/* ───────── あの日の自分 ───────── */
+.im-flash {
+  display: grid;
+  grid-template-columns: 3px 1fr auto;
+  gap: 0 16px;
+  align-items: stretch;
+  padding: 4px 0;
+}
+.im-flash + .im-flash {
+  margin-top: 18px;
+}
+.im-flash-bar {
+  border-radius: 3px;
+  background: var(--mood);
+}
+.im-flash-text {
+  font-family: 'Shippori Mincho', serif;
+  font-weight: 500;
+  font-size: 16px;
+  line-height: 1.75;
+  color: var(--foreground);
+  margin-top: 4px;
+}
+.im-chevron {
+  align-self: center;
+  color: var(--muted-2);
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 22px;
+}
+
+/* ───────── 最近の記録 ───────── */
+.im-row {
+  display: grid;
+  grid-template-columns: 46px 1fr;
+  gap: 16px;
+  align-items: start;
+  padding: 18px 0;
+  border-bottom: 1px solid var(--hairline);
+  justify-content: stretch;
+}
+.im-row:first-child {
+  padding-top: 4px;
+}
+.im-row-date {
+  text-align: center;
+}
+.im-row-day {
+  font-variant-numeric: lining-nums;
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 32px;
+  font-weight: 400;
+  line-height: 1;
+  color: var(--foreground);
+}
+.im-row-wd {
+  margin-top: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.im-row-wd i {
+  width: 7px;
+  height: 7px;
+  border-radius: 7px;
+  background: var(--mood);
+}
+.im-row-text {
+  font-family: 'Shippori Mincho', serif;
+  font-weight: 500;
+  font-size: 15px;
+  line-height: 1.75;
+  color: var(--foreground);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.im-row-tags {
+  margin-top: 6px;
+  font-family: 'Zen Kaku Gothic New', system-ui, sans-serif;
+  font-size: 11px;
+  color: var(--muted);
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ───────── 結び ───────── */
+.im-colophon {
+  text-align: center;
+  padding: 56px 0 18px;
+}
+.im-colophon-mark {
+  font-family: 'Cormorant Garamond', serif;
+  font-style: italic;
+  font-size: 17px;
+  color: var(--foreground);
+}
+.im-colophon-line {
+  margin-top: 8px;
+  font-family: 'Shippori Mincho', serif;
+  font-size: 12px;
+  letter-spacing: 0.3em;
+  color: var(--muted);
+}
+
+/* ───────── 動き ───────── */
+@keyframes im-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes im-rise {
+  from { opacity: 0; transform: translateY(0.5em); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes im-draw { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+@keyframes im-moon-in {
+  from { opacity: 0; transform: translateY(10px) scale(0.96); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes im-twinkle {
+  0%, 100% { opacity: var(--star-opacity); }
+  50% { opacity: calc(var(--star-opacity) * 0.35); }
+}
+
+.im-anim .im-sky { animation: im-fade 0.9s ease-out both; }
+.im-anim .im-moon { animation: im-moon-in 1.3s cubic-bezier(0.2, 0.7, 0.2, 1) 0.15s both; }
+.im-anim .im-date-main .im-ch { animation: im-rise 0.8s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+.im-anim .im-date-sub { animation: im-fade 0.9s ease-out 0.5s both; }
+.im-anim .im-horizon { animation: im-draw 1.1s cubic-bezier(0.6, 0, 0.2, 1) 0.25s both; }
+.im-anim .im-reflection { animation: im-reflect-in 1.4s ease-out 0.6s both; }
+@keyframes im-reflect-in { from { opacity: 0; } to { opacity: 0.5; } }
+.im-anim .im-cta { animation: im-rise 0.8s cubic-bezier(0.2, 0.7, 0.2, 1) 0.45s both; }
+.im-anim .im-topbar { animation: im-fade 0.8s ease-out 0.2s both; }
+.im-stars circle { animation: im-twinkle 5s ease-in-out infinite; }
+.im-stars circle:nth-child(3n) { animation-duration: 7s; animation-delay: -2s; }
+.im-stars circle:nth-child(4n) { animation-duration: 3.6s; animation-delay: -1s; }
+
+/* スクロールで現れる */
+.im-reveal {
+  opacity: 0;
+  transform: translateY(18px);
+  transition: opacity 0.8s cubic-bezier(0.2, 0.7, 0.2, 1), transform 0.8s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+.im-reveal[data-visible='true'] {
+  opacity: 1;
+  transform: none;
+}
+.im-reveal[data-visible='true'] .im-day-dot,
+.im-reveal[data-visible='true'] .im-trace-cell i {
+  animation: im-pop 0.6s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  animation-delay: calc(var(--i, 0) * 28ms);
+}
+@keyframes im-pop {
+  from { opacity: 0; transform: scale(0.4); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@supports (animation-timeline: scroll()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .im-stage {
+      animation: im-sky-drift linear both;
+      animation-timeline: scroll(nearest block);
+      animation-range: 0 520px;
+    }
+    /* 入場アニメーション（時間）とスクロール視差（スクロール量）を併用する */
+    .im-anim .im-reflection {
+      animation: im-reflect-in 1.4s ease-out 0.6s both, im-water-drift linear both;
+      animation-timeline: auto, scroll(nearest block);
+      animation-range: normal, 0 520px;
+    }
+    @keyframes im-sky-drift { to { translate: 0 -46px; } }
+    @keyframes im-water-drift { to { translate: 0 46px; } }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .im-anim *,
+  .im-toast,
+  .im-stars circle,
+  .im-glint,
+  .im-reveal[data-visible='true'] .im-day-dot,
+  .im-reveal[data-visible='true'] .im-trace-cell i {
+    animation: none !important;
+  }
+  .im-reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+}

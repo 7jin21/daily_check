@@ -11,7 +11,7 @@ iPhone のホーム画面から使える AI 日記アプリ（PWA）。気分と
 - **毎日のリマインダー（Web Push）** — 記録がまだの日だけ、夜にプッシュ通知。昨日の気分を文面に差し込む（[設定方法](#プッシュ通知リマインダーの設定)）
 - **カレンダー自動挿入** — チェックイン画面で当日の Google Calendar 予定をワンタップ挿入
 - **音声入力** — テキスト欄を 🎤 で音声入力 → GROQ Whisper が文字起こし。iPhone のホーム画面 PWA でも安定動作（[詳細](#音声入力音声で日記を書く)）
-- **AI 日記生成** — チェックイン内容から日記文・タグ・感情を自動生成（GROQ / gpt-oss-120b、日本語が自然）。文章はリアルタイムにストリーミング表示され、過去の日記から文体を学習します
+- **AI 清書** — 書いたメモを、**あなたの言葉・言い回し・口調のまま**読みやすい日記に整える（GROQ / gpt-oss-120b）。言い換え・水増し・書いていない感情や教訓の追加はしない。長さは入力とほぼ同じ。文章はリアルタイムにストリーミング表示され、タグ・感情も自動抽出。AI らしい文章にしたいときは下書き画面の「感情豊かに」などで任意に書き直せます（[詳細](#ai-清書本人の言葉を残す)）
 - **AI 内省ガイド** — 日記生成の前に、AI が「足りていない1点」（例: なぜそう感じた？／何を大事にしていた？）を **1問だけ** 3〜4択で提示。タップで選ぶだけで感情の理由・価値観が日記に織り込まれます（スキップ可・[詳細](#ai-内省ガイド入力を深掘りする1問)）
 - **AI 書き直し** — 「感情豊かに」「短くして」などワンタップで文体変更
 - **Notion 自動同期** — 保存と同時に Notion データベースへ書き出し
@@ -52,8 +52,8 @@ npm run dev
 | AI | GROQ API（gpt-oss-120b / gpt-oss-20b、日本語で選定。音声文字起こしは Whisper） |
 | 外部同期 | Notion API / Google Calendar API |
 | 状態管理 | Zustand |
-| スタイリング | Tailwind CSS ＋ CSS 変数（ボタニカル・セレニティ基調 / トークン一元管理） |
-| フォント | Cormorant Garamond（欧文セリフ）＋ Shippori Mincho（和文明朝） |
+| スタイリング | Tailwind CSS ＋ CSS 変数（和紙と墨の基調 / トークン一元管理）。ホームは `components/home/home.css` |
+| フォント | Cormorant Garamond（欧文・数字）＋ Shippori Mincho（和文明朝）＋ Zen Kaku Gothic New（小さな UI 文字） |
 | PWA | Web App Manifest + Service Worker |
 
 ---
@@ -131,6 +131,21 @@ iPhone Safari（PWA）
          └── Notion にページ作成（同期済みならスキップ — 重複作成なし）
          ※ Notion 同期が失敗しても日記の保存には影響しません
 ```
+
+---
+
+## AI 清書（本人の言葉を残す）
+
+AI は日記の「代筆者」ではなく「清書係」です。チェックインで書いたメモを、**本人の言葉・言い回し・語尾・時制・口調のまま**つなげて読みやすく整えます（`lib/draft-prompt.ts`）。
+
+- 手を加えるのは「単語や箇条書きを文につなぐ最小限の助詞・接続語」「明らかな誤字の修正」「順番の入れ替え・段落分け」だけ
+- 書いていない出来事・感情・気づき・締めの一文（「明日も頑張ろう」など）は足さない
+- 長さは入力とほぼ同じ（短く書けば短い日記になる）。`temperature: 0.3` で言い換えを抑える
+- 過去の日記を文体見本として使うのはやめた（見本の大半が AI の文章で、AI 調を強めていたため）
+
+> 以前は「500 文字程度・気持ちや内省を添えてよい」という指示だったため、短い入力ほど AI の文章に置き換わっていました。合成データでの比較では、本人の言葉の残存率が 37〜44% → 96〜100%、出力の長さが入力の 5〜24 倍 → 1.0〜1.2 倍になりました。
+
+AI らしく膨らませた文章がほしい日は、下書き画面の「感情豊かに ✨」などの書き直しボタンを使ってください。
 
 ---
 
@@ -484,7 +499,7 @@ npm run lint         # lint だけ単独で
 
 ### 3. 一覧・分析・編集
 
-- [ ] ホームに統計・週間ストリップ・ヒートマップ・気分チャートが出る
+- [ ] ホームに水鏡のヒーロー（時間帯で空の色が変わる・その日の月）、この一週間・数字の帯・記録の軌跡・気分の波が出る
 - [ ] `/entries` に月別で一覧が出る
 - [ ] `/insights` で「分析する」→ AI パーソナル分析（5 件以上の記録が必要）
 - [ ] 日記詳細で本文を編集して保存できる
@@ -521,24 +536,28 @@ GROQ_MODEL_TRANSCRIBE=whisper-large-v3-turbo           # 音声入力の文字�
 > ⚠️ **Groq はモデルを頻繁に廃止・改名します。** 以前の既定 `moonshotai/kimi-k2-instruct-0905` は廃止され、指定すると `404` → 毎回オフラインにフォールバックしていました。AI 生成が急にテンプレ調になったら、まず[利用可能モデル一覧](https://console.groq.com/docs/models)に現在の `GROQ_MODEL_QUALITY` が載っているか確認してください。`qwen/qwen3-32b` は reasoning モデルで `<think>` タグが本文に混入し JSON モードも壊れるため非推奨です。
 
 - 最新の利用可能モデルは [console.groq.com/docs/models](https://console.groq.com/docs/models) で確認（モデルは頻繁に入れ替わります）
-- **JSON モードのルート（`draft-meta` / `rewrite-draft` / `analyze` / `weekly-report` / `checkin-question`）は `reasoning_effort: 'low'` を必ず付ける**。gpt-oss 系は reasoning が JSON 出力を壊し `400 json_validate_failed` を起こすため（付けないと毎回フォールバック＝タグ/要約が空になる等の劣化）。あわせてプロンプトに「JSON」の語を必ず含める（Groq の JSON モード要件）。モデルを差し替える時もこの2点を維持すること
+- **JSON モードのルート（`draft-meta` / `rewrite-draft` / `analyze` / `weekly-report` / `checkin-question`）と日記生成（`generate-draft`）は `reasoning_effort: 'low'` を必ず付ける**。gpt-oss 系は reasoning が JSON 出力を壊し `400 json_validate_failed` を起こすため（付けないと毎回フォールバック＝タグ/要約が空になる等の劣化）。あわせてプロンプトに「JSON」の語を必ず含める（Groq の JSON モード要件）。モデルを差し替える時もこの2点を維持すること
 - **モデル ID を間違えても安全**: 生成はオフラインテンプレートに、JSON 系は各フォールバックに自動で切り替わります（白画面にはならない）
 
 ### 見た目（配色・フォント）を変えたい
 
-外観は「**ボタニカル・セレニティ**」基調 — クリームの背景＋深いオリーブの文字＋セージグリーン／ゴールド／ダスティブルーのアクセント、大きな角丸（カード 20〜26px）とピル型ボタン、明朝体。配色は **CSS 変数で一元管理**しているので、コンポーネントを触らずトークンだけ変えれば全画面に反映されます。
+ホームは「**水鏡（みずかがみ）**」— 上半分の空に縦書きの日付と**その日の本当の月**（月齢・和名つき）、下半分の水面がそれを揺らぎながら映す。空と水の色は時間帯（夜明け 4–7 時／昼 7–16 時／夕暮れ 16–19 時／夜）で変わり、水面に触れると波紋が広がる。下には和紙のシートが重なり、週・数字・記録の軌跡・気分の波を編集誌のような組版で並べる。全体の配色は「和紙と墨」（クリームの紙＋墨の文字＋セージ／金のアクセント）で、**CSS 変数で一元管理**している。
 
 | 変えたいもの | 触る場所 |
 |------|------|
-| ページ／カード／文字色・罫線（クリーム・オリーブ・セージ・ゴールド・ブルー） | `app/globals.css` の `:root`（ダークは `@media (prefers-color-scheme: dark)` と `.dark`） |
-| ホームのヒーロー背景・CTA カードの紙面・ピルボタン | `app/globals.css` の `.hero-botanical` / `.cta-paper` / `.btn-pill` |
+| ページ／カード／文字色・罫線（和紙・墨・セージ・金） | `app/globals.css` の `:root`（ダークは `.dark`） |
+| ホームの空と水の色（時間帯ごと）・映り込み・月の道・波紋 | `components/home/home.css` の `.im-mirror[data-period=…]` ほか |
+| ホームの構成（ヒーロー／シートの各セクション） | `components/home/HomeView.tsx` / `MirrorHero.tsx` / `HomeSections.tsx` |
+| 月齢・月の形・漢数字の日付 | `lib/almanac.ts` |
+| 浮いたカプセル型ナビ・アイコン | `components/ui/BottomNav.tsx` ＋ `app/globals.css` の `.nav-*` |
 | Tailwind の `primary` / `surface` 階調 | `tailwind.config.ts` |
 | 気分・エネルギーの色ランプ（アース系 `#b5654a`→`#6f8a5f`） | `lib/constants.ts` の `MOODS` / `ENERGY` |
-| フォント（欧文 Cormorant Garamond ＋ 和文 Shippori Mincho） | `app/layout.tsx`（Google Fonts の `link`）＋ `app/globals.css` / `tailwind.config.ts` |
-| 統計カードのアイコン・モチーフ / ヒーローの葉の線画 | `components/home/StatsCards.tsx` / `app/page.tsx`（インライン SVG） |
+| フォント（Cormorant Garamond ＋ Shippori Mincho ＋ Zen Kaku Gothic New） | `app/layout.tsx`（Google Fonts の `link`）＋ `app/globals.css` の `.font-*` |
 | iOS ステータスバー色（theme-color） | `app/layout.tsx` の `<meta name="theme-color">` |
 
-> ダークモードは OS のカラースキームに自動追従します（深い森のグリーン系）。`.dark` クラスによる手動オーバーライドの口は用意済みですが、切り替え UI は未実装です（[今後の実装予定](#今後の実装予定)）。
+> テーマは設定画面で「自動／ライト／ダーク」を選べます（「自動」は OS 設定に追従）。切り替えは `<html>` の `.dark` クラスだけで行います。
+>
+> 💡 **ログインなしでホームのデザインを確認する**: `npm run dev` で `/dev/home` を開くとモックデータで表示できます（開発時のみ・本番は 404）。`?h=6`（時刻）・`?date=2026-12-24`（日付）・`?state=recorded|new`（今日記録済み／初回）で状態を切り替えられます。
 
 ### ログイン方法を追加・変更したい
 
@@ -737,7 +756,7 @@ create policy "entries: own rows only"
 ├── components/
 │   ├── checkin/                 # StateStep / NotesStep / TextStep / ReflectionQuestion
 │   ├── entry/                   # EditableContent / DeleteEntryButton
-│   ├── home/                    # CheckinCTA / StatsCards / MoodChart / WeekStrip ほか
+│   ├── home/                    # HomeView / MirrorHero（水鏡）/ MirrorCTA / HomeSections / home.css ほか
 │   ├── insights/                # PersonalityCard
 │   └── ui/                      # BottomNav / VoiceInputButton ほか
 ├── lib/
@@ -748,6 +767,9 @@ create policy "entries: own rows only"
 │   ├── supabase-admin.ts        # Service Role クライアント（cron 専用）
 │   ├── push-client.ts           # Web Push 購読ヘルパー（クライアント）
 │   ├── api-client.ts            # fetch ラッパー（タイムアウト・リトライ）
+│   ├── draft-prompt.ts          # 日記清書プロンプト（本人の言葉を残す）
+│   ├── home-model.ts            # ホーム表示用の計算（連続記録・書き忘れ・フラッシュバック）
+│   ├── almanac.ts               # 月齢・月の形・漢数字
 │   └── offline-draft.ts         # オフライン日記生成テンプレート
 ├── stores/
 │   ├── checkin.ts               # チェックイン状態（localStorage 永続化・対象日）
@@ -789,7 +811,7 @@ create policy "entries: own rows only"
 → ① **HTTPS でアクセスしているか確認**。マイク取得（`getUserMedia`）はセキュアコンテキスト必須で、`http://192.168.x.x`（LAN の生 HTTP）では動きません。本番 `https://...vercel.app` か PC の `localhost` で試してください（詳細は[音声入力](#音声入力音声で日記を書く)）。② 「マイクの使用が許可されていません」→ ブラウザ / OS のマイク権限を確認（iPhone は **設定 → Safari → マイク**、PWA は初回プロンプトで許可）。③ 「音声入力は現在利用できません」→ `GROQ_API_KEY` が未設定。④ 文字起こしは GROQ Whisper を使うため**ネットワーク接続が必要**です（オフラインでは使えません）。
 
 **ダークモードが適用されない**
-→ OS のカラースキーム設定に自動追従します。iPhone の **設定 → 画面表示と明るさ** で切り替えてください。
+→ 設定画面の「外観」が「自動」なら OS のカラースキームに追従します（iPhone は **設定 → 画面表示と明るさ**）。「ライト」「ダーク」を選ぶと OS 設定より優先されます。
 
 ---
 

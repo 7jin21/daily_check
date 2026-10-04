@@ -3,59 +3,37 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
+// 画面下に浮かぶカプセル型ナビゲーション。アイコンは「水鏡」に合わせた細線。
 const NAV_ITEMS = [
-  { href: '/', icon: HomeIcon, label: 'ホーム' },
-  { href: '/entries', icon: BookIcon, label: '一覧' },
-  { href: '/insights', icon: ChartIcon, label: 'インサイト' },
-  { href: '/settings', icon: GearIcon, label: '設定' },
+  { href: '/', icon: MirrorIcon, label: 'ホーム' },
+  { href: '/entries', icon: PagesIcon, label: '一覧' },
+  { href: '/insights', icon: WaveIcon, label: 'インサイト' },
+  { href: '/settings', icon: DialIcon, label: '設定' },
 ]
 
 export default function BottomNav() {
   const pathname = usePathname()
 
   // ログインページ・チェックイン・ドラフトページではナビを非表示
-  const hideNav = ['/login', '/auth', '/checkin', '/draft'].some((path) =>
-    pathname.startsWith(path)
-  )
+  const hideNav = ['/login', '/auth', '/checkin', '/draft'].some((path) => pathname.startsWith(path))
 
   if (hideNav) return null
 
   return (
-    <nav
-      className="fixed bottom-0 left-0 right-0 z-50 border-t border-[var(--border)]"
-      style={{
-        paddingBottom: 'env(safe-area-inset-bottom)',
-        background: 'color-mix(in srgb, var(--surface) 88%, transparent)',
-        backdropFilter: 'blur(14px)',
-        WebkitBackdropFilter: 'blur(14px)',
-      }}
-    >
-      <div className="flex items-stretch h-[68px]">
+    <nav className="nav-float" aria-label="メインメニュー">
+      <div className="nav-capsule">
         {NAV_ITEMS.map(({ href, icon: Icon, label }) => {
           const isActive = pathname === href || (href !== '/' && pathname.startsWith(href))
           return (
             <Link
               key={href}
               href={href}
-              className="flex-1 flex flex-col items-center justify-center gap-1 transition-colors"
+              className="nav-item"
+              data-active={isActive}
+              aria-current={isActive ? 'page' : undefined}
             >
-              {/* アイコンチップ（アクティブ＝セージの角丸スクエア＋白アイコン） */}
-              <span
-                className={`w-11 h-8 rounded-[12px] flex items-center justify-center transition-all ${
-                  isActive
-                    ? 'bg-[var(--accent)] text-[#f7f4ea] shadow-[0_4px_12px_rgba(95,122,76,0.35)]'
-                    : 'bg-[var(--surface-secondary)] text-[var(--muted)]'
-                }`}
-              >
-                <Icon active={isActive} />
-              </span>
-              <span
-                className={`text-[11px] tracking-wide ${
-                  isActive ? 'text-[var(--primary)] font-bold' : 'text-[var(--muted)]'
-                }`}
-              >
-                {label}
-              </span>
+              <Icon />
+              <span className="nav-label">{label}</span>
             </Link>
           )
         })}
@@ -64,39 +42,59 @@ export default function BottomNav() {
   )
 }
 
-function HomeIcon({ active }: { active: boolean }) {
+const iconProps = {
+  width: 24,
+  height: 24,
+  viewBox: '0 0 24 24',
+  fill: 'none',
+  stroke: 'currentColor',
+  strokeWidth: 1.5,
+  strokeLinecap: 'round' as const,
+  strokeLinejoin: 'round' as const,
+  'aria-hidden': true,
+}
+
+/** 水平線に映る月 */
+function MirrorIcon() {
   return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill={active ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2">
-      <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-      <polyline points="9,22 9,12 15,12 15,22" />
+    <svg {...iconProps}>
+      <circle cx="12" cy="8.5" r="4" />
+      <path d="M3.5 14.5h17" />
+      <path d="M7.5 18h9" opacity="0.7" />
+      <path d="M10 21h4" opacity="0.45" />
     </svg>
   )
 }
 
-function BookIcon({ active }: { active: boolean }) {
+/** 重なった頁 */
+function PagesIcon() {
   return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill={active ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2">
-      <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
-      <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+    <svg {...iconProps}>
+      <rect x="6" y="3.5" width="12.5" height="16" rx="1.8" />
+      <path d="M3.5 7v12.2a1.8 1.8 0 0 0 1.8 1.8H15" />
+      <path d="M9.5 8.5h5.5M9.5 12h5.5M9.5 15.5h3" />
     </svg>
   )
 }
 
-function ChartIcon({ active }: { active: boolean }) {
+/** 気分の波 */
+function WaveIcon() {
   return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill={active ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2">
-      <line x1="18" y1="20" x2="18" y2="10" />
-      <line x1="12" y1="20" x2="12" y2="4" />
-      <line x1="6" y1="20" x2="6" y2="14" />
+    <svg {...iconProps}>
+      <path d="M3 15.5c2.2-6 4.6-6 6.4-1.6 1.6 4 4 4 5.6-.6 1.4-4 3.6-5 6-2.3" />
+      <path d="M3 20.5h18" opacity="0.45" />
     </svg>
   )
 }
 
-function GearIcon({ active }: { active: boolean }) {
+/** 調整つまみ */
+function DialIcon() {
   return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill={active ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2">
-      <circle cx="12" cy="12" r="3" />
-      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+    <svg {...iconProps}>
+      <path d="M4 7.5h9M17 7.5h3" />
+      <circle cx="15" cy="7.5" r="2" />
+      <path d="M4 16.5h3M11 16.5h9" />
+      <circle cx="9" cy="16.5" r="2" />
     </svg>
   )
 }

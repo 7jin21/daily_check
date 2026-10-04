@@ -4,16 +4,17 @@ import { useEffect, useState } from 'react'
 import { STORAGE_KEYS } from '@/lib/constants'
 
 const MILESTONES: Record<number, string> = {
-  3:   '3日連続！いいペースです 🔥',
-  7:   '1週間連続達成！素晴らしい！ 🎉',
-  14:  '2週間連続！習慣になってきましたね 🌟',
-  30:  '1ヶ月連続達成！本当に凄い！ 🏆',
-  50:  '50日連続！驚異的です！ 💫',
-  60:  '60日連続！習慣が力になっています 🚀',
-  80:  '80日連続！100日まであと少し ⛰️',
-  100: '100日連続！あなたは伝説です！ 👑',
+  3: '三日、続きました。',
+  7: '一週間、続きました。',
+  14: '二週間。もう習慣になっています。',
+  30: 'ひと月、毎日映してきました。',
+  50: '五十日。積み重ねが形になってきました。',
+  60: '六十日。続けることが力になっています。',
+  80: '八十日。百日まで、あと少し。',
+  100: '百日。ここまでの自分を誇ってください。',
 }
 
+// 連続記録の節目に、ヒーローの上へ静かに現れる知らせ（同じ節目は一度だけ）
 export default function StreakCelebration({ streak }: { streak: number }) {
   const [message, setMessage] = useState<string | null>(null)
 
@@ -21,23 +22,24 @@ export default function StreakCelebration({ streak }: { streak: number }) {
     const msg = MILESTONES[streak]
     if (!msg) return
     const key = `${STORAGE_KEYS.MILESTONE_PREFIX}${streak}`
-    if (localStorage.getItem(key)) return
-    localStorage.setItem(key, '1')
+    try {
+      if (localStorage.getItem(key)) return
+      localStorage.setItem(key, '1')
+    } catch {
+      return
+    }
     setMessage(msg)
-    const t = setTimeout(() => setMessage(null), 4500)
+    const t = setTimeout(() => setMessage(null), 5200)
     return () => clearTimeout(t)
   }, [streak])
 
   if (!message) return null
 
   return (
-    <div
-      className="fixed top-safe left-1/2 z-50 animate-slide-up"
-      style={{ transform: 'translateX(-50%)', top: 'calc(env(safe-area-inset-top) + 16px)' }}
-    >
-      <div className="px-6 py-3 rounded-2xl bg-[#333a28] text-[#f5f2e7] font-semibold text-sm shadow-xl shadow-[rgba(42,38,34,0.3)] whitespace-nowrap border border-[var(--gold)]">
-        {message}
-      </div>
+    <div className="im-toast" role="status">
+      <span className="im-toast-mark" aria-hidden="true">✦</span>
+      <span className="im-toast-count">{streak}</span>
+      <span className="im-toast-text">{message}</span>
     </div>
   )
 }
