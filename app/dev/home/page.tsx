@@ -3,7 +3,7 @@ import { buildHomeModel, subtractDays, toJSTDate, type HomeEntry } from '@/lib/h
 import HomeView, { OnboardingView } from '@/components/home/HomeView'
 
 // 開発専用: モックデータでホームを表示する（デザイン確認用。本番では 404）
-// ?h=0-23 時刻 / ?date=YYYY-MM-DD 日付 / ?state=recorded|empty|new
+// ?h=0-23 時刻 / ?date=YYYY-MM-DD 日付 / ?state=recorded|moodonly|empty|new
 
 const SUMMARIES = [
   '朝の散歩で金木犀の香りがして、少し季節が進んだ気がした',
@@ -68,7 +68,10 @@ export default async function DevHomePreview({
   if (state === 'new') {
     return <OnboardingView model={buildHomeModel([], 0, now)} now={now} />
   }
-  const entries = mockEntries(today, state === 'recorded')
+  const entries = mockEntries(today, state === 'recorded' || state === 'moodonly')
+  if (state === 'moodonly' && entries[0]?.entry_date === today) {
+    entries[0] = { ...entries[0], summary: null, dominant_emotion: null, tags: [] }
+  }
   const cutoff = subtractDays(today, 365)
   const within = entries.filter((e) => e.entry_date >= cutoff)
   return <HomeView model={buildHomeModel(within, entries.length, now)} now={now} />

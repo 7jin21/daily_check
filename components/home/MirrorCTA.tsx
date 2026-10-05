@@ -13,6 +13,7 @@ interface Props {
   greeting: string
   todaySummary: string | null
   hasTodayEntry: boolean
+  moodOnly?: boolean // 今日の記録が気分だけ（言葉はまだ）
   missedYesterday: string | null // 昨日の日付（書き忘れのときだけ）
 }
 
@@ -24,7 +25,7 @@ function Arrow() {
   )
 }
 
-export default function MirrorCTA({ today, greeting, todaySummary, hasTodayEntry, missedYesterday }: Props) {
+export default function MirrorCTA({ today, greeting, todaySummary, hasTodayEntry, moodOnly = false, missedYesterday }: Props) {
   const [hasDraft, setHasDraft] = useState(false)
 
   useEffect(() => {
@@ -47,6 +48,26 @@ export default function MirrorCTA({ today, greeting, todaySummary, hasTodayEntry
       昨日の分も書く
     </Link>
   ) : null
+
+  if (hasTodayEntry && moodOnly) {
+    return (
+      <>
+        <p className="im-cta-eyebrow">今日の記録</p>
+        <p className="im-cta-title">
+          気分だけ、
+          <br />
+          残しました。
+        </p>
+        <div className="im-cta-row">
+          <Link href={`/entries/${today}?write=1`} className="im-pill">
+            言葉を書き足す
+            <span className="im-pill-arrow"><Arrow /></span>
+          </Link>
+          {yesterdayLink}
+        </div>
+      </>
+    )
+  }
 
   if (hasTodayEntry) {
     return (

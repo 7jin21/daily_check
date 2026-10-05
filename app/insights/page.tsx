@@ -1,15 +1,19 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import Link from 'next/link'
 import { getSupabaseClient } from '@/lib/supabase'
 import { apiPost } from '@/lib/api-client'
 import { STORAGE_KEYS } from '@/lib/constants'
 import PersonalityCard from '@/components/insights/PersonalityCard'
+import { doneInLastWeek, FOCUS_MAX_CHARS, isFocusActive, loadFocus, saveFocus, type Focus } from '@/lib/focus'
 
 interface EmotionTrigger {
   trigger: string
   effect: 'positive' | 'negative'
   description: string
+  // 根拠になった日と、その日の本人の言葉（古いキャッシュには無い）
+  evidence?: { date: string; mood: number | null; quote: string }[]
 }
 
 interface AnalysisResult {
@@ -82,6 +86,23 @@ function formatAge(ts: number) {
   return `${Math.floor(h / 24)}日前`
 }
 
+/** キャッシュや API の分析結果が、画面で使う形をしているか（欠けていると表示が落ちる） */
+function isValidAnalysis(r: unknown): r is AnalysisResult {
+  const a = r as Partial<AnalysisResult> | null
+  return (
+    !!a &&
+    typeof a.personalityType === 'string' &&
+    Array.isArray(a.strengths) &&
+    Array.isArray(a.growthAreas) &&
+    Array.isArray(a.emotionalPatterns) &&
+    Array.isArray(a.recommendations) &&
+    Array.isArray(a.emotionTriggers) &&
+    typeof a.averageMood === 'number'
+  )
+}
+
+const jstToday = () => new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Tokyo' })
+
 function moodColorFor(avg: number): string {
   const idx = Math.min(5, Math.max(1, Math.round(avg)))
   return MOOD_COLOR[idx]
@@ -98,6 +119,10 @@ export default function InsightsPage() {
   const [isWeeklyLoading, setIsWeeklyLoading] = useState(false)
   const [weeklyError, setWeeklyError] = useState<string | null>(null)
   const [weeklyCachedAt, setWeeklyCachedAt] = useState<number | null>(null)
+  // 採用した「今週のフォーカス」（ホームでワンタップ記録できる）
+  const [focus, setFocus] = useState<Focus | null>(null)
+  const [focusEditing, setFocusEditing] = useState(false)
+  const [focusDraft, setFocusDraft] = useState('')
 
   // 「AIに聞いてみる」
   const [question, setQuestion] = useState('')
@@ -112,7 +137,7 @@ export default function InsightsPage() {
       const raw = localStorage.getItem(CACHE_KEY)
       if (raw) {
         const cached: CachedAnalysis = JSON.parse(raw)
-        if (Date.now() - cached.timestamp < CACHE_TTL) {
+        if (Date.now() - cached.timestamp < CACHE_TTL && isValidAnalysis(cached.result)) {
           setAnalysis(cached.result)
           setCachedAt(cached.timestamp)
         }
@@ -128,8 +153,19 @@ export default function InsightsPage() {
         }
       }
     } catch { /* ignore */ }
+    const f = loadFocus()
+    if (isFocusActive(f, jstToday())) setFocus(f)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  const adoptFocus = (text: string) => {
+    const t = text.trim().slice(0, FOCUS_MAX_CHARS)
+    if (!t) return
+    const next: Focus = { text: t, adoptedAt: jstToday(), doneDates: [] }
+    saveFocus(next)
+    setFocus(next)
+    setFocusEditing(false)
+  }
 
   const loadLocalStats = async () => {
     try {
@@ -225,10 +261,14 @@ export default function InsightsPage() {
     setIsWeeklyLoading(true)
     setWeeklyError(null)
     try {
-      // 前回レポートの「来週のフォーカス」を渡すと、AI がそのふり返りも書いてくれる
+      // 採用したフォーカス（なければ前回レポートの提案）と実施日数を渡すと、AI がそのふり返りも書く
+      // （以前は 6 時間で消えるキャッシュから読んでいたため、翌週にはふり返りが働かなかった）
+      const adopted = loadFocus()
       const result = await apiPost<WeeklyReport | { status: string }>(
         '/api/weekly-report',
-        { previousFocus: weeklyReport?.nextFocus ?? undefined },
+        adopted
+          ? { previousFocus: adopted.text, focusDone: doneInLastWeek(adopted, jstToday()) }
+          : { previousFocus: weeklyReport?.nextFocus ?? undefined },
         { retry: false }
       )
       if ('status' in result) {
@@ -257,6 +297,8 @@ export default function InsightsPage() {
       if ('status' in result) {
         if (result.status === 'insufficient_data') setHasEnoughData(false)
         else setError('データの取得に失敗しました')
+      } else if (!isValidAnalysis(result)) {
+        setError('分析結果を読み取れませんでした。もう一度お試しください')
       } else {
         const now = Date.now()
         // フォールバック（AI不通時の簡易版）はキャッシュしない
@@ -374,19 +416,24 @@ export default function InsightsPage() {
             <div className="card">
               <h2 className="font-bold text-[var(--foreground)] mb-1">タグと気分の関係</h2>
               <p className="text-xs text-[var(--muted-2)] mb-3">
-                そのタグが付いた日の平均気分（全体平均 {localStats.avgMood} との差）
+                そのタグが付いた日の平均気分（全体平均 {localStats.avgMood} との差）。タップでその日記を一覧できます
               </p>
               <ul className="space-y-2">
                 {localStats.tagMoods.map((t) => (
-                  <li key={t.tag} className="flex items-center gap-3">
-                    <span className="text-sm text-[var(--primary)] flex-1 min-w-0 truncate">#{t.tag}</span>
-                    <span className="text-sm font-semibold text-[var(--foreground)] tabular-nums">{t.avg}</span>
-                    <span
-                      className="text-xs font-medium tabular-nums w-12 text-right"
-                      style={{ color: t.diff >= 0 ? '#5a7350' : '#9c4a2f' }}
-                    >
-                      {t.diff >= 0 ? `+${t.diff}` : t.diff}
-                    </span>
+                  <li key={t.tag}>
+                    {/* 根拠になった日記（そのタグの記録）を時系列で開ける */}
+                    <Link href={`/entries?tag=${encodeURIComponent(t.tag)}`} className="w-full flex items-center gap-3 !justify-start">
+                      <span className="text-sm text-[var(--primary)] flex-1 min-w-0 truncate text-left">#{t.tag}</span>
+                      <span className="text-xs text-[var(--muted-2)] tabular-nums">{t.count}日</span>
+                      <span className="text-sm font-semibold text-[var(--foreground)] tabular-nums">{t.avg}</span>
+                      <span
+                        className="text-xs font-medium tabular-nums w-12 text-right"
+                        style={{ color: t.diff >= 0 ? '#5a7350' : '#9c4a2f' }}
+                      >
+                        {t.diff >= 0 ? `+${t.diff}` : t.diff}
+                      </span>
+                      <span className="text-[var(--muted-2)]">›</span>
+                    </Link>
                   </li>
                 ))}
               </ul>
@@ -572,6 +619,56 @@ export default function InsightsPage() {
               <div className="card" style={{ background: 'rgba(156,107,74,0.10)', borderColor: 'rgba(156,107,74,0.3)' }}>
                 <p className="text-xs font-bold mb-1" style={{ color: 'var(--primary)' }}>🎯 来週のフォーカス</p>
                 <p className="text-sm text-[var(--foreground)]">{weeklyReport.nextFocus}</p>
+                {/* 本人が採用・言い換えたものをホームに出し、できた日をワンタップで残せる */}
+                {focus && focus.text === weeklyReport.nextFocus ? (
+                  <p className="mt-3 text-xs font-bold text-[var(--primary)]">✓ 今週のフォーカスにしました（ホームで記録できます）</p>
+                ) : focusEditing ? (
+                  <div className="mt-3">
+                    <input
+                      value={focusDraft}
+                      onChange={(e) => setFocusDraft(e.target.value.slice(0, FOCUS_MAX_CHARS))}
+                      className="w-full px-4 py-2.5 rounded-2xl border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
+                      placeholder="自分の言葉で、小さな行動に"
+                      aria-label="今週のフォーカス"
+                    />
+                    <div className="flex gap-2 mt-2">
+                      <button
+                        onClick={() => adoptFocus(focusDraft)}
+                        disabled={!focusDraft.trim()}
+                        className="flex-1 py-2 rounded-full bg-[var(--accent)] text-[#f7f4ea] text-xs font-bold disabled:opacity-40"
+                      >
+                        これにする
+                      </button>
+                      <button
+                        onClick={() => setFocusEditing(false)}
+                        className="px-4 py-2 rounded-full border border-[var(--border)] text-[var(--muted)] text-xs"
+                      >
+                        やめる
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex gap-2 mt-3">
+                    <button
+                      onClick={() => adoptFocus(weeklyReport.nextFocus)}
+                      className="flex-1 py-2 rounded-full bg-[var(--accent)] text-[#f7f4ea] text-xs font-bold"
+                    >
+                      今週のフォーカスにする
+                    </button>
+                    <button
+                      onClick={() => {
+                        setFocusDraft(weeklyReport.nextFocus)
+                        setFocusEditing(true)
+                      }}
+                      className="px-4 py-2 rounded-full border border-[var(--border)] text-[var(--muted)] text-xs"
+                    >
+                      言い換える
+                    </button>
+                  </div>
+                )}
+                {focus && focus.text !== weeklyReport.nextFocus && !focusEditing && (
+                  <p className="mt-2 text-[11px] text-[var(--muted)]">いまのフォーカス: {focus.text}</p>
+                )}
               </div>
             </div>
           </div>
@@ -682,16 +779,35 @@ export default function InsightsPage() {
                 <h3 className="font-bold text-[var(--foreground)] mb-3">
                   🔍 感情トリガー分析
                 </h3>
-                <p className="text-xs text-[var(--muted-2)] mb-3">気分に影響しやすいパターン</p>
+                <p className="text-xs text-[var(--muted-2)] mb-3">気分に影響しやすいパターン（根拠になった日記つき）</p>
                 <ul className="space-y-3">
                   {analysis.emotionTriggers.map((t, i) => (
                     <li key={i} className="flex items-start gap-3">
                       <span className="text-lg flex-shrink-0">
                         {t.effect === 'positive' ? '🔆' : '🔻'}
                       </span>
-                      <div>
+                      <div className="min-w-0 flex-1">
                         <p className="text-sm font-medium text-[var(--foreground)]">{t.trigger}</p>
                         <p className="text-xs text-[var(--muted-2)] mt-0.5">{t.description}</p>
+                        {/* 根拠: その日の本人の言葉と、日記へのリンク */}
+                        {t.evidence && t.evidence.length > 0 && (
+                          <div className="mt-2 flex flex-col gap-1.5">
+                            {t.evidence.map((ev) => (
+                              <Link
+                                key={ev.date}
+                                href={`/entries/${ev.date}`}
+                                className="evidence-chip"
+                                style={{ borderLeftColor: ev.mood ? MOOD_COLOR[ev.mood] : 'var(--border)' }}
+                              >
+                                <span className="evidence-date">
+                                  {Number(ev.date.slice(5, 7))}/{Number(ev.date.slice(8, 10))}
+                                </span>
+                                <span className="evidence-quote">{ev.quote ? `「${ev.quote}」` : 'この日の日記'}</span>
+                                <span className="text-[var(--muted-2)]">›</span>
+                              </Link>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     </li>
                   ))}

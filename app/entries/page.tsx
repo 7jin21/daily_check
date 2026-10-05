@@ -13,7 +13,7 @@ interface Entry {
 }
 
 interface Props {
-  searchParams: Promise<{ q?: string; page?: string; view?: string; month?: string }>
+  searchParams: Promise<{ q?: string; page?: string; view?: string; month?: string; tag?: string }>
 }
 
 /** Asia/Tokyo の今日の日付を YYYY-MM-DD で返す */
@@ -128,6 +128,9 @@ export default async function EntriesPage({ searchParams }: Props) {
 
   const rawQuery = (params.q ?? '').trim().slice(0, 50)
   const q = sanitizeQuery(rawQuery)
+  // タグで絞り込む（同じテーマの記録を時系列でたどる）
+  // 配列リテラルの区切り文字は取り除く（PostgREST の cs フィルタを壊さないように）
+  const tag = (params.tag ?? '').replace(/[{},"\\]/g, '').trim().slice(0, 30)
   const page = Math.max(1, parseInt(params.page ?? '1', 10) || 1)
   const offset = (page - 1) * PAGE_SIZE
 
@@ -135,6 +138,10 @@ export default async function EntriesPage({ searchParams }: Props) {
     .from('diary_entries')
     .select('id, entry_date, mood, energy, summary, tags')
     .eq('user_id', user.id)
+
+  if (tag) {
+    query = query.contains('tags', [tag])
+  }
 
   if (q) {
     const pattern = `%${q}%`
@@ -165,7 +172,7 @@ export default async function EntriesPage({ searchParams }: Props) {
   }, {})
 
   const pageLink = (p: number) =>
-    `/entries?${new URLSearchParams({ ...(rawQuery ? { q: rawQuery } : {}), page: String(p) })}`
+    `/entries?${new URLSearchParams({ ...(rawQuery ? { q: rawQuery } : {}), ...(tag ? { tag } : {}), page: String(p) })}`
 
   return (
     <div className="px-5 pt-8 pb-8">
@@ -187,6 +194,7 @@ export default async function EntriesPage({ searchParams }: Props) {
 
       {/* キーワード検索（GET フォーム） */}
       <form method="GET" action="/entries" className="mb-6 flex gap-2">
+        {tag && <input type="hidden" name="tag" value={tag} />}
         <input
           type="search"
           name="q"
@@ -202,6 +210,21 @@ export default async function EntriesPage({ searchParams }: Props) {
         </button>
       </form>
 
+      {tag && (
+        <div className="mb-5 flex items-center justify-between gap-3 p-4 rounded-2xl bg-[var(--surface)] border border-[var(--border)]">
+          <div>
+            <p className="text-base font-bold text-[var(--primary)]">#{tag}</p>
+            <p className="text-xs text-[var(--muted)] mt-0.5">
+              このタグがついた記録 {safeEntries.length}
+              {hasMore ? '+' : ''}件（新しい順）
+            </p>
+          </div>
+          <Link href="/entries" className="text-xs text-[var(--primary)] underline underline-offset-2">
+            解除
+          </Link>
+        </div>
+      )}
+
       {rawQuery && (
         <p className="mb-4 text-sm text-[var(--muted)]">
           「{rawQuery}」の検索結果 {safeEntries.length}{hasMore ? '+' : ''}件
@@ -214,7 +237,7 @@ export default async function EntriesPage({ searchParams }: Props) {
       {safeEntries.length === 0 ? (
         <div className="text-center py-20 text-[var(--muted)]">
           <p className="text-6xl mb-4">📖</p>
-          {rawQuery ? (
+          {rawQuery || tag ? (
             <>
               <p className="font-medium text-lg text-[var(--foreground)]">見つかりませんでした</p>
               <p className="text-sm mt-2">別のキーワードで試してみてください</p>
@@ -260,7 +283,7 @@ export default async function EntriesPage({ searchParams }: Props) {
                         </span>
                       </div>
                       <p className="text-sm text-[var(--muted)] truncate">
-                        {entry.summary ?? '記録あり'}
+                        {entry.summary || '気分だけの記録'}
                       </p>
                       {entry.tags.length > 0 && (
                         <div className="flex gap-2 mt-1.5 flex-wrap">

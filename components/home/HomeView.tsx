@@ -4,7 +4,10 @@ import MirrorHero from './MirrorHero'
 import MirrorCTA from './MirrorCTA'
 import StreakCelebration from './StreakCelebration'
 import Reveal from './Reveal'
-import { Section, WeekRipples, StatsLine, MoodTrace, MoodCurve, Flashbacks, RecentList, weekDates } from './HomeSections'
+import { Section, WeekRipples, StatsLine, MoodTrace, Flashbacks, RecentList, weekDates } from './HomeSections'
+import MoodCurve from './MoodCurve'
+import QuickMemo from './QuickMemo'
+import FocusLine from './FocusLine'
 import './home.css'
 
 // ホーム画面の描画（データは app/page.tsx か開発用プレビューから受け取る）
@@ -27,22 +30,35 @@ export default function HomeView({ model, now }: { model: HomeModel; now: Date }
   const week = weekDates(today)
   let n = 0
   const idx = () => String(++n).padStart(2, '0')
+  // 「気分だけ」の記録（本文・要約がまだない）
+  const moodOnlyToday = !!todayEntry && !todayEntry.summary && !todayEntry.dominant_emotion
 
   return (
     <div className="im-home">
       <StreakCelebration streak={stats.streak} />
 
-      <MirrorHero today={today} period={period} now={now}>
+      {/* 記録済みの日は空を低くして、読み返し・数字をすぐ見られるようにする */}
+      <MirrorHero today={today} period={period} now={now} compact={!!todayEntry}>
         <MirrorCTA
           today={today}
           greeting={GREETING[period]}
           todaySummary={todayEntry?.summary || todayEntry?.dominant_emotion || null}
           hasTodayEntry={!!todayEntry}
+          moodOnly={moodOnlyToday}
           missedYesterday={missedYesterday ? yesterday : null}
         />
       </MirrorHero>
 
       <div className="im-sheet">
+        <FocusLine today={today} />
+
+        {/* 日中のひとこと（今日の言葉がまだ日記になっていない間だけ） */}
+        {(!todayEntry || moodOnlyToday) && (
+          <Section idx={idx()} title="今日のひとこと" meta="夜の日記にまとめられます">
+            <QuickMemo today={today} />
+          </Section>
+        )}
+
         <Section idx={idx()} title="この一週間" meta={`${short(week[0])} — ${short(week[6])}`}>
           <WeekRipples today={today} entries={entries} />
         </Section>

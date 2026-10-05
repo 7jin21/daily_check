@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { STORAGE_KEYS } from '@/lib/constants'
 import type { DraftResult } from '@/lib/offline-draft'
+import type { DraftMode } from '@/lib/draft-compose'
 
 export interface CheckinInput {
   mood: number | null
@@ -21,6 +22,8 @@ interface CheckinState extends CheckinInput {
   isGenerating: boolean
   reflectionQ: string          // AIが投げた内省の問い（任意）
   reflectionA: string          // それへのユーザーの回答（選択肢＋一言）
+  draftMode: DraftMode         // 清書の整え方（原文のまま / 整える / 箇条書き）
+  draftInputKey: string        // ドラフトを作ったときの入力（入力が変わったら清書し直すため）
   // Actions
   setMood: (mood: number) => void
   setEnergy: (energy: number) => void
@@ -37,6 +40,9 @@ interface CheckinState extends CheckinInput {
   setEditedDraft: (text: string) => void
   setIsGenerating: (isGenerating: boolean) => void
   setReflection: (question: string, answer: string) => void
+  setDraftMode: (mode: DraftMode) => void
+  setDraftInputKey: (key: string) => void
+  clearDraft: () => void       // ドラフトだけ捨てる（入力は残す）
   reset: () => void
   // Derived
   getInput: () => CheckinInput
@@ -46,7 +52,7 @@ const initialState: Omit<CheckinState, keyof Pick<CheckinState,
   'setMood' | 'setEnergy' | 'setEvents' | 'setChallenges' | 'setGratitude' |
   'setFreeform' | 'setCurrentStep' | 'nextStep' | 'prevStep' |
   'setCheckinDate' | 'setTargetDate' | 'setDraftResult' | 'setEditedDraft' | 'setIsGenerating' |
-  'setReflection' | 'reset' | 'getInput'
+  'setReflection' | 'setDraftMode' | 'setDraftInputKey' | 'clearDraft' | 'reset' | 'getInput'
 >> = {
   mood: null,
   energy: null,
@@ -62,6 +68,8 @@ const initialState: Omit<CheckinState, keyof Pick<CheckinState,
   isGenerating: false,
   reflectionQ: '',
   reflectionA: '',
+  draftMode: 'tidy',
+  draftInputKey: '',
 }
 
 export const useCheckinStore = create<CheckinState>()(
@@ -84,6 +92,9 @@ export const useCheckinStore = create<CheckinState>()(
       setEditedDraft: (editedDraft) => set({ editedDraft }),
       setIsGenerating: (isGenerating) => set({ isGenerating }),
       setReflection: (reflectionQ, reflectionA) => set({ reflectionQ, reflectionA }),
+      setDraftMode: (draftMode) => set({ draftMode }),
+      setDraftInputKey: (draftInputKey) => set({ draftInputKey }),
+      clearDraft: () => set({ draftResult: null, editedDraft: '', draftInputKey: '', draftMode: 'tidy' }),
 
       reset: () => set({ ...initialState }),
 
@@ -115,6 +126,8 @@ export const useCheckinStore = create<CheckinState>()(
         editedDraft: state.editedDraft,
         reflectionQ: state.reflectionQ,
         reflectionA: state.reflectionA,
+        draftMode: state.draftMode,
+        draftInputKey: state.draftInputKey,
       }),
     }
   )

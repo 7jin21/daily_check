@@ -1,23 +1,33 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Confetti from '@/components/ui/Confetti'
 import { useCheckinStore } from '@/stores/checkin'
 import { useSettingsStore } from '@/stores/settings'
-import { getSupabaseClient } from '@/lib/supabase'
+import { useMemoStore } from '@/stores/memos'
 import { apiPost } from '@/lib/api-client'
 import { generateOfflineDraft } from '@/lib/offline-draft'
+import { saveFullEntry } from '@/lib/entry-save'
+import {
+  DRAFT_MODES,
+  analyzeKept,
+  composeBullets,
+  composeRaw,
+  inputKey,
+  type ComposeInput,
+  type DraftMode,
+} from '@/lib/draft-compose'
 import ReflectionQuestion from '@/components/checkin/ReflectionQuestion'
 
 type RewriteInstruction = 'emotional' | 'shorter' | 'positive' | 'formal'
 
 const REWRITE_BUTTONS: { key: RewriteInstruction; label: string }[] = [
   { key: 'emotional', label: '感情豊かに ✨' },
-  { key: 'shorter',  label: '短くして 📝' },
+  { key: 'shorter', label: '短くして 📝' },
   { key: 'positive', label: 'ポジティブに 🌟' },
-  { key: 'formal',   label: '丁寧な文体に 📖' },
+  { key: 'formal', label: '丁寧な文体に 📖' },
 ]
 
 function getTodayJST() {
@@ -41,19 +51,33 @@ function classifyError(err: unknown): string {
   return '保存に失敗しました。時間をおいて再試行してください。'
 }
 
+/** ストアの最新値から、清書の材料（メモ＋内省の答え）を組み立てる */
+function currentComposeInput(): ComposeInput {
+  const st = useCheckinStore.getState()
+  return { ...st.getInput(), reflectionQ: st.reflectionQ, reflectionA: st.reflectionA }
+}
+
 export default function DraftPage() {
   const router = useRouter()
   const {
-    getInput,
-    checkinDate,
+    events,
+    challenges,
+    gratitude,
+    freeform,
+    reflectionQ,
+    reflectionA,
     targetDate,
     draftResult,
     editedDraft,
+    draftMode,
+    isGenerating,
     setDraftResult,
     setEditedDraft,
     setIsGenerating,
-    isGenerating,
     setReflection,
+    setDraftMode,
+    setDraftInputKey,
+    clearDraft,
     reset,
   } = useCheckinStore()
   const notificationsEnabled = useSettingsStore((s) => s.settings.notificationsEnabled)
@@ -61,47 +85,79 @@ export default function DraftPage() {
   const [isSaving, setIsSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [savedEntryDate, setSavedEntryDate] = useState<string | null>(null)
-  const [isOffline, setIsOffline] = useState(false)
+  const [notice, setNotice] = useState<'offline' | 'partial' | null>(null)
   const [rewritingKey, setRewritingKey] = useState<RewriteInstruction | null>(null)
   const [rewriteError, setRewriteError] = useState<string | null>(null)
   const [reflectPhase, setReflectPhase] = useState<'pending' | 'fetching' | 'asking' | 'done'>('pending')
   const [reflectQuestion, setReflectQuestion] = useState<{ question: string; options: string[] } | null>(null)
+  const [history, setHistory] = useState<{ text: string; mode: DraftMode }[]>([])
+  const [compareOpen, setCompareOpen] = useState(false)
+
   const abortRef = useRef<AbortController | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const startedRef = useRef(false) // StrictMode(dev)の二重実行で生成/質問が2回走らないようにする
+  // 非同期応答の取り違え防止: 生成・書き直しのたびに番号を進め、古い番号の応答は捨てる
+  const genRef = useRef(0)
+  const rewriteRef = useRef(0)
+  const savedRef = useRef(false)
+
+  // 本人のメモ（比較の基準）と、清書に残っている割合
+  const original = useMemo(
+    () => composeRaw({ mood: null, energy: null, events, challenges, gratitude, freeform, reflectionQ, reflectionA }),
+    [events, challenges, gratitude, freeform, reflectionQ, reflectionA]
+  )
+  const kept = useMemo(() => analyzeKept(original, editedDraft), [original, editedDraft])
 
   useEffect(() => {
+    const st = useCheckinStore.getState()
     const today = getTodayJST()
 
-    // 前日以前のデータでドラフトページに来た場合はチェックインへ戻す
-    if (checkinDate && checkinDate !== today) {
-      reset()
+    // 前日以前に書き始めたデータでドラフトページに来た場合はチェックインへ戻す
+    if (st.checkinDate && st.checkinDate !== today) {
+      st.reset()
       router.replace('/checkin')
       return
     }
-
-    const input = getInput()
+    const input = st.getInput()
     if (!input.mood && !input.energy) {
       router.replace('/checkin')
       return
     }
+    if (startedRef.current) return
+    startedRef.current = true
 
-    // editedDraft が空の場合のみ生成/初期化（編集済みなら保持）
-    // startedRef で StrictMode(dev) の二重起動を防ぐ（生成・質問が2回走らないように）
-    if (!editedDraft && !startedRef.current) {
-      startedRef.current = true
-      if (draftResult) {
-        setEditedDraft(draftResult.draft)
-      } else {
-        // 生成の「前」に、AIが内省の問いを1つだけ投げる（不要・失敗なら即生成へ）
-        startReflectionThenGenerate()
+    if (st.editedDraft || st.draftResult) {
+      const key = inputKey(currentComposeInput())
+      // 入力に戻ってメモを変えていたら、古い清書のまま保存しないようにする
+      if (st.draftInputKey && st.draftInputKey !== key) {
+        const untouched = st.draftMode === 'tidy' && st.editedDraft === st.draftResult?.draft
+        if (untouched || window.confirm('メモの内容が変わりました。新しい内容で清書し直しますか？\n（いまのドラフトは置き換わります）')) {
+          st.clearDraft()
+          st.setReflection('', '')
+          startReflectionThenGenerate()
+        } else {
+          st.setDraftInputKey(key)
+        }
+        return
       }
+      if (!st.editedDraft && st.draftResult) st.setEditedDraft(st.draftResult.draft)
+      return
     }
+    // 生成の「前」に、AIが内省の問いを1つだけ投げる（不要・失敗なら即生成へ）
+    startReflectionThenGenerate()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // 画面を離れたら進行中の生成を止め、遅れて届く応答はすべて無効にする
   useEffect(() => {
-    return () => { abortRef.current?.abort() }
+    const abort = abortRef
+    const gen = genRef
+    const rewrite = rewriteRef
+    return () => {
+      abort.current?.abort()
+      gen.current++
+      rewrite.current++
+    }
   }, [])
 
   useEffect(() => {
@@ -111,73 +167,102 @@ export default function DraftPage() {
     el.style.height = `${el.scrollHeight}px`
   }, [editedDraft])
 
+  /** AI が使えないとき: 本人のメモをそのまま使う（メモが空ならテンプレート） */
+  const fallbackToOwnWords = (full: ComposeInput, entryTarget: string | null) => {
+    const raw = composeRaw(full)
+    const offline = generateOfflineDraft(full, entryTarget)
+    const text = raw || offline.draft
+    setDraftResult({ ...offline, draft: text, fromAI: false })
+    setEditedDraft(text)
+    setDraftMode(raw ? 'raw' : 'tidy')
+    setNotice('offline')
+  }
+
   const generateDraft = async () => {
     abortRef.current?.abort()
-    abortRef.current = new AbortController()
-    setIsGenerating(true)
-    setIsOffline(false)
-    setEditedDraft('')
+    const controller = new AbortController()
+    abortRef.current = controller
+    const id = ++genRef.current
+    const isCurrent = () => id === genRef.current
 
-    const input = getInput()
-    const { reflectionQ, reflectionA, targetDate: entryTarget } = useCheckinStore.getState()
+    const st = useCheckinStore.getState()
+    const full = currentComposeInput()
+    const entryTarget = st.targetDate
+    setIsGenerating(true)
+    setNotice(null)
+    setEditedDraft('')
+    setDraftMode('tidy')
+    setDraftInputKey(inputKey(full))
+
+    let text = ''
     try {
       // 日記本文は text/plain でストリーミングされる。内省Q&Aがあれば文脈として渡す。
       // entryDate は過去日付の書き忘れ救済用（null なら今日扱い）
       const res = await fetch('/api/generate-draft', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...input, reflectionQ, reflectionA, entryDate: entryTarget ?? undefined }),
-        signal: abortRef.current.signal,
+        body: JSON.stringify({ ...full, entryDate: entryTarget ?? undefined }),
+        signal: controller.signal,
       })
       if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`)
 
       const isFallback = res.headers.get('X-Draft-Fallback') === '1'
       const reader = res.body.getReader()
       const decoder = new TextDecoder()
-      let text = ''
       for (;;) {
         const { done, value } = await reader.read()
+        if (!isCurrent()) {
+          reader.cancel().catch(() => {})
+          return
+        }
         if (done) break
         text += decoder.decode(value, { stream: true })
         setEditedDraft(text)
       }
       text = text.trim()
       if (!text) throw new Error('empty draft')
-      setEditedDraft(text)
 
       if (isFallback) {
-        // サーバー側でオフラインテンプレートが使われた
-        const offline = generateOfflineDraft(input, entryTarget)
-        setDraftResult({ ...offline, draft: text })
-        setIsOffline(true)
+        // サーバーに AI が設定されていない → 本人のメモをそのまま使う
+        fallbackToOwnWords(full, entryTarget)
         return
       }
 
-      // メタ情報（タグ・サマリー・感情）は本文確定後にバックグラウンドで取得。
-      // 失敗時はローカル生成のメタにフォールバック
-      const offlineMeta = generateOfflineDraft(input, entryTarget)
+      setEditedDraft(text)
+      // メタ情報（タグ・サマリー・感情）は本文確定後にバックグラウンドで取得。失敗時はローカル生成のメタ
+      const offlineMeta = generateOfflineDraft(full, entryTarget)
       setDraftResult({
         draft: text,
         tags: offlineMeta.tags,
         summary: offlineMeta.summary,
         dominantEmotion: offlineMeta.dominantEmotion,
+        fromAI: true,
       })
-      apiPost<{ tags: string[]; summary: string; dominantEmotion: string }>(
-        '/api/draft-meta',
-        { draft: text },
-        { retry: false }
-      )
-        .then((meta) => setDraftResult({ draft: text, ...meta }))
-        .catch(() => { /* オフラインメタのまま */ })
+      apiPost<{ tags: string[]; summary: string; dominantEmotion: string }>('/api/draft-meta', { draft: text }, { retry: false })
+        .then((meta) => {
+          // 保存・再生成・画面離脱のあとに届いた応答は捨てる（古い下書きを復活させない）
+          if (isCurrent() && !savedRef.current) setDraftResult({ draft: text, ...meta, fromAI: true })
+        })
+        .catch(() => {
+          /* オフラインメタのまま */
+        })
     } catch (err) {
+      if (!isCurrent()) return
       if (err instanceof DOMException && err.name === 'AbortError') return
-      console.warn('AI生成失敗、オフラインドラフトを使用します:', err)
-      const offlineResult = generateOfflineDraft(input, entryTarget)
-      setDraftResult(offlineResult)
-      setEditedDraft(offlineResult.draft)
-      setIsOffline(true)
+      const partial = text.trim()
+      if (partial) {
+        // 途中まで届いた清書は捨てずに残し、途中で止まったことを伝える
+        console.warn('清書が途中で止まりました:', err)
+        const meta = generateOfflineDraft(full, entryTarget)
+        setDraftResult({ ...meta, draft: partial, fromAI: true })
+        setEditedDraft(partial)
+        setNotice('partial')
+      } else {
+        console.warn('AI清書に失敗、本人のメモをそのまま使います:', err)
+        fallbackToOwnWords(full, entryTarget)
+      }
     } finally {
-      setIsGenerating(false)
+      if (isCurrent()) setIsGenerating(false)
     }
   }
 
@@ -189,7 +274,7 @@ export default function DraftPage() {
     try {
       const res = await apiPost<{ skip: boolean; question?: string; options?: string[] }>(
         '/api/checkin-question',
-        getInput(),
+        useCheckinStore.getState().getInput(),
         { signal: controller.signal }
       )
       clearTimeout(timer)
@@ -220,96 +305,127 @@ export default function DraftPage() {
 
   const handleCancel = () => {
     abortRef.current?.abort()
+    genRef.current++
+    // 途中まで書かれたドラフトを、次に開いたとき完成品のように再利用しない
+    clearDraft()
     router.push('/checkin')
+  }
+
+  /** いまの整え方で作られる「元の形」（手で直したかどうかの判定に使う） */
+  const baseText = (mode: DraftMode): string => {
+    if (mode === 'raw') return composeRaw(currentComposeInput())
+    if (mode === 'bullets') return composeBullets(currentComposeInput())
+    return draftResult?.draft ?? ''
+  }
+
+  const pushHistory = () => setHistory((h) => [...h, { text: editedDraft, mode: draftMode }].slice(-10))
+
+  const switchMode = (next: DraftMode) => {
+    if (next === draftMode || isGenerating || rewritingKey || isSaving) return
+    const edited = editedDraft.trim() && editedDraft !== baseText(draftMode)
+    if (edited && !window.confirm('手で直した内容は置き換わります（「元に戻す」で戻せます）。よろしいですか？')) return
+    pushHistory()
+    setRewriteError(null)
+    if (next === 'tidy') {
+      if (draftResult?.fromAI) {
+        setDraftMode('tidy')
+        setEditedDraft(draftResult.draft)
+      } else {
+        generateDraft() // AI の清書がまだない（または失敗していた）ので作る
+      }
+      return
+    }
+    setNotice(null)
+    setDraftMode(next)
+    setEditedDraft(next === 'raw' ? composeRaw(currentComposeInput()) : composeBullets(currentComposeInput()))
+  }
+
+  const handleUndo = () => {
+    const last = history[history.length - 1]
+    if (!last || isGenerating || rewritingKey) return
+    setHistory((h) => h.slice(0, -1))
+    setDraftMode(last.mode)
+    setEditedDraft(last.text)
   }
 
   // ユーザーが手で編集した内容を無確認で破棄しない
   const handleRegenerate = () => {
-    const hasEdits =
-      draftResult && editedDraft.trim() && editedDraft !== draftResult.draft
-    if (hasEdits && !window.confirm('編集した内容は破棄されます。AIに最初から書き直してもらいますか？')) {
+    const hasEdits = draftResult && editedDraft.trim() && editedDraft !== draftResult.draft
+    if (hasEdits && !window.confirm('編集した内容は置き換わります（「元に戻す」で戻せます）。清書し直しますか？')) {
       return
     }
+    pushHistory()
     generateDraft()
   }
 
   const handleRewrite = async (instruction: RewriteInstruction) => {
-    if (!editedDraft.trim() || rewritingKey) return
+    if (!editedDraft.trim() || rewritingKey || isGenerating) return
+    const rid = ++rewriteRef.current
+    const before = editedDraft
     setRewritingKey(instruction)
     setRewriteError(null)
     try {
-      const result = await apiPost<{ draft: string }>('/api/rewrite-draft', {
-        draft: editedDraft,
-        instruction,
-      })
+      const result = await apiPost<{ draft: string }>('/api/rewrite-draft', { draft: before, instruction })
+      if (rid !== rewriteRef.current || savedRef.current) return
+      setHistory((h) => [...h, { text: before, mode: draftMode }].slice(-10))
       setEditedDraft(result.draft)
     } catch {
-      setRewriteError('AIの書き直しに失敗しました。しばらくしてから再試行してください。')
+      if (rid === rewriteRef.current) setRewriteError('AIの書き直しに失敗しました。しばらくしてから再試行してください。')
     } finally {
-      setRewritingKey(null)
+      if (rid === rewriteRef.current) setRewritingKey(null)
     }
   }
 
   const handleSave = async () => {
-    if (!editedDraft.trim()) return
+    if (!editedDraft.trim() || isSaving || rewritingKey || isGenerating) return
     setIsSaving(true)
     setSaveError(null)
 
-    const input = getInput()
-    // 過去日付の記録なら targetDate、通常は今日
-    const entryDate = useCheckinStore.getState().targetDate ?? getTodayJST()
+    const st = useCheckinStore.getState()
+    const input = st.getInput()
+    // 記録の対象日は「書き始めた日」で固定する（日付をまたいで開いたままでも、翌日の記録を上書きしない）
+    const entryDate = st.targetDate ?? st.checkinDate ?? getTodayJST()
     // 内省Q&Aは DB 列を増やさず freeform に畳んで残す（将来のAI分析の材料にする）
-    const { reflectionQ, reflectionA } = useCheckinStore.getState()
-    const freeformToSave = reflectionA?.trim()
-      ? `${input.freeform ? input.freeform + '\n\n' : ''}【ふりかえり】${reflectionQ}\n→ ${reflectionA}`
+    const freeformToSave = st.reflectionA?.trim()
+      ? `${input.freeform ? input.freeform + '\n\n' : ''}【ふりかえり】${st.reflectionQ}\n→ ${st.reflectionA}`
       : input.freeform
 
     try {
-      const supabase = getSupabaseClient()
-      const { data: { user } } = await supabase.auth.getUser()
+      const entryId = await saveFullEntry({
+        entryDate,
+        mood: input.mood,
+        energy: input.energy,
+        events: input.events,
+        challenges: input.challenges,
+        gratitude: input.gratitude,
+        freeform: freeformToSave,
+        aiDraft: draftResult?.draft ?? editedDraft,
+        editedDraft,
+        tags: draftResult?.tags ?? [],
+        summary: draftResult?.summary ?? '',
+        dominantEmotion: draftResult?.dominantEmotion ?? '',
+      })
+      // ここから先に届く生成・メタ・書き直しの応答はすべて無効
+      savedRef.current = true
+      genRef.current++
+      rewriteRef.current++
 
-      if (!user) {
-        router.push('/login')
-        return
-      }
-
-      const { data: savedEntry, error: saveDbError } = await supabase
-        .from('diary_entries')
-        .upsert(
-          {
-            user_id: user.id,
-            entry_date: entryDate,
-            mood: input.mood,
-            energy: input.energy,
-            events: input.events,
-            challenges: input.challenges,
-            gratitude: input.gratitude,
-            freeform: freeformToSave,
-            ai_draft: draftResult?.draft ?? editedDraft,
-            edited_draft: editedDraft,
-            tags: draftResult?.tags ?? [],
-            summary: draftResult?.summary ?? '',
-            dominant_emotion: draftResult?.dominantEmotion ?? '',
-          },
-          // PKのidは渡していないため、user_id + entry_date で競合判定しないと
-          // 同日2回目の保存が unique 制約違反になる
-          { onConflict: 'user_id,entry_date' }
-        )
-        .select('id')
-        .single()
-
-      if (saveDbError) throw new Error(saveDbError.message)
-
-      if (savedEntry) {
-        apiPost('/api/notion-sync', {
-          entryId: savedEntry.id,
+      apiPost(
+        '/api/notion-sync',
+        {
+          entryId,
           entryDate,
           draft: editedDraft,
           tags: draftResult?.tags ?? [],
           mood: input.mood,
           energy: input.energy,
-        }, { retry: false }).catch((err) => console.warn('Notion同期失敗（無視）:', err))
-      }
+        },
+        { retry: false }
+      ).catch((err) => console.warn('Notion同期失敗（無視）:', err))
+
+      // その日のひとことメモは日記に入ったので片付ける
+      const memos = useMemoStore.getState()
+      if (memos.date === entryDate) memos.clear()
 
       reset()
       setSavedEntryDate(entryDate)
@@ -382,7 +498,7 @@ export default function DraftPage() {
         <div className="spinner" style={{ width: 48, height: 48, borderWidth: 3 }} />
         <div className="text-center">
           <p className="font-bold text-[var(--foreground)] text-lg">あなたの言葉を清書しています…</p>
-          <p className="text-[var(--muted-2)] text-sm mt-1">少々お待ちください ✨</p>
+          <p className="text-[var(--muted-2)] text-sm mt-1">言い回しはそのまま、つなぎだけ整えます</p>
         </div>
         <button
           onClick={handleCancel}
@@ -434,9 +550,12 @@ export default function DraftPage() {
 
   if (!editedDraft && !draftResult) return null
 
+  const keptPercent = Math.round(kept.kept * 100)
+  const busy = isGenerating || !!rewritingKey || isSaving
+
   return (
     <div className="min-h-dvh flex flex-col px-4 pt-6">
-      <div className="flex items-center gap-3 mb-6">
+      <div className="flex items-center gap-3 mb-5">
         <button
           onClick={() => router.push('/checkin')}
           className="w-11 h-11 rounded-full bg-[var(--surface-secondary)] border border-[var(--border)] flex items-center justify-center text-xl text-[var(--foreground)]"
@@ -451,49 +570,127 @@ export default function DraftPage() {
         </h1>
       </div>
 
-      {isOffline && (
-        <div className="mb-4 p-3 rounded-2xl text-sm" style={{ background: 'rgba(197,137,95,0.12)', border: '1px solid rgba(197,137,95,0.35)', color: '#a4683f' }}>
-          <p className="font-semibold">⚠️ AI生成に失敗しました</p>
-          <p className="mt-0.5 text-xs">ネットワーク接続を確認のうえ「書き直す」を試してください。以下はオフライン生成のドラフトです。</p>
+      {notice && (
+        <div
+          className="mb-4 p-3 rounded-2xl text-sm"
+          style={{ background: 'rgba(197,137,95,0.12)', border: '1px solid rgba(197,137,95,0.35)', color: '#a4683f' }}
+        >
+          {notice === 'offline' ? (
+            <>
+              <p className="font-semibold">AI に接続できませんでした</p>
+              <p className="mt-0.5 text-xs">書いたメモをそのまま使っています。「整える」を押すと清書を再試行します。</p>
+            </>
+          ) : (
+            <>
+              <p className="font-semibold">清書が途中で止まりました</p>
+              <p className="mt-0.5 text-xs">続きは手で直すか、「清書し直す」を押してください。</p>
+            </>
+          )}
         </div>
       )}
 
-      {draftResult && (
-        <div className="mb-4">
-          <p className="text-sm text-[var(--muted)] mb-2">{draftResult.summary}</p>
-          <div className="flex flex-wrap gap-2">
-            {draftResult.tags.map((tag) => (
-              <span
-                key={tag}
-                className="px-3 py-1 rounded-full bg-[var(--surface-secondary)] border border-[var(--border)] text-[var(--primary)] text-xs font-medium"
-              >
-                #{tag}
-              </span>
-            ))}
-          </div>
+      {/* 整え方 */}
+      <div className="mb-4">
+        <div role="radiogroup" aria-label="整え方" className="draft-modes">
+          {DRAFT_MODES.map((m) => (
+            <button
+              key={m.value}
+              role="radio"
+              aria-checked={draftMode === m.value}
+              data-active={draftMode === m.value}
+              onClick={() => switchMode(m.value)}
+              disabled={busy}
+              className="draft-mode"
+            >
+              {m.label}
+            </button>
+          ))}
+        </div>
+        <p className="mt-2 text-xs text-[var(--muted)] px-1">{DRAFT_MODES.find((m) => m.value === draftMode)?.hint}</p>
+      </div>
+
+      {draftResult && draftResult.tags.length > 0 && (
+        <div className="mb-3 flex flex-wrap gap-2">
+          {draftResult.tags.map((tag) => (
+            <span
+              key={tag}
+              className="px-3 py-1 rounded-full bg-[var(--surface-secondary)] border border-[var(--border)] text-[var(--primary)] text-xs font-medium"
+            >
+              #{tag}
+            </span>
+          ))}
         </div>
       )}
 
       <div className="flex-1 mb-4">
-        <label className="block text-sm font-medium text-[var(--muted)] mb-2">
-          編集して保存できます
-        </label>
         <textarea
           ref={textareaRef}
           value={editedDraft}
+          readOnly={!!rewritingKey}
+          aria-label="日記の本文（編集できます）"
           onChange={(e) => setEditedDraft(e.target.value)}
-          className="w-full min-h-40 p-4 rounded-2xl border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] text-base resize-none overflow-hidden focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
+          className="w-full min-h-40 p-4 rounded-2xl border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] text-base resize-none overflow-hidden focus:outline-none focus:ring-2 focus:ring-[var(--primary)] leading-relaxed"
         />
 
-        {/* AI書き直しボタン */}
-        <div className="mt-3">
-          <p className="text-xs text-[var(--muted-2)] mb-2">AIに書き直してもらう</p>
+        {/* 自分の言葉が残っているかを確かめる */}
+        <div className="mt-2 flex items-center gap-2 flex-wrap">
+          {original && (
+            <button
+              type="button"
+              onClick={() => setCompareOpen((v) => !v)}
+              aria-expanded={compareOpen}
+              className="draft-kept"
+            >
+              <span className="draft-kept-meter" aria-hidden="true">
+                <span style={{ width: `${keptPercent}%` }} />
+              </span>
+              あなたの言葉 {keptPercent}%
+              <span className="text-[var(--muted-2)]">{compareOpen ? '▴' : '▾'}</span>
+            </button>
+          )}
+          {history.length > 0 && (
+            <button type="button" onClick={handleUndo} disabled={busy} className="draft-undo">
+              ↶ 元に戻す
+            </button>
+          )}
+        </div>
+
+        {compareOpen && original && (
+          <div className="mt-3 card animate-fade-in" style={{ padding: 16 }}>
+            <p className="text-xs font-bold text-[var(--muted)] tracking-wide">いまの本文</p>
+            <p className="mt-2 text-[15px] leading-loose text-[var(--foreground)] whitespace-pre-wrap">
+              {kept.segments.map((s, i) =>
+                s.added ? (
+                  <mark key={i} className="ai-added">
+                    {s.text}
+                  </mark>
+                ) : (
+                  <span key={i}>{s.text}</span>
+                )
+              )}
+            </p>
+            <p className="mt-2 text-[11px] text-[var(--muted)]">
+              <mark className="ai-added">下線</mark> は、あなたのメモに無かった言葉です。
+            </p>
+            <p className="mt-4 text-xs font-bold text-[var(--muted)] tracking-wide">あなたが書いたメモ</p>
+            <p className="mt-2 text-sm leading-relaxed text-[var(--muted)] whitespace-pre-wrap">{original}</p>
+            {draftMode !== 'raw' && (
+              <button type="button" onClick={() => switchMode('raw')} disabled={busy} className="mt-3 draft-undo">
+                メモのままにする
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* AI書き直し（任意。AI らしく膨らませたい日に） */}
+        <div className="mt-5">
+          <p className="text-xs text-[var(--muted-2)] mb-2">AIに書き直してもらう（言葉が変わります）</p>
           <div className="flex flex-wrap gap-2">
             {REWRITE_BUTTONS.map(({ key, label }) => (
               <button
                 key={key}
                 onClick={() => handleRewrite(key)}
-                disabled={!!rewritingKey || isSaving}
+                disabled={busy}
                 className="px-3 py-1.5 rounded-full text-xs font-medium border border-[var(--border)] text-[var(--muted)] bg-[var(--surface)] disabled:opacity-40 active:scale-95 transition-transform"
               >
                 {rewritingKey === key ? '書き直し中...' : label}
@@ -501,13 +698,18 @@ export default function DraftPage() {
             ))}
           </div>
           {rewriteError && (
-            <p className="mt-2 text-xs" style={{ color: '#9c4a2f' }}>{rewriteError}</p>
+            <p className="mt-2 text-xs" style={{ color: '#9c4a2f' }}>
+              {rewriteError}
+            </p>
           )}
         </div>
       </div>
 
       {saveError && (
-        <div className="mb-4 p-3 rounded-2xl text-sm" style={{ background: 'rgba(181,101,74,0.12)', border: '1px solid rgba(181,101,74,0.35)', color: '#9c4a2f' }}>
+        <div
+          className="mb-4 p-3 rounded-2xl text-sm"
+          style={{ background: 'rgba(181,101,74,0.12)', border: '1px solid rgba(181,101,74,0.35)', color: '#9c4a2f' }}
+        >
           <p className="font-semibold">保存できませんでした</p>
           <p className="mt-0.5 text-xs">{saveError}</p>
         </div>
@@ -516,18 +718,20 @@ export default function DraftPage() {
       <div className="pb-6 space-y-3">
         <button
           onClick={handleSave}
-          disabled={isSaving || !editedDraft.trim()}
+          disabled={busy || !editedDraft.trim()}
           className="w-full py-4 rounded-full bg-[var(--accent)] text-[#f7f4ea] font-bold text-base disabled:opacity-40 active:scale-[0.99] transition-transform"
         >
           {isSaving ? '保存中...' : '保存する 💾'}
         </button>
-        <button
-          onClick={handleRegenerate}
-          disabled={isGenerating || isSaving}
-          className="w-full py-3 rounded-full border border-[var(--border)] text-[var(--muted)] text-base disabled:opacity-40"
-        >
-          🔄 AIに書き直してもらう
-        </button>
+        {draftMode === 'tidy' && (
+          <button
+            onClick={handleRegenerate}
+            disabled={busy}
+            className="w-full py-3 rounded-full border border-[var(--border)] text-[var(--muted)] text-base disabled:opacity-40"
+          >
+            🔄 清書し直す
+          </button>
+        )}
       </div>
     </div>
   )

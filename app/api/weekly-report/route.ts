@@ -32,11 +32,15 @@ export async function POST(req: NextRequest) {
   } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  // 前回レポートの「来週のフォーカス」（あれば今週のふり返りに使う）
+  // 本人が採用した「今週のフォーカス」（なければ前回レポートの提案）と、実施した日数
   let previousFocus = ''
+  let focusDone: number | null = null
   try {
-    const body = (await req.json()) as { previousFocus?: unknown }
+    const body = (await req.json()) as { previousFocus?: unknown; focusDone?: unknown }
     if (typeof body.previousFocus === 'string') previousFocus = body.previousFocus.trim().slice(0, 100)
+    if (Number.isInteger(body.focusDone) && (body.focusDone as number) >= 0 && (body.focusDone as number) <= 7) {
+      focusDone = body.focusDone as number
+    }
   } catch {
     // body なしでも動く
   }
@@ -78,8 +82,10 @@ export async function POST(req: NextRequest) {
   try {
     const groq = getGroqClient()
 
+    const doneNote =
+      focusDone !== null ? `本人はこれを今週のフォーカスとして採用し、直近7日のうち${focusDone}日「できた」と記録しています。` : ''
     const focusInstruction = previousFocus
-      ? `\n\n先週のレポートでは「来週のフォーカス」として「${previousFocus}」を提案しました。今週の記録を踏まえて、それがどうだったかを "focusReview"（60字以内・責めない表現で）として必ず含めてください。`
+      ? `\n\n先週のレポートでは「来週のフォーカス」として「${previousFocus}」を提案しました。${doneNote}今週の記録を踏まえて、それがどうだったかを "focusReview"（60字以内・責めない表現で）として必ず含めてください。`
       : ''
     const focusField = previousFocus ? `,\n  "focusReview": "先週のフォーカスがどうだったか（60字以内）"` : ''
 

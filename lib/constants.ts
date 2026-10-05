@@ -117,6 +117,8 @@ export const STORAGE_KEYS = {
   INSIGHTS_CACHE: 'insights-analysis-cache',
   WEEKLY_REPORT_CACHE: 'insights-weekly-report-cache',
   MILESTONE_PREFIX: 'inner-mirror-milestone-',
+  MEMOS: 'inner-mirror-memos',
+  FOCUS: 'inner-mirror-focus',
 } as const
 
 /**
@@ -129,6 +131,8 @@ export function clearUserLocalData() {
     localStorage.removeItem(STORAGE_KEYS.SETTINGS)
     localStorage.removeItem(STORAGE_KEYS.INSIGHTS_CACHE)
     localStorage.removeItem(STORAGE_KEYS.WEEKLY_REPORT_CACHE)
+    localStorage.removeItem(STORAGE_KEYS.MEMOS)
+    localStorage.removeItem(STORAGE_KEYS.FOCUS)
     Object.keys(localStorage)
       .filter((key) => key.startsWith(STORAGE_KEYS.MILESTONE_PREFIX))
       .forEach((key) => localStorage.removeItem(key))

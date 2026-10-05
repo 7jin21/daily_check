@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useSettingsStore } from '@/stores/settings'
 import { useCheckinStore } from '@/stores/checkin'
+import { useMemoStore } from '@/stores/memos'
 import { getSupabaseClient } from '@/lib/supabase'
 import { apiGet, apiPost } from '@/lib/api-client'
 import { clearUserLocalData } from '@/lib/constants'
@@ -146,6 +147,7 @@ export default function SettingsPage() {
     // 共有端末対策: 前ユーザーの下書き・AI分析キャッシュ等を残さない
     useCheckinStore.getState().reset()
     useSettingsStore.getState().reset()
+    useMemoStore.getState().clear()
     clearUserLocalData()
     router.push('/login')
   }

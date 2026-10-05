@@ -7,6 +7,7 @@ export interface DraftResult {
   tags: string[]
   summary: string
   dominantEmotion: string
+  fromAI?: boolean // AI の清書から作られたか（false ならテンプレート／本人のメモそのまま）
 }
 
 // テンプレートベースで日記ドラフトを生成（AI不使用）

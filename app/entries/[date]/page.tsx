@@ -4,9 +4,14 @@ import Link from 'next/link'
 import EditableContent from '@/components/entry/EditableContent'
 import DeleteEntryButton from '@/components/entry/DeleteEntryButton'
 import ShareEntryButton from '@/components/entry/ShareEntryButton'
+import LaterNote from '@/components/entry/LaterNote'
+import { parseFreeform } from '@/lib/freeform'
+import { toJSTDate } from '@/lib/home-model'
 
 interface Props {
   params: Promise<{ date: string }>
+  // write=1: 言葉を書き足す（気分だけの記録から）／ now=1: 今の一言を添える（フラッシュバックから）
+  searchParams: Promise<{ write?: string; now?: string }>
 }
 
 const MOOD_EMOJI: Record<number, string> = {
@@ -19,8 +24,9 @@ const ENERGY_LABEL: Record<number, string> = {
   1: '枯渇', 2: '低い', 3: '普通', 4: '高い', 5: '最高',
 }
 
-export default async function EntryDetailPage({ params }: Props) {
+export default async function EntryDetailPage({ params, searchParams }: Props) {
   const { date } = await params
+  const { write, now } = await searchParams
 
   // 日付フォーマット検証
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
@@ -44,7 +50,10 @@ export default async function EntryDetailPage({ params }: Props) {
   }
 
   // || を使う: edited_draft が空文字のときも ai_draft にフォールバックさせる
-  const displayContent = entry.edited_draft || entry.ai_draft
+  const displayContent: string = entry.edited_draft || entry.ai_draft || ''
+  const today = toJSTDate()
+  // 自由メモ・内省の答え・あとから添えた一言を分けて表示する
+  const ff = parseFreeform(entry.freeform as string | null)
 
   return (
     <div className="px-4 pt-6 pb-8">
@@ -91,28 +100,32 @@ export default async function EntryDetailPage({ params }: Props) {
       {/* タグ */}
       {Array.isArray(entry.tags) && entry.tags.length > 0 && (
         <div className="flex flex-wrap gap-2 mb-6">
+          {/* タグから、同じテーマの記録を時系列でたどれる */}
           {(entry.tags as string[]).map((tag) => (
-            <span
+            <Link
               key={tag}
+              href={`/entries?tag=${encodeURIComponent(tag)}`}
               className="px-3 py-1 rounded-full bg-[var(--surface-secondary)] border border-[var(--border)] text-[var(--primary)] text-xs font-medium"
+              style={{ minHeight: 32 }}
             >
               #{tag}
-            </span>
+            </Link>
           ))}
         </div>
       )}
 
-      {/* 日記本文（編集可能） */}
-      {displayContent && (
-        <EditableContent
-          entryId={entry.id as string}
-          initialContent={displayContent}
-          entryDate={date}
-          mood={entry.mood as number | null}
-          energy={entry.energy as number | null}
-          tags={Array.isArray(entry.tags) ? (entry.tags as string[]) : []}
-        />
-      )}
+      {/* 日記本文（編集可能。気分だけの記録なら、ここから言葉を書き足せる） */}
+      <EditableContent
+        entryId={entry.id as string}
+        initialContent={displayContent}
+        entryDate={date}
+        mood={entry.mood as number | null}
+        energy={entry.energy as number | null}
+        tags={Array.isArray(entry.tags) ? (entry.tags as string[]) : []}
+        autoEdit={write === '1' && !displayContent}
+        needsMeta={!entry.summary}
+        isToday={date === today}
+      />
 
       {/* 入力内容 */}
       <div className="space-y-4">
@@ -134,13 +147,31 @@ export default async function EntryDetailPage({ params }: Props) {
             <p className="text-base text-[var(--foreground)] whitespace-pre-wrap leading-relaxed">{entry.gratitude}</p>
           </div>
         )}
-        {entry.freeform && (
+        {ff.memo && (
           <div className="card">
             <h3 className="eyebrow mb-2">メモ</h3>
-            <p className="text-base text-[var(--foreground)] whitespace-pre-wrap leading-relaxed">{entry.freeform}</p>
+            <p className="text-base text-[var(--foreground)] whitespace-pre-wrap leading-relaxed">{ff.memo}</p>
           </div>
         )}
+        {ff.reflections.map((r, i) => (
+          <div key={`r${i}`} className="card">
+            <h3 className="eyebrow mb-2">ふりかえり</h3>
+            <p className="text-sm text-[var(--muted)] leading-relaxed">{r.question}</p>
+            {r.answer && (
+              <p className="mt-1.5 text-base text-[var(--foreground)] whitespace-pre-wrap leading-relaxed">{r.answer}</p>
+            )}
+          </div>
+        ))}
+        {ff.laterNotes.map((n, i) => (
+          <div key={`n${i}`} className="card" style={{ borderStyle: 'dashed' }}>
+            <h3 className="eyebrow mb-2">あとから・{n.date.split('-').join('.')}</h3>
+            <p className="text-base text-[var(--foreground)] whitespace-pre-wrap leading-relaxed">{n.text}</p>
+          </div>
+        ))}
       </div>
+
+      {/* 過去の日記に「今の一言」を添える（当時の本文はそのまま） */}
+      {date < today && <LaterNote entryId={entry.id as string} autoOpen={now === '1'} />}
 
       {/* シェア */}
       <div className="mt-6 flex gap-3">

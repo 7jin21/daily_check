@@ -11,6 +11,8 @@ interface Props {
   today: string // YYYY-MM-DD (JST)
   period: DayPeriod
   now: Date
+  /** 記録済みの日は空を低くする（読み返しやシートの数字をすぐ見られるように） */
+  compact?: boolean
   children: ReactNode
 }
 
@@ -120,7 +122,7 @@ function StageArt({
   )
 }
 
-export default function MirrorHero({ today, period, now, children }: Props) {
+export default function MirrorHero({ today, period, now, compact = false, children }: Props) {
   const [, m, d] = today.split('-').map(Number)
   const monthDay = `${toKanjiNumber(m)}月${toKanjiNumber(d)}日`
   const weekday = `${WEEKDAY_KANJI[dayOfWeek(today)]}曜日`
@@ -128,7 +130,7 @@ export default function MirrorHero({ today, period, now, children }: Props) {
   const stars = starsFor(today)
 
   return (
-    <section className="im-mirror im-anim" data-period={period} aria-label="今日">
+    <section className="im-mirror im-anim" data-period={period} data-compact={compact} aria-label="今日">
       <RippleFilter />
       <div className="im-sky">
         <div className="im-stage">

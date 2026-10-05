@@ -92,7 +92,10 @@ export async function POST(req: NextRequest) {
             if (delta) controller.enqueue(encoder.encode(delta))
           }
         } catch (err) {
+          // 途中で止まったことをクライアントに伝える（正常終了に見せかけると、切れた本文が完成品として残る）
           console.error('GROQ stream error:', err)
+          controller.error(err)
+          return
         }
         controller.close()
       },

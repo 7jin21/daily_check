@@ -7,6 +7,7 @@ import { STEPS, getDailyDescription } from '@/lib/constants'
 import StateStep from '@/components/checkin/StateStep'
 import NotesStep from '@/components/checkin/NotesStep'
 import { hapticTap } from '@/lib/haptics'
+import { saveMoodOnly } from '@/lib/entry-save'
 
 function getTodayJST() {
   return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Tokyo' })
@@ -31,9 +32,13 @@ function formatDateLabel(date: string): string {
 
 export default function CheckinPage() {
   const router = useRouter()
-  const { currentStep, mood, energy, targetDate, nextStep, prevStep } = useCheckinStore()
+  const { currentStep, mood, energy, targetDate, events, challenges, gratitude, freeform, nextStep, prevStep } =
+    useCheckinStore()
 
   const [direction, setDirection] = useState<'forward' | 'back'>('forward')
+  const [quickSaving, setQuickSaving] = useState(false)
+  const [quickError, setQuickError] = useState<string | null>(null)
+  const hasText = [events, challenges, gratitude, freeform].some((v) => v.trim())
 
   // 前日以前のデータが残っていたら自動クリア
   // PWA は何日もバックグラウンドに残るため、マウント時だけでなく
@@ -82,6 +87,31 @@ export default function CheckinPage() {
       nextStep()
     } else {
       router.push('/draft')
+    }
+  }
+
+  // 気分とエネルギーだけで記録する（疲れた日でも続けられるように。言葉はあとから日記に書き足せる）
+  const handleQuickSave = async () => {
+    if (quickSaving) return
+    const state = useCheckinStore.getState()
+    if (state.mood === null || state.energy === null) return
+    hapticTap()
+    setQuickSaving(true)
+    setQuickError(null)
+    const entryDate = state.targetDate ?? state.checkinDate ?? getTodayJST()
+    try {
+      await saveMoodOnly(entryDate, state.mood, state.energy)
+      state.reset()
+      router.replace(entryDate === getTodayJST() ? '/' : `/entries/${entryDate}`)
+      router.refresh()
+    } catch (err) {
+      console.error('気分だけの記録に失敗:', err)
+      if (err instanceof Error && err.message === 'Unauthorized') {
+        router.push('/login')
+        return
+      }
+      setQuickError('記録できませんでした。通信を確認して、もう一度お試しください。')
+      setQuickSaving(false)
     }
   }
 
@@ -168,17 +198,43 @@ export default function CheckinPage() {
         {step.id === 'notes' && <NotesStep />}
       </div>
 
-      {/* 次へボタン */}
+      {/* 次へボタン（メモが空なら、清書せずに気分だけで記録する） */}
       <div className="pb-6 pt-4">
-        <button
-          onClick={handleNext}
-          disabled={!canProceed()}
-          className="w-full py-4 rounded-full bg-[var(--accent)] text-[#f7f4ea] font-bold text-base disabled:opacity-30 active:scale-[0.99] transition-transform glow-sky"
-        >
-          {stepIndex < totalSteps - 1 ? '次へ →' : '日記に清書する ✨'}
-        </button>
+        {quickError && (
+          <p className="mb-3 text-center text-xs" style={{ color: '#9c4a2f' }} role="alert">
+            {quickError}
+          </p>
+        )}
+        {step.id === 'notes' && !hasText ? (
+          <button
+            onClick={handleQuickSave}
+            disabled={!canProceed() || quickSaving}
+            className="w-full py-4 rounded-full bg-[var(--accent)] text-[#f7f4ea] font-bold text-base disabled:opacity-30 active:scale-[0.99] transition-transform glow-sky"
+          >
+            {quickSaving ? '記録しています…' : '気分だけで記録する'}
+          </button>
+        ) : (
+          <button
+            onClick={handleNext}
+            disabled={!canProceed() || quickSaving}
+            className="w-full py-4 rounded-full bg-[var(--accent)] text-[#f7f4ea] font-bold text-base disabled:opacity-30 active:scale-[0.99] transition-transform glow-sky"
+          >
+            {stepIndex < totalSteps - 1 ? '次へ →' : '日記に清書する ✨'}
+          </button>
+        )}
+        {step.id === 'state' && (
+          <button
+            onClick={handleQuickSave}
+            disabled={!canProceed() || quickSaving}
+            className="w-full mt-2 py-2 text-sm text-[var(--muted)] underline underline-offset-4 decoration-[var(--border)] disabled:opacity-30"
+          >
+            {quickSaving ? '記録しています…' : '今日は気分だけで記録する'}
+          </button>
+        )}
         {step.id === 'notes' && (
-          <p className="text-center text-xs text-[var(--muted-2)] mt-2">入力しなくても進めます</p>
+          <p className="text-center text-xs text-[var(--muted-2)] mt-2">
+            {hasText ? '書いた言葉のまま、読みやすく整えます' : '言葉は、あとから日記に書き足せます'}
+          </p>
         )}
       </div>
     </div>

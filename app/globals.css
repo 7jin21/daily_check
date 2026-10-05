@@ -358,6 +358,170 @@ body {
   animation: blink 0.9s step-start infinite;
 }
 
+/* ───── 下書き画面: 整え方・自分の言葉の残り具合 ───── */
+.draft-modes {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  padding: 4px;
+  border-radius: 999px;
+  background: var(--surface-secondary);
+  border: 1px solid var(--border);
+}
+.draft-mode {
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  transition: background 0.2s, color 0.2s;
+}
+.draft-mode[data-active='true'] {
+  background: var(--surface);
+  color: var(--foreground);
+  box-shadow: 0 2px 8px rgba(20, 22, 18, 0.1);
+}
+.draft-mode:disabled {
+  opacity: 0.5;
+}
+.draft-kept,
+.draft-undo {
+  gap: 8px;
+  min-height: 36px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  font-family: 'Zen Kaku Gothic New', system-ui, sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--foreground);
+}
+.draft-undo {
+  color: var(--muted);
+}
+.draft-undo:disabled {
+  opacity: 0.4;
+}
+.draft-kept-meter {
+  display: inline-block;
+  width: 36px;
+  height: 4px;
+  border-radius: 4px;
+  background: var(--surface-secondary);
+  overflow: hidden;
+}
+.draft-kept-meter span {
+  display: block;
+  height: 100%;
+  background: var(--primary);
+}
+/* チェックイン: 今日のひとこと・予定から選んで入れるリスト */
+.pick {
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: var(--surface);
+  padding: 12px 12px 10px;
+}
+.pick-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 0 4px 6px;
+}
+.pick-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--foreground);
+}
+.pick-count {
+  font-size: 11px;
+  color: var(--muted);
+}
+.pick-item {
+  width: 100%;
+  justify-content: flex-start;
+  gap: 10px;
+  padding: 6px 4px;
+  text-align: left;
+  font-size: 14px;
+  color: var(--muted);
+}
+.pick-item[data-on='true'] {
+  color: var(--foreground);
+}
+.pick-check {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  border: 1.5px solid var(--border);
+  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.pick-item[data-on='true'] .pick-check {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: var(--primary-foreground);
+}
+.pick-meta {
+  flex: none;
+  font-size: 12px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.pick-label {
+  line-height: 1.5;
+}
+.pick-insert {
+  width: 100%;
+  margin-top: 6px;
+  min-height: 40px;
+  border-radius: 999px;
+  background: var(--surface-secondary);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--primary);
+}
+.pick-insert:disabled {
+  opacity: 0.4;
+}
+
+/* インサイト: 分析の根拠（その日の本人の言葉と日記へのリンク） */
+.evidence-chip {
+  justify-content: flex-start;
+  gap: 8px;
+  min-height: 36px;
+  padding: 6px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  border-left-width: 3px;
+  background: var(--surface);
+  text-align: left;
+}
+.evidence-date {
+  flex: none;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.evidence-quote {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--foreground);
+}
+
+/* あなたのメモに無かった言葉（AI が足した部分） */
+mark.ai-added {
+  background: linear-gradient(transparent 62%, color-mix(in srgb, var(--gold) 38%, transparent) 62%);
+  color: inherit;
+  border-radius: 2px;
+}
+
 /* 読み込み中の小さな月（app/loading.tsx） */
 .loading-moon {
   width: 14px;

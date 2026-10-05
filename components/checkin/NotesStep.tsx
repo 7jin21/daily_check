@@ -2,13 +2,15 @@
 
 import { useEffect, useState } from 'react'
 import { useCheckinStore } from '@/stores/checkin'
+import { todaysMemos, useMemoStore } from '@/stores/memos'
 import TextStep from './TextStep'
+import PickList, { type PickItem } from './PickList'
 import { apiGet } from '@/lib/api-client'
 import { hapticTap } from '@/lib/haptics'
 
 // チェックイン2画面目: テキスト4欄を1画面に集約。
 // 「出来事」は常時表示、残り3欄は折りたたみ（値があれば自動で開く）。
-// Google Calendar の当日予定をワンタップで「出来事」に挿入できる。
+// 日中に残した「ひとこと」と Google Calendar の当日予定は、残したいものだけ選んで「出来事」に入れられる。
 
 interface CalendarEvent {
   id: string
@@ -56,7 +58,12 @@ export default function NotesStep() {
   })
 
   const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([])
-  const [calendarInserted, setCalendarInserted] = useState(false)
+  // 日中のひとこと（今日の記録のときだけ。localStorage 由来なのでマウント後に読む）
+  const memoState = useMemoStore()
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => setMounted(true), [])
+  const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Tokyo' })
+  const memos = mounted && !targetDate ? [...todaysMemos(memoState, today)].reverse() : []
 
   // 当日の予定を取得（過去日付の記録では「今日の予定」はノイズなので出さない）
   useEffect(() => {
@@ -72,25 +79,25 @@ export default function NotesStep() {
     return () => { cancelled = true }
   }, [targetDate])
 
-  const insertCalendarEvents = () => {
-    hapticTap()
-    const lines = calendarEvents
-      .map((e) => {
-        const time =
-          e.isAllDay || !e.startTime
-            ? '終日'
-            : new Date(e.startTime).toLocaleTimeString('ja-JP', {
-                timeZone: 'Asia/Tokyo',
-                hour: '2-digit',
-                minute: '2-digit',
-              })
-        return `・${e.title}（${time}）`
-      })
-      .join('\n')
-    const next = events.trim() ? `${events}\n${lines}` : `今日の予定:\n${lines}`
+  /** 選んだ行を「出来事」の末尾に足す（本人の言葉なので、清書でもそのまま残る） */
+  const insertLines = (picked: PickItem[]) => {
+    const lines = picked.map((p) => `・${p.meta ? `${p.meta} ` : ''}${p.label}`).join('\n')
+    const next = events.trim() ? `${events.trimEnd()}\n${lines}` : lines
     setEvents(next.slice(0, MAX_CHARS))
-    setCalendarInserted(true)
   }
+
+  const calendarItems: PickItem[] = calendarEvents.map((e) => ({
+    id: e.id,
+    label: e.title,
+    meta:
+      e.isAllDay || !e.startTime
+        ? '終日'
+        : new Date(e.startTime).toLocaleTimeString('ja-JP', {
+            timeZone: 'Asia/Tokyo',
+            hour: '2-digit',
+            minute: '2-digit',
+          }),
+  }))
 
   const toggleSection = (id: OptionalField) => {
     hapticTap()
@@ -101,18 +108,19 @@ export default function NotesStep() {
     <div className="space-y-5 pb-2">
       {/* 出来事（メイン欄） */}
       <section>
-        <div className="flex items-center justify-between mb-2">
-          <p className="text-sm font-medium text-[var(--muted)]">今日あったこと</p>
-          {calendarEvents.length > 0 && !calendarInserted && (
-            <button
-              type="button"
-              onClick={insertCalendarEvents}
-              className="text-xs px-3 py-1.5 rounded-full border border-[var(--border)] bg-[var(--surface)] text-[var(--primary)] font-medium active:scale-95 transition-transform"
-            >
-              📅 今日の予定を挿入（{calendarEvents.length}件）
-            </button>
-          )}
-        </div>
+        <p className="text-sm font-medium text-[var(--muted)] mb-2">今日あったこと</p>
+        {(memos.length > 0 || calendarItems.length > 0) && (
+          <div className="space-y-2.5 mb-3">
+            {/* 項目が後から届いたときに選択状態を作り直すため、件数を key にする */}
+            <PickList
+              key={`memo-${memos.length}`}
+              title="今日のひとこと"
+              items={memos.map((m) => ({ id: m.id, label: m.text, meta: m.time }))}
+              onInsert={insertLines}
+            />
+            <PickList key={`cal-${calendarItems.length}`} title="今日の予定" items={calendarItems} onInsert={insertLines} />
+          </div>
+        )}
         <TextStep
           value={events}
           onChange={setEvents}
