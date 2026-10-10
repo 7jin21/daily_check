@@ -2,6 +2,7 @@ import { createServerSupabaseClient } from '@/lib/supabase-server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import MonthCalendar from '@/components/entries/MonthCalendar'
+import { formatJSTDate, todayJST } from '@/lib/jst'
 
 interface Entry {
   id: string
@@ -14,11 +15,6 @@ interface Entry {
 
 interface Props {
   searchParams: Promise<{ q?: string; page?: string; view?: string; month?: string; tag?: string }>
-}
-
-/** Asia/Tokyo の今日の日付を YYYY-MM-DD で返す */
-function getTodayJST(): string {
-  return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Tokyo' })
 }
 
 /** "YYYY-MM" を delta ヶ月分ずらす */
@@ -75,8 +71,8 @@ export default async function EntriesPage({ searchParams }: Props) {
 
   const params = await searchParams
   const view = params.view === 'calendar' ? 'calendar' : 'list'
-  const todayJST = getTodayJST()
-  const currentMonth = todayJST.slice(0, 7)
+  const today = todayJST()
+  const currentMonth = today.slice(0, 7)
 
   if (view === 'calendar') {
     const monthParam = /^\d{4}-\d{2}$/.test(params.month ?? '') ? (params.month as string) : currentMonth
@@ -117,7 +113,7 @@ export default async function EntriesPage({ searchParams }: Props) {
           year={y}
           month={m}
           entries={(monthEntries ?? []) as { entry_date: string; mood: number; summary: string | null }[]}
-          todayJST={todayJST}
+          todayJST={today}
           prevHref={`/entries?view=calendar&month=${shiftMonth(monthParam, -1)}`}
           nextHref={monthParam < currentMonth ? `/entries?view=calendar&month=${shiftMonth(monthParam, 1)}` : null}
           todayHref={monthParam !== currentMonth ? `/entries?view=calendar&month=${currentMonth}` : null}
@@ -260,7 +256,7 @@ export default async function EntriesPage({ searchParams }: Props) {
           {Object.entries(grouped).map(([month, monthEntries]) => (
             <div key={month}>
               <h2 className="eyebrow mb-4">
-                {new Date(`${month}-01T12:00:00+09:00`).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo', year: 'numeric', month: 'long' })}
+                {formatJSTDate(`${month}-01`, { year: 'numeric', month: 'long' })}
               </h2>
               <div>
                 {monthEntries.map((entry) => (
@@ -276,7 +272,7 @@ export default async function EntriesPage({ searchParams }: Props) {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
                         <span className="font-bold text-[var(--foreground)]">
-                          {new Date(`${entry.entry_date}T12:00:00+09:00`).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric', weekday: 'short' })}
+                          {formatJSTDate(entry.entry_date, { month: 'numeric', day: 'numeric', weekday: 'short' })}
                         </span>
                         <span className="text-xs text-[var(--muted-2)] font-mono tracking-tighter">
                           {ENERGY_BAR[entry.energy] ?? ''}

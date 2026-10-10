@@ -1,7 +1,7 @@
 {
   "name": "Inner Mirror",
   "short_name": "InnerMirror",
-  "description": "AIが日記を代筆する、自己理解のための日記アプリ",
+  "description": "あなたの言葉のまま、AIが日記に清書する。自己理解のための日記アプリ",
   "display": "standalone",
   "orientation": "portrait",
   "start_url": "/",

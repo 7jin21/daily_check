@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createReadonlyServerClient } from '@/lib/supabase-server'
 import { getGroqClient, GROQ_MODELS } from '@/lib/groq'
+import { subtractDays, todayJST } from '@/lib/jst'
+import { formatEntriesForPrompt } from '@/lib/prompt-context'
 
 export interface WeeklyReport {
   narrative: string
@@ -45,9 +47,8 @@ export async function POST(req: NextRequest) {
     // body なしでも動く
   }
 
-  const jstToday = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Tokyo' })
-  const [y, m, d] = jstToday.split('-').map(Number)
-  const from = new Date(y, m - 1, d - 6).toLocaleDateString('en-CA', { timeZone: 'Asia/Tokyo' })
+  const jstToday = todayJST()
+  const from = subtractDays(jstToday, 6)
 
   const { data: entries, error } = await supabase
     .from('diary_entries')
@@ -67,17 +68,7 @@ export async function POST(req: NextRequest) {
       (entries.reduce((s, e) => s + (e.mood ?? 3), 0) / entries.length) * 10
     ) / 10
 
-  const summary = (entries as WeeklyEntry[])
-    .map((e) => {
-      const parts = [`[${e.entry_date}] 気分:${e.mood}/5 エネルギー:${e.energy}/5`]
-      if (e.events?.trim()) parts.push(`出来事: ${e.events.substring(0, 120)}`)
-      if (e.challenges?.trim()) parts.push(`困ったこと: ${e.challenges.substring(0, 80)}`)
-      if (e.gratitude?.trim()) parts.push(`感謝: ${e.gratitude.substring(0, 80)}`)
-      if (e.freeform?.trim()) parts.push(`メモ・ふりかえり: ${e.freeform.substring(0, 120)}`)
-      if (e.dominant_emotion?.trim()) parts.push(`感情: ${e.dominant_emotion}`)
-      return parts.join(' / ')
-    })
-    .join('\n')
+  const summary = formatEntriesForPrompt(entries as WeeklyEntry[], { events: 120, challenges: 80, gratitude: 80, freeform: 120 })
 
   try {
     const groq = getGroqClient()

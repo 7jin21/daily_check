@@ -2,59 +2,39 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import Link from 'next/link'
-import Confetti from '@/components/ui/Confetti'
 import { useCheckinStore } from '@/stores/checkin'
 import { useSettingsStore } from '@/stores/settings'
 import { useMemoStore } from '@/stores/memos'
 import { apiPost } from '@/lib/api-client'
 import { generateOfflineDraft } from '@/lib/offline-draft'
-import { saveFullEntry } from '@/lib/entry-save'
-import {
-  DRAFT_MODES,
-  analyzeKept,
-  composeBullets,
-  composeRaw,
-  inputKey,
-  type ComposeInput,
-  type DraftMode,
-} from '@/lib/draft-compose'
+import { hasEntryWithWords, refreshEntryMeta, saveFullEntry } from '@/lib/entry-save'
+import { withReflection } from '@/lib/freeform'
+import { metaExcerpt } from '@/lib/entry-merge'
+import { todayJST } from '@/lib/jst'
+import { clearReflectionCache, requestReflection } from '@/lib/reflection-prefetch'
+import { analyzeKept, composeBullets, composeRaw, inputKey, type ComposeInput, type DraftMode } from '@/lib/draft-compose'
 import ReflectionQuestion from '@/components/checkin/ReflectionQuestion'
-
-type RewriteInstruction = 'emotional' | 'shorter' | 'positive' | 'formal'
-
-const REWRITE_BUTTONS: { key: RewriteInstruction; label: string }[] = [
-  { key: 'emotional', label: '感情豊かに ✨' },
-  { key: 'shorter', label: '短くして 📝' },
-  { key: 'positive', label: 'ポジティブに 🌟' },
-  { key: 'formal', label: '丁寧な文体に 📖' },
-]
-
-function getTodayJST() {
-  return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Tokyo' })
-}
-
-function classifyError(err: unknown): string {
-  if (err instanceof DOMException && err.name === 'AbortError') return 'cancelled'
-  if (err instanceof TypeError && err.message.includes('fetch')) {
-    return 'ネットワークに接続できません。Wi-Fiやモバイルデータ通信を確認してください。'
-  }
-  if (err instanceof Error) {
-    if (err.message.includes('401') || err.message.includes('Unauthorized')) {
-      return 'セッションが切れました。再ログインしてください。'
-    }
-    if (err.message.includes('500') || err.message.includes('Server error')) {
-      return 'サーバーで問題が発生しました。時間をおいて再試行してください。'
-    }
-    return err.message
-  }
-  return '保存に失敗しました。時間をおいて再試行してください。'
-}
+import { GeneratingView, ReadingView } from '@/components/draft/WaitingViews'
+import SavedView from '@/components/draft/SavedView'
+import DraftHeader from '@/components/draft/DraftHeader'
+import DraftNotice, { type DraftNoticeKind } from '@/components/draft/DraftNotice'
+import DraftModePicker from '@/components/draft/DraftModePicker'
+import DraftTags from '@/components/draft/DraftTags'
+import { ComparePanel, OwnWordsMeter } from '@/components/draft/OwnWords'
+import RewriteButtons, { type RewriteInstruction } from '@/components/draft/RewriteButtons'
+import SaveActions from '@/components/draft/SaveActions'
+import { classifyError } from '@/components/draft/classify-error'
 
 /** ストアの最新値から、清書の材料（メモ＋内省の答え）を組み立てる */
 function currentComposeInput(): ComposeInput {
   const st = useCheckinStore.getState()
   return { ...st.getInput(), reflectionQ: st.reflectionQ, reflectionA: st.reflectionA }
+}
+
+/** 記録の対象日。「書き始めた日」で固定する（日付をまたいで開いたままでも、翌日の記録を上書きしない） */
+function currentEntryDate(): string {
+  const st = useCheckinStore.getState()
+  return st.targetDate ?? st.checkinDate ?? todayJST()
 }
 
 export default function DraftPage() {
@@ -70,6 +50,7 @@ export default function DraftPage() {
     draftResult,
     editedDraft,
     draftMode,
+    aiText,
     isGenerating,
     setDraftResult,
     setEditedDraft,
@@ -77,6 +58,7 @@ export default function DraftPage() {
     setReflection,
     setDraftMode,
     setDraftInputKey,
+    addAiText,
     clearDraft,
     reset,
   } = useCheckinStore()
@@ -84,14 +66,18 @@ export default function DraftPage() {
 
   const [isSaving, setIsSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
-  const [savedEntryDate, setSavedEntryDate] = useState<string | null>(null)
-  const [notice, setNotice] = useState<'offline' | 'partial' | null>(null)
+  const [saved, setSaved] = useState<{ date: string; merged: boolean } | null>(null)
+  const [willAppend, setWillAppend] = useState(false) // この日の日記がすでにあり、保存すると追記になる
+  const [notice, setNotice] = useState<DraftNoticeKind | null>(null)
   const [rewritingKey, setRewritingKey] = useState<RewriteInstruction | null>(null)
   const [rewriteError, setRewriteError] = useState<string | null>(null)
   const [reflectPhase, setReflectPhase] = useState<'pending' | 'fetching' | 'asking' | 'done'>('pending')
   const [reflectQuestion, setReflectQuestion] = useState<{ question: string; options: string[] } | null>(null)
   const [history, setHistory] = useState<{ text: string; mode: DraftMode }[]>([])
   const [compareOpen, setCompareOpen] = useState(false)
+  // 配信中の清書。端末に保存する下書き（editedDraft）には、清書が終わってから入れる。
+  // 途中でアプリを閉じたり画面を離れたりしても、途中で切れた文が完成した下書きとして残らないように
+  const [streamText, setStreamText] = useState('')
 
   const abortRef = useRef<AbortController | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -100,17 +86,26 @@ export default function DraftPage() {
   const genRef = useRef(0)
   const rewriteRef = useRef(0)
   const savedRef = useRef(false)
+  // 画面にいるか（内省の問いを待っている間に離れたら、そのあと清書を始めない）。
+  // genRef では代用できない: StrictMode(dev) の二重実行でクリーンアップが genRef を進めるため
+  const mountedRef = useRef(false)
 
-  // 本人のメモ（比較の基準）と、清書に残っている割合
+  // 本人のメモ（比較の基準）と、清書のうち本人の言葉の割合
   const original = useMemo(
     () => composeRaw({ mood: null, energy: null, events, challenges, gratitude, freeform, reflectionQ, reflectionA }),
     [events, challenges, gratitude, freeform, reflectionQ, reflectionA]
   )
-  const kept = useMemo(() => analyzeKept(original, editedDraft), [original, editedDraft])
+  // この下書きで AI が出した文章。メモに無い言葉のうち、これにも無いもの（下書き画面で自分で書き足した言葉）は
+  // 本人の言葉として数える。aiText を持たない古い下書きでも、AI の清書（draftResult）は AI の文章として扱う
+  const aiSource = useMemo(
+    () => [aiText, draftResult?.fromAI ? draftResult.draft : ''].filter(Boolean).join('\n'),
+    [aiText, draftResult]
+  )
+  const kept = useMemo(() => analyzeKept(original, editedDraft, aiSource), [original, editedDraft, aiSource])
 
   useEffect(() => {
     const st = useCheckinStore.getState()
-    const today = getTodayJST()
+    const today = todayJST()
 
     // 前日以前に書き始めたデータでドラフトページに来た場合はチェックインへ戻す
     if (st.checkinDate && st.checkinDate !== today) {
@@ -125,6 +120,11 @@ export default function DraftPage() {
     }
     if (startedRef.current) return
     startedRef.current = true
+
+    // この日にすでに言葉のある日記があれば、保存は上書きではなく追記になることを先に伝える
+    hasEntryWithWords(currentEntryDate())
+      .then((exists) => setWillAppend(exists))
+      .catch(() => setWillAppend(false))
 
     if (st.editedDraft || st.draftResult) {
       const key = inputKey(currentComposeInput())
@@ -153,10 +153,17 @@ export default function DraftPage() {
     const abort = abortRef
     const gen = genRef
     const rewrite = rewriteRef
+    const mounted = mountedRef
+    mounted.current = true
     return () => {
+      mounted.current = false
       abort.current?.abort()
       gen.current++
       rewrite.current++
+      // 清書の途中で画面を離れたら「生成中」を戻す（戻ってきたときに、動いていない待ち画面のまま固まらないように）。
+      // 途中までの清書は下書きに入れていないので、戻ると前の下書き（なければ新しい清書）になる
+      const st = useCheckinStore.getState()
+      if (st.isGenerating) st.setIsGenerating(false)
     }
   }, [])
 
@@ -164,8 +171,10 @@ export default function DraftPage() {
     const el = textareaRef.current
     if (!el) return
     el.style.height = 'auto'
-    el.style.height = `${el.scrollHeight}px`
-  }, [editedDraft])
+    // 枠線の分も足す（scrollHeight は枠線を含まないため、そのままだと最後の行が少し欠ける）
+    el.style.height = `${el.scrollHeight + el.offsetHeight - el.clientHeight}px`
+    // 生成が終わって本文の欄が現れたときにも高さを合わせる（本文が変わらないままだと長い清書が欄で切れて見える）
+  }, [editedDraft, isGenerating, reflectPhase])
 
   /** AI が使えないとき: 本人のメモをそのまま使う（メモが空ならテンプレート） */
   const fallbackToOwnWords = (full: ComposeInput, entryTarget: string | null) => {
@@ -190,6 +199,7 @@ export default function DraftPage() {
     const entryTarget = st.targetDate
     setIsGenerating(true)
     setNotice(null)
+    setStreamText('')
     setEditedDraft('')
     setDraftMode('tidy')
     setDraftInputKey(inputKey(full))
@@ -217,7 +227,7 @@ export default function DraftPage() {
         }
         if (done) break
         text += decoder.decode(value, { stream: true })
-        setEditedDraft(text)
+        setStreamText(text)
       }
       text = text.trim()
       if (!text) throw new Error('empty draft')
@@ -229,6 +239,7 @@ export default function DraftPage() {
       }
 
       setEditedDraft(text)
+      addAiText(text)
       // メタ情報（タグ・サマリー・感情）は本文確定後にバックグラウンドで取得。失敗時はローカル生成のメタ
       const offlineMeta = generateOfflineDraft(full, entryTarget)
       setDraftResult({
@@ -238,10 +249,19 @@ export default function DraftPage() {
         dominantEmotion: offlineMeta.dominantEmotion,
         fromAI: true,
       })
-      apiPost<{ tags: string[]; summary: string; dominantEmotion: string }>('/api/draft-meta', { draft: text }, { retry: false })
+      // draft-meta は 3000 字まで。長い清書は始まりと終わりから作る（超えると要約・タグが作れない）
+      apiPost<{ tags: string[]; summary: string; dominantEmotion: string }>('/api/draft-meta', { draft: metaExcerpt(text) }, { retry: false })
         .then((meta) => {
           // 保存・再生成・画面離脱のあとに届いた応答は捨てる（古い下書きを復活させない）
-          if (isCurrent() && !savedRef.current) setDraftResult({ draft: text, ...meta, fromAI: true })
+          if (!isCurrent() || savedRef.current) return
+          // AI が使えないとき draft-meta は 200 で空の結果を返す。空の項目は手元で作ったもののまま残す
+          setDraftResult({
+            draft: text,
+            tags: meta.tags?.length ? meta.tags : offlineMeta.tags,
+            summary: meta.summary || offlineMeta.summary,
+            dominantEmotion: meta.dominantEmotion || offlineMeta.dominantEmotion,
+            fromAI: true,
+          })
         })
         .catch(() => {
           /* オフラインメタのまま */
@@ -256,6 +276,7 @@ export default function DraftPage() {
         const meta = generateOfflineDraft(full, entryTarget)
         setDraftResult({ ...meta, draft: partial, fromAI: true })
         setEditedDraft(partial)
+        addAiText(partial)
         setNotice('partial')
       } else {
         console.warn('AI清書に失敗、本人のメモをそのまま使います:', err)
@@ -266,27 +287,18 @@ export default function DraftPage() {
     }
   }
 
-  // 生成前の内省質問ゲート。質問が不要/失敗/遅延（7秒）なら黙って生成へ進む（絶対にブロックしない）。
+  // 生成前の内省質問ゲート。問いは入力中に先読みしてあるので、たいていすぐ届く。
+  // 不要・失敗・遅延（7秒）なら黙って生成へ進む（requestReflection は例外を投げず、絶対にブロックしない）
   const startReflectionThenGenerate = async () => {
+    // 先読み済みなら描画の前に届き、'fetching' は次の段階とまとめて描画されるので待ち画面は残らない
     setReflectPhase('fetching')
-    const controller = new AbortController()
-    const timer = setTimeout(() => controller.abort(), 7000)
-    try {
-      const res = await apiPost<{ skip: boolean; question?: string; options?: string[] }>(
-        '/api/checkin-question',
-        useCheckinStore.getState().getInput(),
-        { signal: controller.signal }
-      )
-      clearTimeout(timer)
-      if (!res.skip && res.question && Array.isArray(res.options) && res.options.length >= 2) {
-        setReflectQuestion({ question: res.question, options: res.options })
-        setReflectPhase('asking')
-        return
-      }
-    } catch {
-      // 失敗・タイムアウト → 質問なしで生成へ
+    const res = await requestReflection(useCheckinStore.getState().getInput())
+    if (!mountedRef.current) return
+    if (!res.skip && res.question && Array.isArray(res.options) && res.options.length >= 2) {
+      setReflectQuestion({ question: res.question, options: res.options })
+      setReflectPhase('asking')
+      return
     }
-    clearTimeout(timer)
     setReflectPhase('done')
     generateDraft()
   }
@@ -369,6 +381,13 @@ export default function DraftPage() {
       if (rid !== rewriteRef.current || savedRef.current) return
       setHistory((h) => [...h, { text: before, mode: draftMode }].slice(-10))
       setEditedDraft(result.draft)
+      // AI の言葉として覚えるのは、書き直しで新しく足された言葉だけ（書き直す前の本文には本人が書き足した言葉もある）
+      addAiText(
+        analyzeKept(before, result.draft)
+          .segments.filter((s) => s.added && !s.connector)
+          .map((s) => s.text)
+          .join('\n')
+      )
     } catch {
       if (rid === rewriteRef.current) setRewriteError('AIの書き直しに失敗しました。しばらくしてから再試行してください。')
     } finally {
@@ -383,15 +402,13 @@ export default function DraftPage() {
 
     const st = useCheckinStore.getState()
     const input = st.getInput()
-    // 記録の対象日は「書き始めた日」で固定する（日付をまたいで開いたままでも、翌日の記録を上書きしない）
-    const entryDate = st.targetDate ?? st.checkinDate ?? getTodayJST()
+    const entryDate = currentEntryDate()
     // 内省Q&Aは DB 列を増やさず freeform に畳んで残す（将来のAI分析の材料にする）
-    const freeformToSave = st.reflectionA?.trim()
-      ? `${input.freeform ? input.freeform + '\n\n' : ''}【ふりかえり】${st.reflectionQ}\n→ ${st.reflectionA}`
-      : input.freeform
+    const freeformToSave = withReflection(input.freeform, st.reflectionQ ?? '', st.reflectionA ?? '')
 
     try {
-      const entryId = await saveFullEntry({
+      // 同じ日に言葉のある日記がすでにあれば、上書きせずに追記される（result.draft は保存された本文全体）
+      const result = await saveFullEntry({
         entryDate,
         mood: input.mood,
         energy: input.energy,
@@ -410,25 +427,26 @@ export default function DraftPage() {
       genRef.current++
       rewriteRef.current++
 
-      apiPost(
-        '/api/notion-sync',
-        {
-          entryId,
-          entryDate,
-          draft: editedDraft,
-          tags: draftResult?.tags ?? [],
-          mood: input.mood,
-          energy: input.energy,
-        },
-        { retry: false }
-      ).catch((err) => console.warn('Notion同期失敗（無視）:', err))
+      // Notion には保存した本文全体を送る（追記した日は前の日記も含めた本文）
+      const notion = { entryId: result.id, entryDate, draft: result.draft, mood: input.mood, energy: input.energy }
+      const syncNotion = (tags: string[]) =>
+        apiPost('/api/notion-sync', { ...notion, tags }, { retry: false }).catch((err) => console.warn('Notion同期失敗（無視）:', err))
+      if (result.merged) {
+        // 追記した日は、要約・タグを本文全体から作り直してから同期する（作り直せなければ保存時のタグ）
+        refreshEntryMeta(result.id, result.draft).then((meta) => syncNotion(meta?.tags ?? result.tags))
+      } else {
+        syncNotion(draftResult?.tags ?? [])
+      }
 
       // その日のひとことメモは日記に入ったので片付ける
       const memos = useMemoStore.getState()
       if (memos.date === entryDate) memos.clear()
 
       reset()
-      setSavedEntryDate(entryDate)
+      // 先読みした内省の問いは、この日記のためのもの（次のチェックインで使い回さない）
+      clearReflectionCache()
+      // 「追記しました」と出すのは、実際に言葉が足されたときだけ（保存のやり直しで何も足されなかったときは出さない）
+      setSaved({ date: entryDate, merged: result.appended })
     } catch (err) {
       console.error('保存エラー:', err)
       const classified = classifyError(err)
@@ -438,6 +456,10 @@ export default function DraftPage() {
         return
       }
       setSaveError(classified)
+      // 保存は届いていたのに応答だけ失われた場合、次の保存は追記になる。案内を出し直す
+      hasEntryWithWords(entryDate)
+        .then((exists) => setWillAppend(exists))
+        .catch(() => {})
     } finally {
       setIsSaving(false)
     }
@@ -455,172 +477,36 @@ export default function DraftPage() {
     )
   }
 
-  // 問いを生成中（最大7秒。失敗すれば自動で生成へ進む）
-  if (reflectPhase === 'fetching') {
-    return (
-      <div className="min-h-dvh flex flex-col items-center justify-center px-4 gap-6">
-        <div className="spinner" style={{ width: 40, height: 40, borderWidth: 3 }} />
-        <p className="text-[var(--muted-2)] text-sm">今日の記録を読んでいます…</p>
-      </div>
-    )
-  }
+  // 問いを待っている（最大7秒。失敗すれば自動で生成へ進む）
+  if (reflectPhase === 'fetching') return <ReadingView />
 
-  if (isGenerating) {
-    // ストリーミング中: 文字が書かれていく様子をリアルタイム表示
-    if (editedDraft) {
-      return (
-        <div className="min-h-dvh flex flex-col px-4 pt-6">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="spinner" style={{ width: 20, height: 20 }} />
-            <h1 className="text-lg font-bold text-[var(--foreground)]">あなたの言葉を清書しています…</h1>
-          </div>
-          <div className="card flex-1 mb-4 overflow-y-auto">
-            <p className="text-base text-[var(--foreground)] whitespace-pre-wrap leading-relaxed">
-              {editedDraft}
-              <span className="typing-cursor" aria-hidden="true" />
-            </p>
-          </div>
-          <div className="pb-6">
-            <button
-              onClick={handleCancel}
-              className="w-full py-3 rounded-full border border-[var(--border)] text-[var(--muted)] text-sm"
-            >
-              キャンセルして入力に戻る
-            </button>
-          </div>
-        </div>
-      )
-    }
+  if (isGenerating) return <GeneratingView text={streamText} onCancel={handleCancel} />
 
-    // 最初のトークンが届くまでの待機画面
+  if (saved) {
     return (
-      <div className="min-h-dvh flex flex-col items-center justify-center px-4 gap-6">
-        <div className="spinner" style={{ width: 48, height: 48, borderWidth: 3 }} />
-        <div className="text-center">
-          <p className="font-bold text-[var(--foreground)] text-lg">あなたの言葉を清書しています…</p>
-          <p className="text-[var(--muted-2)] text-sm mt-1">言い回しはそのまま、つなぎだけ整えます</p>
-        </div>
-        <button
-          onClick={handleCancel}
-          className="px-6 py-3 rounded-full border border-[var(--border)] text-[var(--muted)] text-sm"
-        >
-          キャンセルして入力に戻る
-        </button>
-      </div>
-    )
-  }
-
-  if (savedEntryDate) {
-    return (
-      <>
-        <Confetti />
-        <div className="min-h-dvh flex flex-col items-center justify-center px-4 gap-6 animate-fade-in">
-          <div className="text-7xl animate-float">✨</div>
-          <div className="text-center">
-            <p className="font-bold text-[var(--foreground)] text-2xl">保存しました！</p>
-            <p className="text-[var(--muted)] text-sm mt-1">今日も記録できました</p>
-          </div>
-          <div className="w-full space-y-3">
-            <Link
-              href={`/entries/${savedEntryDate}`}
-              className="block w-full py-4 text-center rounded-full bg-[var(--accent)] text-[#f7f4ea] font-bold text-base active:scale-[0.99] transition-transform glow-sky"
-            >
-              日記を見る
-            </Link>
-            <Link
-              href="/"
-              className="block w-full py-3 text-center rounded-full border border-[var(--border)] text-[var(--muted)] text-base active:scale-95 transition-transform"
-            >
-              ホームに戻る
-            </Link>
-            {/* 記録の習慣化ナッジ: リマインダー未設定の場合のみ */}
-            {!notificationsEnabled && (
-              <Link
-                href="/settings"
-                className="block w-full py-2 text-center text-xs text-[var(--muted)] underline underline-offset-2"
-              >
-                🔔 リマインダーを設定して、記録を習慣にする
-              </Link>
-            )}
-          </div>
-        </div>
-      </>
+      <SavedView
+        entryDate={saved.date}
+        merged={saved.merged}
+        isToday={saved.date === todayJST()}
+        showReminderNudge={!notificationsEnabled}
+      />
     )
   }
 
   if (!editedDraft && !draftResult) return null
 
-  const keptPercent = Math.round(kept.kept * 100)
   const busy = isGenerating || !!rewritingKey || isSaving
 
   return (
     <div className="min-h-dvh flex flex-col px-4 pt-6">
-      <div className="flex items-center gap-3 mb-5">
-        <button
-          onClick={() => router.push('/checkin')}
-          className="w-11 h-11 rounded-full bg-[var(--surface-secondary)] border border-[var(--border)] flex items-center justify-center text-xl text-[var(--foreground)]"
-          aria-label="入力に戻る"
-        >
-          ‹
-        </button>
-        <h1 className="text-xl font-bold text-[var(--foreground)]">
-          {targetDate
-            ? `${new Date(`${targetDate}T12:00:00+09:00`).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo', month: 'long', day: 'numeric' })}の日記のドラフト`
-            : '日記のドラフト'}
-        </h1>
-      </div>
+      <DraftHeader targetDate={targetDate} onBack={() => router.push('/checkin')} />
 
-      {notice && (
-        <div
-          className="mb-4 p-3 rounded-2xl text-sm"
-          style={{ background: 'rgba(197,137,95,0.12)', border: '1px solid rgba(197,137,95,0.35)', color: '#a4683f' }}
-        >
-          {notice === 'offline' ? (
-            <>
-              <p className="font-semibold">AI に接続できませんでした</p>
-              <p className="mt-0.5 text-xs">書いたメモをそのまま使っています。「整える」を押すと清書を再試行します。</p>
-            </>
-          ) : (
-            <>
-              <p className="font-semibold">清書が途中で止まりました</p>
-              <p className="mt-0.5 text-xs">続きは手で直すか、「清書し直す」を押してください。</p>
-            </>
-          )}
-        </div>
-      )}
+      {notice && <DraftNotice kind={notice} />}
 
       {/* 整え方 */}
-      <div className="mb-4">
-        <div role="radiogroup" aria-label="整え方" className="draft-modes">
-          {DRAFT_MODES.map((m) => (
-            <button
-              key={m.value}
-              role="radio"
-              aria-checked={draftMode === m.value}
-              data-active={draftMode === m.value}
-              onClick={() => switchMode(m.value)}
-              disabled={busy}
-              className="draft-mode"
-            >
-              {m.label}
-            </button>
-          ))}
-        </div>
-        <p className="mt-2 text-xs text-[var(--muted)] px-1">{DRAFT_MODES.find((m) => m.value === draftMode)?.hint}</p>
-      </div>
+      <DraftModePicker mode={draftMode} disabled={busy} onSelect={switchMode} />
 
-      {draftResult && draftResult.tags.length > 0 && (
-        <div className="mb-3 flex flex-wrap gap-2">
-          {draftResult.tags.map((tag) => (
-            <span
-              key={tag}
-              className="px-3 py-1 rounded-full bg-[var(--surface-secondary)] border border-[var(--border)] text-[var(--primary)] text-xs font-medium"
-            >
-              #{tag}
-            </span>
-          ))}
-        </div>
-      )}
+      {draftResult && draftResult.tags.length > 0 && <DraftTags tags={draftResult.tags} />}
 
       <div className="flex-1 mb-4">
         <textarea
@@ -634,19 +520,9 @@ export default function DraftPage() {
 
         {/* 自分の言葉が残っているかを確かめる */}
         <div className="mt-2 flex items-center gap-2 flex-wrap">
-          {original && (
-            <button
-              type="button"
-              onClick={() => setCompareOpen((v) => !v)}
-              aria-expanded={compareOpen}
-              className="draft-kept"
-            >
-              <span className="draft-kept-meter" aria-hidden="true">
-                <span style={{ width: `${keptPercent}%` }} />
-              </span>
-              あなたの言葉 {keptPercent}%
-              <span className="text-[var(--muted-2)]">{compareOpen ? '▴' : '▾'}</span>
-            </button>
+          {/* 本文が空のときは割合に意味がないので出さない */}
+          {original && editedDraft.trim() && (
+            <OwnWordsMeter percent={Math.round(kept.own * 100)} open={compareOpen} onToggle={() => setCompareOpen((v) => !v)} />
           )}
           {history.length > 0 && (
             <button type="button" onClick={handleUndo} disabled={busy} className="draft-undo">
@@ -655,84 +531,32 @@ export default function DraftPage() {
           )}
         </div>
 
-        {compareOpen && original && (
-          <div className="mt-3 card animate-fade-in" style={{ padding: 16 }}>
-            <p className="text-xs font-bold text-[var(--muted)] tracking-wide">いまの本文</p>
-            <p className="mt-2 text-[15px] leading-loose text-[var(--foreground)] whitespace-pre-wrap">
-              {kept.segments.map((s, i) =>
-                s.added ? (
-                  <mark key={i} className="ai-added">
-                    {s.text}
-                  </mark>
-                ) : (
-                  <span key={i}>{s.text}</span>
-                )
-              )}
-            </p>
-            <p className="mt-2 text-[11px] text-[var(--muted)]">
-              <mark className="ai-added">下線</mark> は、あなたのメモに無かった言葉です。
-            </p>
-            <p className="mt-4 text-xs font-bold text-[var(--muted)] tracking-wide">あなたが書いたメモ</p>
-            <p className="mt-2 text-sm leading-relaxed text-[var(--muted)] whitespace-pre-wrap">{original}</p>
-            {draftMode !== 'raw' && (
-              <button type="button" onClick={() => switchMode('raw')} disabled={busy} className="mt-3 draft-undo">
-                メモのままにする
-              </button>
-            )}
-          </div>
+        {compareOpen && original && editedDraft.trim() && (
+          <ComparePanel
+            segments={kept.segments}
+            original={original}
+            keptPercent={Math.round(kept.kept * 100)}
+            addedChars={kept.addedChars}
+            showUseRaw={draftMode !== 'raw'}
+            disabled={busy}
+            onUseRaw={() => switchMode('raw')}
+          />
         )}
 
         {/* AI書き直し（任意。AI らしく膨らませたい日に） */}
-        <div className="mt-5">
-          <p className="text-xs text-[var(--muted-2)] mb-2">AIに書き直してもらう（言葉が変わります）</p>
-          <div className="flex flex-wrap gap-2">
-            {REWRITE_BUTTONS.map(({ key, label }) => (
-              <button
-                key={key}
-                onClick={() => handleRewrite(key)}
-                disabled={busy}
-                className="px-3 py-1.5 rounded-full text-xs font-medium border border-[var(--border)] text-[var(--muted)] bg-[var(--surface)] disabled:opacity-40 active:scale-95 transition-transform"
-              >
-                {rewritingKey === key ? '書き直し中...' : label}
-              </button>
-            ))}
-          </div>
-          {rewriteError && (
-            <p className="mt-2 text-xs" style={{ color: '#9c4a2f' }}>
-              {rewriteError}
-            </p>
-          )}
-        </div>
+        <RewriteButtons activeKey={rewritingKey} disabled={busy} error={rewriteError} onRewrite={handleRewrite} />
       </div>
 
-      {saveError && (
-        <div
-          className="mb-4 p-3 rounded-2xl text-sm"
-          style={{ background: 'rgba(181,101,74,0.12)', border: '1px solid rgba(181,101,74,0.35)', color: '#9c4a2f' }}
-        >
-          <p className="font-semibold">保存できませんでした</p>
-          <p className="mt-0.5 text-xs">{saveError}</p>
-        </div>
-      )}
-
-      <div className="pb-6 space-y-3">
-        <button
-          onClick={handleSave}
-          disabled={busy || !editedDraft.trim()}
-          className="w-full py-4 rounded-full bg-[var(--accent)] text-[#f7f4ea] font-bold text-base disabled:opacity-40 active:scale-[0.99] transition-transform"
-        >
-          {isSaving ? '保存中...' : '保存する 💾'}
-        </button>
-        {draftMode === 'tidy' && (
-          <button
-            onClick={handleRegenerate}
-            disabled={busy}
-            className="w-full py-3 rounded-full border border-[var(--border)] text-[var(--muted)] text-base disabled:opacity-40"
-          >
-            🔄 清書し直す
-          </button>
-        )}
-      </div>
+      <SaveActions
+        willAppend={willAppend}
+        isSaving={isSaving}
+        saveError={saveError}
+        saveDisabled={busy || !editedDraft.trim()}
+        showRegenerate={draftMode === 'tidy'}
+        regenerateDisabled={busy}
+        onSave={handleSave}
+        onRegenerate={handleRegenerate}
+      />
     </div>
   )
 }

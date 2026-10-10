@@ -7,6 +7,8 @@ import TextStep from './TextStep'
 import PickList, { type PickItem } from './PickList'
 import { apiGet } from '@/lib/api-client'
 import { hapticTap } from '@/lib/haptics'
+import { jstTimeHM, todayJST } from '@/lib/jst'
+import { prefetchReflection } from '@/lib/reflection-prefetch'
 
 // チェックイン2画面目: テキスト4欄を1画面に集約。
 // 「出来事」は常時表示、残り3欄は折りたたみ（値があれば自動で開く）。
@@ -22,6 +24,9 @@ interface CalendarEvent {
 
 const MAX_CHARS = 500
 
+// 手が止まってからこれだけ待って、清書の前に出す問いを裏で作りはじめる（打つたびに作り直さないため）
+const PREFETCH_DELAY_MS = 2000
+
 type OptionalField = 'challenges' | 'gratitude' | 'freeform'
 
 const OPTIONAL_SECTIONS: { id: OptionalField; label: string; placeholder: string }[] = [
@@ -32,6 +37,8 @@ const OPTIONAL_SECTIONS: { id: OptionalField; label: string; placeholder: string
 
 export default function NotesStep() {
   const {
+    mood,
+    energy,
     events,
     challenges,
     gratitude,
@@ -62,7 +69,7 @@ export default function NotesStep() {
   const memoState = useMemoStore()
   const [mounted, setMounted] = useState(false)
   useEffect(() => setMounted(true), [])
-  const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Tokyo' })
+  const today = todayJST()
   const memos = mounted && !targetDate ? [...todaysMemos(memoState, today)].reverse() : []
 
   // 当日の予定を取得（過去日付の記録では「今日の予定」はノイズなので出さない）
@@ -79,6 +86,16 @@ export default function NotesStep() {
     return () => { cancelled = true }
   }, [targetDate])
 
+  // 書いている間に AI 内省ガイドの問いを先に作っておく（下書き画面で待たせないため）。
+  // 入力が変わるたびに数え直し、同じ入力なら prefetchReflection 側で1回だけ。何も書いていなければ待たない
+  useEffect(() => {
+    if (![events, challenges, gratitude, freeform].some((v) => v.trim())) return
+    const timer = setTimeout(() => {
+      prefetchReflection(useCheckinStore.getState().getInput())
+    }, PREFETCH_DELAY_MS)
+    return () => clearTimeout(timer)
+  }, [mood, energy, events, challenges, gratitude, freeform])
+
   /** 選んだ行を「出来事」の末尾に足す（本人の言葉なので、清書でもそのまま残る） */
   const insertLines = (picked: PickItem[]) => {
     const lines = picked.map((p) => `・${p.meta ? `${p.meta} ` : ''}${p.label}`).join('\n')
@@ -89,14 +106,7 @@ export default function NotesStep() {
   const calendarItems: PickItem[] = calendarEvents.map((e) => ({
     id: e.id,
     label: e.title,
-    meta:
-      e.isAllDay || !e.startTime
-        ? '終日'
-        : new Date(e.startTime).toLocaleTimeString('ja-JP', {
-            timeZone: 'Asia/Tokyo',
-            hour: '2-digit',
-            minute: '2-digit',
-          }),
+    meta: e.isAllDay || !e.startTime ? '終日' : jstTimeHM(new Date(e.startTime)),
   }))
 
   const toggleSection = (id: OptionalField) => {

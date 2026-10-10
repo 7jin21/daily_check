@@ -13,7 +13,11 @@ function getKey(): Buffer | null {
 
 export function encryptSecret(plain: string): string {
   const key = getKey()
-  if (!key) return plain
+  if (!key) {
+    // 黙って平文で保存しない（サーバーのログで気づけるようにする）
+    console.warn('ENCRYPTION_KEY が未設定のため、トークンを暗号化せずに保存します。.env.local / Vercel に設定してください')
+    return plain
+  }
   const iv = randomBytes(12)
   const cipher = createCipheriv('aes-256-gcm', key, iv)
   const encrypted = Buffer.concat([cipher.update(plain, 'utf8'), cipher.final()])

@@ -1,6 +1,7 @@
 // 週次レポートの「来週のフォーカス」を本人が採用したもの（この端末の localStorage に保存）。
 // ホームに表示し、実施した日をワンタップで残す。次の週次レポートでふり返りの材料になる。
 import { STORAGE_KEYS } from '@/lib/constants'
+import { daysBetween } from '@/lib/jst'
 
 export interface Focus {
   text: string
@@ -36,8 +37,6 @@ export function saveFocus(focus: Focus | null) {
     // localStorage が使えない環境では保存しない
   }
 }
-
-const daysBetween = (a: string, b: string) => (Date.parse(`${b}T00:00:00Z`) - Date.parse(`${a}T00:00:00Z`)) / 86_400_000
 
 export function isFocusActive(focus: Focus | null, today: string): focus is Focus {
   return !!focus && daysBetween(focus.adoptedAt, today) <= ACTIVE_DAYS

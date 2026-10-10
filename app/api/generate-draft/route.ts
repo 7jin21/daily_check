@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createReadonlyServerClient } from '@/lib/supabase-server'
 import { generateOfflineDraft } from '@/lib/offline-draft'
 import { getGroqClient, GROQ_MODELS } from '@/lib/groq'
-import { DRAFT_SYSTEM_PROMPT, buildDraftUserPrompt, type DraftPromptInput } from '@/lib/draft-prompt'
+import { DRAFT_GENERATION, DRAFT_SYSTEM_PROMPT, buildDraftUserPrompt, type DraftPromptInput } from '@/lib/draft-prompt'
 
 // 日記本文を text/plain でストリーミング返却する。
 // タグ・サマリー等のメタ情報は本文確定後に /api/draft-meta で取得する（クライアント側）。
@@ -72,10 +72,8 @@ export async function POST(req: NextRequest) {
     const groq = getGroqClient()
     const stream = await groq.chat.completions.create({
       model: GROQ_MODELS.quality,
-      max_tokens: 1536, // 日本語はトークン消費が多いため余裕を持たせる
-      // 言い換えを減らすため低め。reasoning は推論トークンが max_tokens を食わないよう抑える
-      temperature: 0.3,
-      reasoning_effort: 'low',
+      // 生成パラメータは評価スクリプトと共有（lib/draft-prompt.ts の DRAFT_GENERATION）
+      ...DRAFT_GENERATION,
       stream: true,
       messages: [
         { role: 'system', content: DRAFT_SYSTEM_PROMPT },

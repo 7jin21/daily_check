@@ -1,5 +1,6 @@
 import type { CheckinInput } from '@/stores/checkin'
-import { MOODS, ENERGY } from '@/lib/constants'
+import { energyLabel, moodLabel } from '@/lib/constants'
+import { formatJSTDate } from '@/lib/jst'
 
 // 日記生成プロンプト（/api/generate-draft）。
 // 方針: AI は「代筆者」ではなく「清書係」。本人が書いた言葉・言い回し・語尾をそのまま残し、
@@ -10,6 +11,18 @@ export interface DraftPromptInput extends CheckinInput {
   reflectionQ?: string
   reflectionA?: string
 }
+
+/**
+ * 清書の生成パラメータ（/api/generate-draft と評価スクリプト scripts/eval-draft.ts で共有する）。
+ * - temperature: 言い換えを減らすため低め
+ * - reasoning_effort: gpt-oss の推論トークンが max_tokens を食わないよう抑える
+ * - max_tokens: 日本語はトークン消費が多いため余裕を持たせる
+ */
+export const DRAFT_GENERATION = {
+  max_tokens: 1536,
+  temperature: 0.3,
+  reasoning_effort: 'low',
+} as const
 
 export const DRAFT_SYSTEM_PROMPT = `あなたは、本人が書いたメモを日記帳に清書する係です。
 文章を「書く」のではなく、本人の言葉を「整える」ことだけが仕事です。
@@ -46,19 +59,12 @@ export function buildDraftUserPrompt(input: DraftPromptInput, entryDate: string 
 
   // 過去日付の書き忘れ救済: その日の日記として書く（「今日」と書かないよう明示）
   if (entryDate) {
-    const label = new Date(`${entryDate}T12:00:00+09:00`).toLocaleDateString('ja-JP', {
-      timeZone: 'Asia/Tokyo',
-      month: 'long',
-      day: 'numeric',
-      weekday: 'long',
-    })
+    const label = formatJSTDate(entryDate, { month: 'long', day: 'numeric', weekday: 'long' })
     parts.push(`この日記の対象日: ${label}（あとから振り返って書いている）`)
   }
 
-  const moodLabel = MOODS.find((m) => m.value === input.mood)?.label
-  const energyLabel = ENERGY.find((e) => e.value === input.energy)?.label
-  parts.push(`気分: ${input.mood}/5（${moodLabel ?? '-'}）`)
-  parts.push(`エネルギー: ${input.energy}/5（${energyLabel ?? '-'}）`)
+  parts.push(`気分: ${input.mood}/5（${moodLabel(input.mood) ?? '-'}）`)
+  parts.push(`エネルギー: ${input.energy}/5（${energyLabel(input.energy) ?? '-'}）`)
 
   if (input.events?.trim()) parts.push(`【本人のメモ: 今日あったこと】\n${input.events.trim()}`)
   if (input.challenges?.trim()) parts.push(`【本人のメモ: 困ったこと】\n${input.challenges.trim()}`)
