@@ -110,8 +110,9 @@ const STEP_DESCRIPTIONS: Record<string, string[]> = {
 export function getDailyDescription(stepId: string, date: string = todayJST()): string {
   const descs = STEP_DESCRIPTIONS[stepId]
   if (!descs?.length) return ''
-  const [, m, d] = date.split('-').map(Number)
-  const dayNumber = Math.floor(Date.UTC(2024, m - 1, d) / 86_400_000)
+  // 実際の年で数える（固定の年で数えると、年末年始や平年の2月末で同じ文が続いてしまう）
+  const [y, m, d] = date.split('-').map(Number)
+  const dayNumber = Math.floor(Date.UTC(y, m - 1, d) / 86_400_000)
   return descs[((dayNumber % descs.length) + descs.length) % descs.length]
 }
 

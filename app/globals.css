@@ -522,6 +522,17 @@ mark.ai-added {
   border-radius: 2px;
 }
 
+/* AI が足した、文をつなぐだけの助詞（「で」「が」など）。言葉としては数えないので、淡い点線で控えめに示す */
+mark.ai-joint {
+  background: none;
+  color: inherit;
+  text-decoration-line: underline;
+  text-decoration-style: dotted;
+  text-decoration-color: color-mix(in srgb, var(--gold) 70%, transparent);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 4px;
+}
+
 /* 読み込み中の小さな月（app/loading.tsx） */
 .loading-moon {
   width: 14px;

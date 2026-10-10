@@ -6,22 +6,13 @@ import DeleteEntryButton from '@/components/entry/DeleteEntryButton'
 import ShareEntryButton from '@/components/entry/ShareEntryButton'
 import LaterNote from '@/components/entry/LaterNote'
 import { parseFreeform } from '@/lib/freeform'
-import { toJSTDate } from '@/lib/home-model'
+import { APP_TIME_ZONE, formatJSTDate, todayJST } from '@/lib/jst'
+import { energyLabel, moodEmoji, moodLabel } from '@/lib/constants'
 
 interface Props {
   params: Promise<{ date: string }>
   // write=1: 言葉を書き足す（気分だけの記録から）／ now=1: 今の一言を添える（フラッシュバックから）
   searchParams: Promise<{ write?: string; now?: string }>
-}
-
-const MOOD_EMOJI: Record<number, string> = {
-  1: '😞', 2: '😕', 3: '😐', 4: '🙂', 5: '😄',
-}
-const MOOD_LABEL: Record<number, string> = {
-  1: 'とても悪い', 2: '悪い', 3: '普通', 4: '良い', 5: 'とても良い',
-}
-const ENERGY_LABEL: Record<number, string> = {
-  1: '枯渇', 2: '低い', 3: '普通', 4: '高い', 5: '最高',
 }
 
 export default async function EntryDetailPage({ params, searchParams }: Props) {
@@ -51,7 +42,7 @@ export default async function EntryDetailPage({ params, searchParams }: Props) {
 
   // || を使う: edited_draft が空文字のときも ai_draft にフォールバックさせる
   const displayContent: string = entry.edited_draft || entry.ai_draft || ''
-  const today = toJSTDate()
+  const today = todayJST()
   // 自由メモ・内省の答え・あとから添えた一言を分けて表示する
   const ff = parseFreeform(entry.freeform as string | null)
 
@@ -68,8 +59,7 @@ export default async function EntryDetailPage({ params, searchParams }: Props) {
         </Link>
         <div>
           <h1 className="text-xl font-bold text-[var(--foreground)]">
-            {new Date(`${date}T12:00:00+09:00`).toLocaleDateString('ja-JP', {
-              timeZone: 'Asia/Tokyo',
+            {formatJSTDate(date, {
               year: 'numeric',
               month: 'long',
               day: 'numeric',
@@ -82,17 +72,17 @@ export default async function EntryDetailPage({ params, searchParams }: Props) {
       {/* 気分・エネルギー */}
       <div className="flex gap-3 mb-6">
         <div className="flex-1 card text-center">
-          <p className="text-3xl mb-1">{MOOD_EMOJI[entry.mood as number] ?? '😐'}</p>
+          <p className="text-3xl mb-1">{moodEmoji(entry.mood as number | null) ?? '😐'}</p>
           <p className="eyebrow">気分</p>
           <p className="text-sm font-medium text-[var(--foreground)] mt-1">
-            {MOOD_LABEL[entry.mood as number] ?? '-'}
+            {moodLabel(entry.mood as number | null) ?? '-'}
           </p>
         </div>
         <div className="flex-1 card text-center">
           <p className="text-3xl mb-1">⚡</p>
           <p className="eyebrow">エネルギー</p>
           <p className="text-sm font-medium text-[var(--foreground)] mt-1">
-            {ENERGY_LABEL[entry.energy as number] ?? '-'}
+            {energyLabel(entry.energy as number | null) ?? '-'}
           </p>
         </div>
       </div>
@@ -187,7 +177,7 @@ export default async function EntryDetailPage({ params, searchParams }: Props) {
       {/* Notion同期状態 */}
       {entry.notion_synced_at && (
         <p className="mt-6 text-xs text-center text-[var(--muted-2)]">
-          ✓ Notionに同期済み ({new Date(entry.notion_synced_at as string).toLocaleDateString('ja-JP')})
+          ✓ Notionに同期済み ({new Date(entry.notion_synced_at as string).toLocaleDateString('ja-JP', { timeZone: APP_TIME_ZONE })})
         </p>
       )}
 

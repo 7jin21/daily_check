@@ -54,7 +54,7 @@ export default function LoginPage() {
         <div className="eyebrow mb-3" style={{ letterSpacing: '0.3em' }}>Diary</div>
         <h1 className="text-3xl font-bold gradient-text tracking-tight">Inner Mirror</h1>
         <p className="mt-3 text-[var(--muted)] text-base leading-relaxed">
-          毎日の気づきを、AIが日記に
+          毎日の気づきを、あなたの言葉のまま日記に
         </p>
       </div>
 
@@ -63,7 +63,7 @@ export default function LoginPage() {
         <div className="flex justify-center gap-6 text-center">
           {[
             { icon: '⚡', label: '30秒で完了' },
-            { icon: '✨', label: 'AI代筆' },
+            { icon: '✨', label: '言葉のまま清書' },
             { icon: '📊', label: '自己分析' },
           ].map((f) => (
             <div key={f.label} className="flex flex-col items-center gap-1">

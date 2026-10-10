@@ -1,6 +1,8 @@
 'use client'
 
 import { useState } from 'react'
+import { moodEmoji } from '@/lib/constants'
+import { formatJSTDate } from '@/lib/jst'
 
 interface Props {
   date: string
@@ -10,7 +12,6 @@ interface Props {
   tags: string[]
 }
 
-const MOOD_EMOJI: Record<number, string> = { 1: '😞', 2: '😕', 3: '😐', 4: '🙂', 5: '😄' }
 const MOOD_COLOR: Record<number, string> = {
   1: '#b5654a', 2: '#c5895f', 3: '#cdbf9a', 4: '#9caa7e', 5: '#6f8a5f',
 }
@@ -80,17 +81,14 @@ async function buildCardBlob(props: Props): Promise<Blob | null> {
   ctx.font = '600 30px Georgia, serif'
   ctx.fillText('INNER MIRROR', 80, 150)
 
-  const d = new Date(`${props.date}T12:00:00+09:00`)
-  const dateStr = d.toLocaleDateString('ja-JP', {
-    timeZone: 'Asia/Tokyo', year: 'numeric', month: 'long', day: 'numeric', weekday: 'long',
-  })
+  const dateStr = formatJSTDate(props.date, { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' })
   ctx.fillStyle = '#32362a'
   ctx.font = 'bold 50px Georgia, serif'
   ctx.fillText(dateStr, 80, 220)
 
   if (props.mood) {
     ctx.font = '170px sans-serif'
-    ctx.fillText(MOOD_EMOJI[props.mood], 80, 430)
+    ctx.fillText(moodEmoji(props.mood) ?? '', 80, 430)
   }
 
   ctx.fillStyle = '#32362a'

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createReadonlyServerClient } from '@/lib/supabase-server'
 import { getGroqClient, GROQ_MODELS } from '@/lib/groq'
+import { formatEntriesForPrompt } from '@/lib/prompt-context'
 
 // 「AI に聞いてみる」: 直近の日記データを文脈に、ユーザーの質問へ1回だけ答える。
 // 例:「今週なんでこんなに疲れてたんだろう」「最近気分がいい日の共通点は？」
@@ -45,17 +46,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ answer: 'まだ日記の記録がないため、お答えできる材料がありません。まずは今日のチェックインから始めてみましょう。' })
   }
 
-  const summary = entries
-    .map((e) => {
-      const parts = [`[${e.entry_date}] 気分:${e.mood}/5 エネルギー:${e.energy}/5`]
-      if (e.events?.trim()) parts.push(`出来事: ${e.events.substring(0, 100)}`)
-      if (e.challenges?.trim()) parts.push(`困ったこと: ${e.challenges.substring(0, 80)}`)
-      if (e.gratitude?.trim()) parts.push(`感謝: ${e.gratitude.substring(0, 60)}`)
-      if (e.freeform?.trim()) parts.push(`メモ・ふりかえり: ${e.freeform.substring(0, 120)}`)
-      if (e.dominant_emotion?.trim()) parts.push(`感情: ${e.dominant_emotion}`)
-      return parts.join(' / ')
-    })
-    .join('\n')
+  const summary = formatEntriesForPrompt(entries, { events: 100, challenges: 80, gratitude: 60, freeform: 120 })
 
   try {
     const groq = getGroqClient()

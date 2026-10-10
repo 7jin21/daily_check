@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { getSupabaseClient } from '@/lib/supabase'
 import { apiPost } from '@/lib/api-client'
+import { refreshEntryMeta } from '@/lib/entry-save'
 import { todaysMemos, useMemoStore } from '@/stores/memos'
 
 interface Props {
@@ -78,22 +79,11 @@ export default function EditableContent({
       if (memosInserted && memoState.date === entryDate) memoState.clear()
 
       // 気分だけの記録に言葉を足したときは、要約・タグ・感情を本文から補う（一覧やホームの表示・分析に使う）
+      // （失敗しても本文は保存済み。タグは今のまま Notion へ送る）
       let nextTags = tags
       if (needsMeta) {
-        try {
-          const meta = await apiPost<{ tags: string[]; summary: string; dominantEmotion: string }>(
-            '/api/draft-meta',
-            { draft },
-            { retry: false }
-          )
-          nextTags = meta.tags
-          await supabase
-            .from('diary_entries')
-            .update({ summary: meta.summary || null, tags: meta.tags, dominant_emotion: meta.dominantEmotion || null })
-            .eq('id', entryId)
-        } catch (metaErr) {
-          console.warn('要約・タグの補完に失敗（本文は保存済み）:', metaErr)
-        }
+        const meta = await refreshEntryMeta(entryId, draft)
+        if (meta) nextTags = meta.tags
       }
 
       // Notion にも編集内容を反映（同期済みページは更新される。失敗しても保存には影響しない）

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createReadonlyServerClient } from '@/lib/supabase-server'
+import { todayJST } from '@/lib/jst'
 
 // 日記データのエクスポート（データ所有権はユーザーにある）。
 // GET /api/export?format=json | csv — 全件をファイルとしてダウンロードさせる。
@@ -53,7 +54,7 @@ export async function GET(req: NextRequest) {
   }
 
   const rows = (entries ?? []) as unknown as ExportRow[]
-  const dateStamp = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Tokyo' })
+  const dateStamp = todayJST()
 
   if (format === 'csv') {
     const header = EXPORT_COLUMNS.join(',')

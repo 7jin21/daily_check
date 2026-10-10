@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { daysBetween } from '@/lib/jst'
 
 interface DayEntry {
   entry_date: string
@@ -24,11 +25,6 @@ const WEEKDAY_LABELS = ['日', '月', '火', '水', '木', '金', '土']
 
 function pad2(n: number): string {
   return String(n).padStart(2, '0')
-}
-
-/** today からの経過日数（正の値 = 過去）*/
-function diffDaysFromToday(dateStr: string, todayJST: string): number {
-  return Math.round((Date.parse(`${todayJST}T00:00:00Z`) - Date.parse(`${dateStr}T00:00:00Z`)) / 86_400_000)
 }
 
 export default function MonthCalendar({ year, month, entries, todayJST, prevHref, nextHref, todayHref }: Props) {
@@ -99,7 +95,8 @@ export default function MonthCalendar({ year, month, entries, todayJST, prevHref
           const entry = entryMap.get(dateStr)
           const isToday = dateStr === todayJST
           const isFuture = dateStr > todayJST
-          const diffDays = diffDaysFromToday(dateStr, todayJST)
+          // today からの経過日数（正の値 = 過去）
+          const diffDays = daysBetween(dateStr, todayJST)
           const backfillable = !entry && !isFuture && !isToday && diffDays > 0 && diffDays <= 7
 
           let href: string | null = null

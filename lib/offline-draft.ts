@@ -1,6 +1,7 @@
 // オフライン時・API失敗時のフォールバック日記生成
 import type { CheckinInput } from '@/stores/checkin'
 import { MOODS, ENERGY } from '@/lib/constants'
+import { formatJSTDate, todayJST } from '@/lib/jst'
 
 export interface DraftResult {
   draft: string
@@ -16,13 +17,9 @@ export function generateOfflineDraft(input: CheckinInput, entryDate?: string | n
   const moodInfo = MOODS.find((m) => m.value === input.mood)
   const energyInfo = ENERGY.find((e) => e.value === input.energy)
 
-  // API ルートのフォールバックとしてサーバー(UTC)でも実行されるため timeZone 指定は必須
-  const baseDate =
-    entryDate && /^\d{4}-\d{2}-\d{2}$/.test(entryDate)
-      ? new Date(`${entryDate}T12:00:00+09:00`)
-      : new Date()
-  const today = baseDate.toLocaleDateString('ja-JP', {
-    timeZone: 'Asia/Tokyo',
+  // API ルートのフォールバックとしてサーバー(UTC)でも実行されるため、日付は必ず Asia/Tokyo で決める
+  const baseDate = entryDate && /^\d{4}-\d{2}-\d{2}$/.test(entryDate) ? entryDate : todayJST()
+  const today = formatJSTDate(baseDate, {
     year: 'numeric',
     month: 'long',
     day: 'numeric',

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createReadonlyServerClient } from '@/lib/supabase-server'
 import { decryptSecret } from '@/lib/crypto'
+import { subtractDays, todayJST } from '@/lib/jst'
 
 interface CalendarEvent {
   id: string
@@ -88,10 +89,9 @@ export async function GET() {
     }
 
     // 今日の日付範囲（Asia/Tokyo 基準）
-    const todayJST = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Tokyo' })
-    const startOfDay = new Date(`${todayJST}T00:00:00+09:00`)
-    const endOfDay = new Date(`${todayJST}T00:00:00+09:00`)
-    endOfDay.setDate(endOfDay.getDate() + 1)
+    const today = todayJST()
+    const startOfDay = new Date(`${today}T00:00:00+09:00`)
+    const endOfDay = new Date(`${subtractDays(today, -1)}T00:00:00+09:00`)
 
     const params = new URLSearchParams({
       timeMin: startOfDay.toISOString(),

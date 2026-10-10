@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import webpush from 'web-push'
 import { createAdminClient } from '@/lib/supabase-admin'
+import { moodEmoji } from '@/lib/constants'
+import { subtractDays, todayJST } from '@/lib/jst'
 
 // 毎日のリマインダー配信（Vercel Cron から呼ばれる）。
 // - 「今日（JST）まだ記録していない」購読ユーザーだけに送る
@@ -11,14 +13,6 @@ import { createAdminClient } from '@/lib/supabase-admin'
 // 手動テスト: curl -H "Authorization: Bearer <CRON_SECRET>" https://<app>/api/cron/reminder
 
 export const maxDuration = 60
-
-const MOOD_EMOJI: Record<number, string> = { 1: '😞', 2: '😕', 3: '😐', 4: '🙂', 5: '😄' }
-
-function jstDate(offsetDays = 0): string {
-  const now = new Date()
-  now.setUTCDate(now.getUTCDate() + offsetDays)
-  return now.toLocaleDateString('en-CA', { timeZone: 'Asia/Tokyo' })
-}
 
 export async function GET(req: NextRequest) {
   // 1. Cron 以外からの呼び出しを弾く
@@ -49,8 +43,8 @@ export async function GET(req: NextRequest) {
       { status: 503 }
     )
   }
-  const today = jstDate(0)
-  const yesterday = jstDate(-1)
+  const today = todayJST()
+  const yesterday = subtractDays(today, 1)
 
   // 3. 全購読を取得
   const { data: subs, error: subsError } = await supabase
@@ -92,7 +86,7 @@ export async function GET(req: NextRequest) {
     targets.map(async (sub) => {
       const mood = yesterdayMood.get(sub.user_id)
       const body = mood
-        ? `昨日の気分は${MOOD_EMOJI[mood] ?? ''}でした。今日はどんな一日でしたか？30秒だけふり返ってみませんか`
+        ? `昨日の気分は${moodEmoji(mood) ?? ''}でした。今日はどんな一日でしたか？30秒だけふり返ってみませんか`
         : '今日はまだ記録がありません。30秒だけ、今日をふり返ってみませんか？'
 
       try {

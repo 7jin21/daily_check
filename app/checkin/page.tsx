@@ -8,26 +8,14 @@ import StateStep from '@/components/checkin/StateStep'
 import NotesStep from '@/components/checkin/NotesStep'
 import { hapticTap } from '@/lib/haptics'
 import { saveMoodOnly } from '@/lib/entry-save'
-
-function getTodayJST() {
-  return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Tokyo' })
-}
+import { prefetchReflection } from '@/lib/reflection-prefetch'
+import { daysBetween, formatJSTDate, todayJST } from '@/lib/jst'
 
 // 過去日付の記録（書き忘れ救済）は7日前まで許可する
 function isValidPastDate(date: string, today: string): boolean {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return false
   if (date >= today) return false
-  const diffDays = (Date.parse(`${today}T00:00:00Z`) - Date.parse(`${date}T00:00:00Z`)) / 86_400_000
-  return diffDays <= 7
-}
-
-function formatDateLabel(date: string): string {
-  return new Date(`${date}T12:00:00+09:00`).toLocaleDateString('ja-JP', {
-    timeZone: 'Asia/Tokyo',
-    month: 'long',
-    day: 'numeric',
-    weekday: 'short',
-  })
+  return daysBetween(date, today) <= 7
 }
 
 export default function CheckinPage() {
@@ -40,13 +28,19 @@ export default function CheckinPage() {
   const [quickError, setQuickError] = useState<string | null>(null)
   const hasText = [events, challenges, gratitude, freeform].some((v) => v.trim())
 
+  // ステップの説明文は日替わり。/checkin はビルド時に静的生成されるので、描画中に今日の文を選ぶと
+  // サーバーの HTML（ビルドした日の文）とブラウザの初回描画（今日の文）が食い違う。
+  // 初回描画までは固定の説明文を出し、マウントしてから日替わりの文に切り替える
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => setMounted(true), [])
+
   // 前日以前のデータが残っていたら自動クリア
   // PWA は何日もバックグラウンドに残るため、マウント時だけでなく
   // visibilitychange（スリープ復帰・アプリ切り替え）でも日付またぎを検知する
   useEffect(() => {
     const checkDateRollover = () => {
       if (document.visibilityState === 'hidden') return
-      const today = getTodayJST()
+      const today = todayJST()
       const state = useCheckinStore.getState()
       if (state.checkinDate && state.checkinDate !== today) {
         state.reset()
@@ -60,7 +54,7 @@ export default function CheckinPage() {
     // ?date=YYYY-MM-DD → 過去日付の記録（書き忘れ救済）
     const params = new URLSearchParams(window.location.search)
     const dateParam = params.get('date')
-    const today = getTodayJST()
+    const today = todayJST()
     if (dateParam && isValidPastDate(dateParam, today)) {
       const state = useCheckinStore.getState()
       if (state.targetDate !== dateParam) {
@@ -86,6 +80,8 @@ export default function CheckinPage() {
     if (stepIndex < totalSteps - 1) {
       nextStep()
     } else {
+      // 書き終えてすぐ押したときも、下書き画面に着くまでに問いを作りはじめておく（同じ入力なら作り直さない）
+      prefetchReflection(useCheckinStore.getState().getInput())
       router.push('/draft')
     }
   }
@@ -98,11 +94,11 @@ export default function CheckinPage() {
     hapticTap()
     setQuickSaving(true)
     setQuickError(null)
-    const entryDate = state.targetDate ?? state.checkinDate ?? getTodayJST()
+    const entryDate = state.targetDate ?? state.checkinDate ?? todayJST()
     try {
       await saveMoodOnly(entryDate, state.mood, state.energy)
       state.reset()
-      router.replace(entryDate === getTodayJST() ? '/' : `/entries/${entryDate}`)
+      router.replace(entryDate === todayJST() ? '/' : `/entries/${entryDate}`)
       router.refresh()
     } catch (err) {
       console.error('気分だけの記録に失敗:', err)
@@ -128,7 +124,7 @@ export default function CheckinPage() {
   const handleClearTargetDate = () => {
     const state = useCheckinStore.getState()
     state.reset()
-    state.setCheckinDate(getTodayJST())
+    state.setCheckinDate(todayJST())
     router.replace('/checkin')
   }
 
@@ -172,7 +168,7 @@ export default function CheckinPage() {
         <div className="mb-4 px-4 py-2.5 rounded-2xl flex items-center justify-between text-sm"
           style={{ background: 'rgba(197,137,95,0.12)', border: '1px solid rgba(197,137,95,0.35)', color: '#a4683f' }}
         >
-          <span>🕰 <b>{formatDateLabel(targetDate)}</b> の記録をあとから書いています</span>
+          <span>🕰 <b>{formatJSTDate(targetDate, { month: 'long', day: 'numeric', weekday: 'short' })}</b> の記録をあとから書いています</span>
           <button onClick={handleClearTargetDate} className="text-xs underline ml-3 flex-shrink-0">
             今日に戻す
           </button>
@@ -185,7 +181,7 @@ export default function CheckinPage() {
           {targetDate && step.id === 'state' ? 'その日の調子は？' : step.title}
         </h2>
         <p className="text-[var(--muted)] text-sm mt-1">
-          {getDailyDescription(step.id) || step.description}
+          {(mounted && getDailyDescription(step.id)) || step.description}
         </p>
       </div>
 

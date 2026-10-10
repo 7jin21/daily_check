@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { createReadonlyServerClient } from '@/lib/supabase-server'
 import { getGroqClient, GROQ_MODELS } from '@/lib/groq'
 import { parseFreeform } from '@/lib/freeform'
+import { daysBetween, todayJST } from '@/lib/jst'
+import { formatEntriesForPrompt } from '@/lib/prompt-context'
 
 const MIN_ENTRIES_FOR_ANALYSIS = 5
 
@@ -70,9 +72,8 @@ export async function POST() {
 
   // 件数ではなく実際の日付で「直近7日間 vs その前7日間」を比較する
   // （記録頻度が低いユーザーで数週間前のデータと比較してしまうのを防ぐ）
-  const jstToday = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Tokyo' })
-  const todayUtcMs = Date.parse(`${jstToday}T00:00:00Z`)
-  const daysAgo = (dateStr: string) => (todayUtcMs - Date.parse(`${dateStr}T00:00:00Z`)) / 86_400_000
+  const today = todayJST()
+  const daysAgo = (dateStr: string) => daysBetween(dateStr, today)
 
   const recent7 = entries.filter((e) => daysAgo(e.entry_date) < 7)
   const prev7 = entries.filter((e) => {
@@ -92,18 +93,7 @@ export async function POST() {
   try {
     const groq = getGroqClient()
 
-    const summary = entries
-      .slice(0, 20)
-      .map((e) => {
-        const parts = [`[${e.entry_date}] 気分:${e.mood}/5 エネルギー:${e.energy}/5`]
-        if (e.events?.trim()) parts.push(`出来事: ${e.events.substring(0, 100)}`)
-        if (e.challenges?.trim()) parts.push(`困ったこと: ${e.challenges.substring(0, 80)}`)
-        if (e.gratitude?.trim()) parts.push(`感謝: ${e.gratitude.substring(0, 60)}`)
-        if (e.freeform?.trim()) parts.push(`メモ・ふりかえり: ${e.freeform.substring(0, 160)}`)
-        if (e.dominant_emotion?.trim()) parts.push(`感情: ${e.dominant_emotion}`)
-        return parts.join(' / ')
-      })
-      .join('\n')
+    const summary = formatEntriesForPrompt(rows.slice(0, 20), { events: 100, challenges: 80, gratitude: 60, freeform: 160 })
 
     const completion = await groq.chat.completions.create({
       model: GROQ_MODELS.quality,

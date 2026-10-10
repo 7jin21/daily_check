@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { getSupabaseClient } from '@/lib/supabase'
 import { appendLaterNote } from '@/lib/freeform'
+import { todayJST } from '@/lib/jst'
 
 // 過去の日記に「今の一言」を添える。当時の本文には手を触れず、freeform の末尾に日付つきで足す。
 const MAX = 300
@@ -31,10 +32,9 @@ export default function LaterNote({ entryId, autoOpen = false }: { entryId: stri
       // 直前の内容を読み直してから足す（ほかの画面での変更を消さない）
       const { data, error: readError } = await supabase.from('diary_entries').select('freeform').eq('id', entryId).single()
       if (readError) throw readError
-      const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Tokyo' })
       const { error: writeError } = await supabase
         .from('diary_entries')
-        .update({ freeform: appendLaterNote(data.freeform as string | null, today, text) })
+        .update({ freeform: appendLaterNote(data.freeform as string | null, todayJST(), text) })
         .eq('id', entryId)
       if (writeError) throw writeError
       setText('')

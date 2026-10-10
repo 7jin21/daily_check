@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createReadonlyServerClient } from '@/lib/supabase-server'
 import { createServerSupabaseClient } from '@/lib/supabase-server'
 import { decryptSecret } from '@/lib/crypto'
+import { moodEmoji } from '@/lib/constants'
+import { formatJSTDate } from '@/lib/jst'
+import { toNotionParagraphs } from '@/lib/notion-blocks'
 
 interface NotionSyncBody {
   entryId: string
@@ -96,18 +99,13 @@ export async function POST(req: NextRequest) {
 
   // Notion API呼び出し
   try {
-    const moodEmoji: Record<number, string> = {
-      1: '😞', 2: '😕', 3: '😐', 4: '🙂', 5: '😄',
-    }
-
-    const icon = { emoji: moodEmoji[body.mood] ?? '📓' }
+    const icon = { emoji: moodEmoji(body.mood) ?? '📓' }
     const properties = {
       title: {
         title: [
           {
             text: {
-              content: new Date(`${body.entryDate}T12:00:00+09:00`).toLocaleDateString('ja-JP', {
-                timeZone: 'Asia/Tokyo',
+              content: formatJSTDate(body.entryDate, {
                 year: 'numeric',
                 month: 'long',
                 day: 'numeric',
@@ -130,24 +128,12 @@ export async function POST(req: NextRequest) {
         multi_select: tags.map((tag) => ({ name: tag })),
       },
     }
-    const bodyBlock = {
-      object: 'block',
-      type: 'paragraph',
-      paragraph: {
-        rich_text: [
-          {
-            type: 'text',
-            text: {
-              content: body.draft.substring(0, 2000), // Notionの制限
-            },
-          },
-        ],
-      },
-    }
+    // 本文は2000文字ごとの段落ブロックに分ける（Notion の上限。以前は2000文字で切り捨てていた）
+    const bodyBlocks = toNotionParagraphs(body.draft)
 
     const notionPageId = entry.notion_page_id
-      ? await updateNotionPage(notionToken, entry.notion_page_id, icon, properties, bodyBlock)
-      : await createNotionPage(notionToken, notionDatabaseId, icon, properties, bodyBlock)
+      ? await updateNotionPage(notionToken, entry.notion_page_id, icon, properties, bodyBlocks)
+      : await createNotionPage(notionToken, notionDatabaseId, icon, properties, bodyBlocks)
 
     // Supabaseにページ IDを保存
     await serverSupabase
@@ -194,13 +180,13 @@ async function createNotionPage(
   databaseId: string,
   icon: unknown,
   properties: unknown,
-  bodyBlock: unknown
+  bodyBlocks: unknown[]
 ): Promise<string> {
   const data = await notionFetch(token, 'https://api.notion.com/v1/pages', 'POST', {
     parent: { database_id: databaseId },
     icon,
     properties,
-    children: [bodyBlock],
+    children: bodyBlocks,
   }) as { id: string }
   return data.id
 }
@@ -211,26 +197,33 @@ async function updateNotionPage(
   pageId: string,
   icon: unknown,
   properties: unknown,
-  bodyBlock: unknown
+  bodyBlocks: unknown[]
 ): Promise<string> {
   await notionFetch(token, `https://api.notion.com/v1/pages/${pageId}`, 'PATCH', {
     icon,
     properties,
   })
 
-  // 本文の差し替え: 既存ブロックを削除して新しい本文を追加
-  const children = await notionFetch(
-    token,
-    `https://api.notion.com/v1/blocks/${pageId}/children?page_size=100`,
-    'GET'
-  ) as { results: Array<{ id: string }> }
+  // 本文の差し替え: 既存ブロックを（100件を超えていても）すべて削除して新しい本文を追加
+  const blockIds: string[] = []
+  let cursor: string | null = null
+  do {
+    const query: string = cursor ? `page_size=100&start_cursor=${encodeURIComponent(cursor)}` : 'page_size=100'
+    const children = await notionFetch(token, `https://api.notion.com/v1/blocks/${pageId}/children?${query}`, 'GET') as {
+      results?: Array<{ id: string }>
+      has_more?: boolean
+      next_cursor?: string | null
+    }
+    blockIds.push(...(children.results ?? []).map((b) => b.id))
+    cursor = children.has_more ? children.next_cursor ?? null : null
+  } while (cursor)
 
-  for (const block of children.results ?? []) {
-    await notionFetch(token, `https://api.notion.com/v1/blocks/${block.id}`, 'DELETE')
+  for (const id of blockIds) {
+    await notionFetch(token, `https://api.notion.com/v1/blocks/${id}`, 'DELETE')
   }
 
   await notionFetch(token, `https://api.notion.com/v1/blocks/${pageId}/children`, 'PATCH', {
-    children: [bodyBlock],
+    children: bodyBlocks,
   })
 
   return pageId
