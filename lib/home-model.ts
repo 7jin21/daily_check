@@ -1,5 +1,9 @@
 // ホーム画面の表示用モデル（データ取得と描画の間の純粋な計算）。
 // app/page.tsx（本番）と開発用プレビューの両方から使う。日付はすべて Asia/Tokyo 基準。
+import { dayOfWeek, jstHour, subtractDays, toJSTDate } from '@/lib/jst'
+
+// 日付の関数は lib/jst.ts にまとめた（既存の import 先を変えずに済むよう再公開する）
+export { dayOfWeek, subtractDays, toJSTDate }
 
 export interface HomeEntry {
   id: string
@@ -26,24 +30,6 @@ export interface HomeModel {
   recentEntries: HomeEntry[]
 }
 
-/** Asia/Tokyo の日付を YYYY-MM-DD で返す */
-export function toJSTDate(d: Date = new Date()): string {
-  return d.toLocaleDateString('en-CA', { timeZone: 'Asia/Tokyo' })
-}
-
-/** YYYY-MM-DD 文字列から n 日前の日付文字列を返す（負なら n 日後） */
-export function subtractDays(dateStr: string, n: number): string {
-  const [y, m, d] = dateStr.split('-').map(Number)
-  const t = new Date(Date.UTC(y, m - 1, d - n))
-  return t.toISOString().slice(0, 10)
-}
-
-/** YYYY-MM-DD の曜日（0=日）。タイムゾーンに依存しないよう UTC で計算する */
-export function dayOfWeek(dateStr: string): number {
-  const [y, m, d] = dateStr.split('-').map(Number)
-  return new Date(Date.UTC(y, m - 1, d)).getUTCDay()
-}
-
 export function periodOf(hour: number): DayPeriod {
   if (hour >= 4 && hour < 7) return 'dawn'
   if (hour >= 7 && hour < 16) return 'day'
@@ -53,10 +39,7 @@ export function periodOf(hour: number): DayPeriod {
 
 export function buildHomeModel(entries: HomeEntry[], total: number, now: Date = new Date()): HomeModel {
   const today = toJSTDate(now)
-  const hourJST = parseInt(
-    now.toLocaleString('en-US', { timeZone: 'Asia/Tokyo', hour: 'numeric', hour12: false }),
-    10
-  ) % 24
+  const hourJST = jstHour(now)
 
   // 平均気分は直近365日
   const avgMood =

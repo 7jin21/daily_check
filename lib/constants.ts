@@ -1,3 +1,5 @@
+import { todayJST } from '@/lib/jst'
+
 // 気分の定数
 export const MOODS = [
   { value: 1, emoji: '😞', label: 'とても悪い', color: '#b5654a' },
@@ -100,15 +102,23 @@ const STEP_DESCRIPTIONS: Record<string, string[]> = {
   ],
 }
 
-/** JST の日付から今日のステップ説明文を返す（7日ローテーション） */
-export function getDailyDescription(stepId: string): string {
+/**
+ * その日（YYYY-MM-DD, JST）のステップ説明文を返す（7日ローテーション）。
+ * 日数は UTC の暦で数えるので、端末とサーバーのタイムゾーンが違っても同じ文になる。
+ * ただし /checkin はビルド時に静的生成されるため、画面ではマウント後に呼ぶこと（描画の食い違いを防ぐ）。
+ */
+export function getDailyDescription(stepId: string, date: string = todayJST()): string {
   const descs = STEP_DESCRIPTIONS[stepId]
   if (!descs?.length) return ''
-  const jstDate = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Tokyo' })
-  const [, m, d] = jstDate.split('-').map(Number)
-  const dayOfYear = Math.floor(new Date(2024, m - 1, d).getTime() / 86400000)
-  return descs[((dayOfYear % descs.length) + descs.length) % descs.length]
+  const [, m, d] = date.split('-').map(Number)
+  const dayNumber = Math.floor(Date.UTC(2024, m - 1, d) / 86_400_000)
+  return descs[((dayNumber % descs.length) + descs.length) % descs.length]
 }
+
+/** 気分の値（1〜5）の絵文字・ラベル。範囲外なら undefined（呼び出し側で既定を決める） */
+export const moodEmoji = (value: number | null | undefined) => MOODS.find((m) => m.value === value)?.emoji
+export const moodLabel = (value: number | null | undefined) => MOODS.find((m) => m.value === value)?.label
+export const energyLabel = (value: number | null | undefined) => ENERGY.find((e) => e.value === value)?.label
 
 // ローカルストレージのキー
 export const STORAGE_KEYS = {

@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabaseClient } from '@/lib/supabase-server'
 import { encryptSecret } from '@/lib/crypto'
+import { safeNextPath } from '@/lib/safe-redirect'
 
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url)
   const code = searchParams.get('code')
-  const next = searchParams.get('next') ?? '/'
+  // 戻り先はこのサイト内のパスに限る（next=@evil.com 等で外部へ飛ばされないように）
+  const next = safeNextPath(searchParams.get('next'))
   const error = searchParams.get('error')
   const errorDescription = searchParams.get('error_description')
 

@@ -61,7 +61,10 @@ export async function POST(req: NextRequest) {
     const groq = getGroqClient()
     const completion = await groq.chat.completions.create({
       model: GROQ_MODELS.quality,
-      max_tokens: 700,
+      // gpt-oss は推論トークンも max_tokens に数えるため、推論を抑えて回答が途中で切れないようにする
+      // （回答の長さはプロンプトの「300字以内」で決まる）
+      max_tokens: 1024,
+      reasoning_effort: 'low',
       messages: [
         {
           role: 'system',

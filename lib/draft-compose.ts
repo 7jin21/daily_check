@@ -58,11 +58,22 @@ export function inputKey(input: ComposeInput): string {
 const SKIP = /[\s、。，．,.！!？?・「」『』（）()…—\-:：〜~→]/
 
 export interface KeptAnalysis {
-  /** 清書の本文を「本人の言葉」と「AI が足した言葉」に分けたもの */
-  segments: { text: string; added: boolean }[]
-  /** 本人のメモのうち、清書に残っている割合（0〜1） */
+  /**
+   * 清書の本文を「本人の言葉」と「AI が足した言葉」に分けたもの。
+   * connector は、AI が足したもののうち文をつなぐだけの短いひらがな（「で」「が」など）。
+   */
+  segments: { text: string; added: boolean; connector: boolean }[]
+  /** 清書の本文のうち、本人の言葉が占める割合（0〜1）。AI が足した言葉の分だけ下がる（つなぎの助詞は除く） */
+  own: number
+  /** 本人のメモのうち、清書に残っている割合（0〜1）。AI が言葉を足しても下がらない */
   kept: number
+  /** AI が足した言葉の文字数（記号・空白・つなぎの助詞は数えない） */
+  addedChars: number
 }
+
+/** 文をつなぐだけの、ひらがな2文字以内の足し（例:「で」「が」「って」）は AI の言葉として数えない */
+const CONNECTOR = /^[ぁ-ゟ]{1,2}$/
+const HIRAGANA = /^[ぁ-ゟ]$/
 
 /** 記号・空白で区切った「句」ごとの文字列 */
 function phrasesOf(chars: string[]): string[][] {
@@ -83,6 +94,11 @@ function phrasesOf(chars: string[]): string[][] {
  * メモは句（記号・空白で区切った単位）ごとに3文字の並びに分け、2文字以下の句はそのまま単位にする
  * （句の切れ目をまたぐ並びは数えない。文と文の間に言葉が足されても、本人の言葉は減点しない）。
  * 清書側で、どの単位にも当たらない文字を「AI が足した言葉」とみなす。
+ *
+ * 2つの割合を返す:
+ * - own: 清書のうち本人の言葉の割合。「あなたの言葉 ◯%」として見せる数字。AI が水増しすると下がる
+ * - kept: メモのうち清書に残った割合。メモが削られていないかを見る補助の数字
+ * （以前は kept だけを見せていたため、AI が文を大きく足しても 100% と表示されていた）
  */
 export function analyzeKept(original: string, draft: string): KeptAnalysis {
   const grams = new Set<string>()
@@ -106,6 +122,18 @@ export function analyzeKept(original: string, draft: string): KeptAnalysis {
     const g = seq[k] + seq[k + 1] + seq[k + 2]
     draftGrams.add(g)
     if (grams.has(g)) covered[idx[k]] = covered[idx[k + 1]] = covered[idx[k + 2]] = true
+  }
+  // 句の途中に助詞が1文字だけ挟まった並び（「朝ジム」→「朝はジム」）も本人の言葉として拾う。
+  // 挟まった1文字は覆わずに残すので、「つなぎ」として扱われる
+  for (let k = 0; k + 4 <= seq.length; k++) {
+    for (const gap of [1, 2]) {
+      if (!HIRAGANA.test(seq[k + gap])) continue
+      const picked = [0, 1, 2, 3].filter((j) => j !== gap)
+      const g = picked.map((j) => seq[k + j]).join('')
+      if (!grams.has(g)) continue
+      draftGrams.add(g)
+      for (const j of picked) covered[idx[k + j]] = true
+    }
   }
   let shortHits = 0
   for (const unit of shorts) {
@@ -131,7 +159,17 @@ export function analyzeKept(original: string, draft: string): KeptAnalysis {
     const added = !covered[i]
     const last = segments[segments.length - 1]
     if (last && last.added === added) last.text += c
-    else segments.push({ text: c, added })
+    else segments.push({ text: c, added, connector: false })
   })
-  return { segments, kept }
+
+  let addedChars = 0
+  for (const s of segments) {
+    if (!s.added) continue
+    s.connector = CONNECTOR.test(s.text)
+    if (!s.connector) addedChars += s.text.length
+  }
+  // 記号・空白は本人側に入れているので、added の区間は記号を含まない
+  const own = seq.length ? Math.max(0, 1 - addedChars / seq.length) : 1
+
+  return { segments, own, kept, addedChars }
 }

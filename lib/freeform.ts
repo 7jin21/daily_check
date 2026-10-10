@@ -35,6 +35,28 @@ export function parseFreeform(raw: string | null | undefined): FreeformParts {
   return parts
 }
 
+/** 分けた部品を、保存する形（自由メモ → ふりかえり → あとからの一言）に戻す */
+export function serializeFreeform(parts: FreeformParts): string {
+  const blocks: string[] = []
+  if (parts.memo.trim()) blocks.push(parts.memo.trim())
+  for (const r of parts.reflections) {
+    const q = r.question.trim()
+    const a = r.answer.trim()
+    if (!q && !a) continue
+    blocks.push(a ? `【ふりかえり】${q}\n→ ${a}` : `【ふりかえり】${q}`)
+  }
+  for (const n of parts.laterNotes) {
+    if (n.text.trim()) blocks.push(`【あとから ${n.date}】${n.text.trim()}`)
+  }
+  return blocks.join('\n\n')
+}
+
+/** 自由メモに、AI 内省ガイドの問いと答えを畳んだ文字列を作る（保存用） */
+export function withReflection(memo: string, question: string, answer: string): string {
+  if (!answer.trim()) return memo
+  return serializeFreeform({ memo, reflections: [{ question, answer }], laterNotes: [] })
+}
+
 /** 当時の本文は変えずに、末尾へ「今の一言」を足す */
 export function appendLaterNote(raw: string | null | undefined, date: string, text: string): string {
   const base = (raw ?? '').trimEnd()
