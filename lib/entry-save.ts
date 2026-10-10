@@ -3,7 +3,7 @@
 // 日記の保存（ブラウザから Supabase へ。RLS で自分の行しか書けない）
 import { getSupabaseClient } from '@/lib/supabase'
 import { apiPost } from '@/lib/api-client'
-import { hasWords, mergeEntryText, type MergedEntryText, type StoredEntryText } from '@/lib/entry-merge'
+import { hasWords, mergeEntryText, metaExcerpt, type MergedEntryText, type StoredEntryText } from '@/lib/entry-merge'
 
 async function currentUserId(): Promise<string> {
   const supabase = getSupabaseClient()
@@ -101,9 +101,10 @@ export async function saveFullEntry(e: FullEntry): Promise<SaveResult> {
         mood: e.mood,
         energy: e.energy,
         ...text,
-        // 追記したときの要約・感情は、本文全体から refreshEntryMeta で作り直す（それまでは今回の分か前の分）
-        summary: e.summary || (merged ? (existing?.summary as string | null) : null) || '',
-        dominant_emotion: e.dominantEmotion || (merged ? (existing?.dominant_emotion as string | null) : null) || '',
+        // 追記したときは、前の要約・感情を残しておき、本文全体から refreshEntryMeta で作り直す
+        // （作り直せなかったときに、今回の分だけの要約で一日を上書きしないため）
+        summary: merged ? (existing?.summary as string | null) || e.summary : e.summary,
+        dominant_emotion: merged ? (existing?.dominant_emotion as string | null) || e.dominantEmotion : e.dominantEmotion,
       },
       // PK の id は渡していないため、user_id + entry_date で競合判定しないと同日2回目の保存が一意制約違反になる
       { onConflict: 'user_id,entry_date' }
@@ -114,25 +115,42 @@ export async function saveFullEntry(e: FullEntry): Promise<SaveResult> {
   return { id: data.id as string, merged, draft: text.edited_draft, tags: text.tags }
 }
 
-export interface EntryMeta {
-  tags: string[]
-  summary: string
-  dominantEmotion: string
+interface DraftMeta {
+  tags?: string[]
+  summary?: string
+  dominantEmotion?: string
+}
+
+/** 作り直して保存できた要約・タグ・感情（作れなかった項目は null。DB の値はそのまま） */
+export interface RefreshedMeta {
+  tags: string[] | null
+  summary: string | null
+  dominantEmotion: string | null
 }
 
 /**
  * 本文全体から要約・タグ・主要感情を作り直して保存する（追記したとき・言葉を書き足したとき）。
- * 失敗しても本文は保存済みなので null を返すだけにする。
+ * /api/draft-meta は AI が使えないとき（未設定・失敗）も 200 で空の結果を返すので、
+ * 空の項目は書かない（前の要約・タグを空で上書きして消さない）。
+ * 何も作れなかった・失敗したときは null（本文は保存済み）。
  */
-export async function refreshEntryMeta(entryId: string, draft: string): Promise<EntryMeta | null> {
+export async function refreshEntryMeta(entryId: string, draft: string): Promise<RefreshedMeta | null> {
   try {
-    const meta = await apiPost<EntryMeta>('/api/draft-meta', { draft }, { retry: false })
-    const { error } = await getSupabaseClient()
-      .from('diary_entries')
-      .update({ summary: meta.summary || null, tags: meta.tags, dominant_emotion: meta.dominantEmotion || null })
-      .eq('id', entryId)
+    const meta = await apiPost<DraftMeta>('/api/draft-meta', { draft: metaExcerpt(draft) }, { retry: false })
+    const refreshed: RefreshedMeta = {
+      tags: Array.isArray(meta.tags) && meta.tags.length > 0 ? meta.tags : null,
+      summary: meta.summary?.trim() || null,
+      dominantEmotion: meta.dominantEmotion?.trim() || null,
+    }
+    const update: Record<string, unknown> = {}
+    if (refreshed.tags) update.tags = refreshed.tags
+    if (refreshed.summary) update.summary = refreshed.summary
+    if (refreshed.dominantEmotion) update.dominant_emotion = refreshed.dominantEmotion
+    if (Object.keys(update).length === 0) return null
+
+    const { error } = await getSupabaseClient().from('diary_entries').update(update).eq('id', entryId)
     if (error) throw new Error(error.message)
-    return meta
+    return refreshed
   } catch (err) {
     console.warn('要約・タグの作り直しに失敗（本文は保存済み）:', err)
     return null

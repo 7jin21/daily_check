@@ -90,33 +90,19 @@ function phrasesOf(chars: string[]): string[][] {
 }
 
 /**
- * 本人のメモ（original）と清書（draft）を突き合わせる。
- * メモは句（記号・空白で区切った単位）ごとに3文字の並びに分け、2文字以下の句はそのまま単位にする
- * （句の切れ目をまたぐ並びは数えない。文と文の間に言葉が足されても、本人の言葉は減点しない）。
- * 清書側で、どの単位にも当たらない文字を「AI が足した言葉」とみなす。
- *
- * 2つの割合を返す:
- * - own: 清書のうち本人の言葉の割合。「あなたの言葉 ◯%」として見せる数字。AI が水増しすると下がる
- * - kept: メモのうち清書に残った割合。メモが削られていないかを見る補助の数字
- * （以前は kept だけを見せていたため、AI が文を大きく足しても 100% と表示されていた）
+ * source（突き合わせる元の文）の言葉が、清書のどの文字に現れているかを調べる。
+ * source は句（記号・空白で区切った単位）ごとに3文字の並びに分け、2文字以下の句はそのまま単位にする
+ * （句の切れ目をまたぐ並びは数えない。文と文の間に言葉が足されても減点しない）。
  */
-export function analyzeKept(original: string, draft: string): KeptAnalysis {
+function coverageOf(source: string, chars: string[], idx: number[], seq: string[]) {
   const grams = new Set<string>()
   const shorts: string[][] = []
-  for (const p of phrasesOf(Array.from(original))) {
+  for (const p of phrasesOf(Array.from(source))) {
     if (p.length >= 3) for (let i = 0; i + 3 <= p.length; i++) grams.add(p[i] + p[i + 1] + p[i + 2])
     else shorts.push(p)
   }
 
-  const chars = Array.from(draft)
-  const idx: number[] = []
-  chars.forEach((c, i) => {
-    if (!SKIP.test(c)) idx.push(i)
-  })
-  const seq = idx.map((i) => chars[i]) // 記号を除いた清書の文字の並び
-
-  // 記号・空白は最初から「本人側」に入れておく（句読点が足されただけで AI の言葉と扱わない）
-  const covered = chars.map((c) => SKIP.test(c))
+  const covered = chars.map(() => false)
   const draftGrams = new Set<string>()
   for (let k = 0; k + 3 <= seq.length; k++) {
     const g = seq[k] + seq[k + 1] + seq[k + 2]
@@ -152,7 +138,36 @@ export function analyzeKept(original: string, draft: string): KeptAnalysis {
     if (draftGrams.has(g)) gramHits++
   })
   const total = grams.size + shorts.length
-  const kept = total ? (gramHits + shortHits) / total : 1
+  /** source のうち清書に現れた割合 */
+  const ratio = total ? (gramHits + shortHits) / total : 1
+  return { covered, ratio }
+}
+
+/**
+ * 本人のメモ（original）と清書（draft）を突き合わせる。
+ * 清書側で、メモのどの単位にも当たらない文字を「AI が足した言葉」とみなす。
+ *
+ * aiSource（この下書きで AI が出した文章）を渡すと、メモに無い言葉のうち AI の文章にも無いもの
+ * （下書き画面で本人が書き足した言葉）は本人の言葉として扱う。渡さなければ、メモに無い言葉はすべて AI の言葉。
+ *
+ * 2つの割合を返す:
+ * - own: 清書のうち本人の言葉の割合。「あなたの言葉 ◯%」として見せる数字。AI が水増しすると下がる
+ * - kept: メモのうち清書に残った割合。メモが削られていないかを見る補助の数字
+ * （以前は kept だけを見せていたため、AI が文を大きく足しても 100% と表示されていた）
+ */
+export function analyzeKept(original: string, draft: string, aiSource?: string): KeptAnalysis {
+  const chars = Array.from(draft)
+  const idx: number[] = []
+  chars.forEach((c, i) => {
+    if (!SKIP.test(c)) idx.push(i)
+  })
+  const seq = idx.map((i) => chars[i]) // 記号を除いた清書の文字の並び
+
+  const memo = coverageOf(original, chars, idx, seq)
+  const kept = memo.ratio
+  const fromAi = aiSource === undefined ? null : coverageOf(aiSource, chars, idx, seq).covered
+  // 記号・空白は最初から「本人側」に入れておく（句読点が足されただけで AI の言葉と扱わない）
+  const covered = chars.map((c, i) => SKIP.test(c) || memo.covered[i] || (fromAi !== null && !fromAi[i]))
 
   const segments: KeptAnalysis['segments'] = []
   chars.forEach((c, i) => {

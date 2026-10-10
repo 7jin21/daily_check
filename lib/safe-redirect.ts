@@ -10,6 +10,8 @@ export function safeNextPath(next: string | null | undefined, fallback = '/'): s
     // URL として解釈したときに別のオリジンになるもの（//evil.com、/\evil.com、タブや改行入り等）は弾く
     const url = new URL(next, PROBE_ORIGIN)
     if (url.origin !== PROBE_ORIGIN) return fallback
+    // 正規化の結果が // で始まる（例: /.//evil.com → //evil.com）と、相対 URL として使われたときに外部へ飛ぶ
+    if (url.pathname.startsWith('//')) return fallback
     return `${url.pathname}${url.search}${url.hash}`
   } catch {
     return fallback

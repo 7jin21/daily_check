@@ -26,6 +26,18 @@ describe('safeNextPath', () => {
     }
   })
 
+  it('正規化すると // で始まるパスになるもの（相対 URL として外部へ飛ぶ）は fallback にする', () => {
+    for (const next of ['/.//evil.com', '/..//evil.com', '/./\\evil.com', '/.//evil.com/path?x=1#h', '/a/..//evil.com']) {
+      expect(safeNextPath(next), JSON.stringify(next)).toBe('/')
+    }
+    expect(safeNextPath('/.//evil.com', '/entries')).toBe('/entries')
+  })
+
+  it('途中に // があるだけのパスはサイト内として通す（先頭が // ではない）', () => {
+    expect(safeNextPath('/entries//x')).toBe('/entries//x')
+    expect(safeNextPath('/entries/.//x')).toBe('/entries//x')
+  })
+
   it('値が無いときは fallback', () => {
     expect(safeNextPath(null)).toBe('/')
     expect(safeNextPath(undefined)).toBe('/')

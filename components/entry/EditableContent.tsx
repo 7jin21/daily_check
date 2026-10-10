@@ -83,7 +83,7 @@ export default function EditableContent({
       let nextTags = tags
       if (needsMeta) {
         const meta = await refreshEntryMeta(entryId, draft)
-        if (meta) nextTags = meta.tags
+        if (meta?.tags) nextTags = meta.tags
       }
 
       // Notion にも編集内容を反映（同期済みページは更新される。失敗しても保存には影響しない）

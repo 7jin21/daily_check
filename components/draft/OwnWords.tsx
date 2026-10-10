@@ -46,8 +46,8 @@ export function ComparePanel({ segments, original, keptPercent, addedChars, show
         メモの {keptPercent}% を使っています・AIが足した言葉 {addedChars}字
       </p>
       <p className="mt-1 text-[11px] text-[var(--muted)]">
-        <mark className="ai-added">下線</mark> はメモに無かった言葉、<mark className="ai-joint">点線</mark>{' '}
-        は文をつなぐための助詞です。
+        <mark className="ai-added">下線</mark> は AI が足した言葉（メモに無かった言葉）、<mark className="ai-joint">点線</mark>{' '}
+        は文をつなぐための助詞です。ここで自分で書き足した言葉は、あなたの言葉として数えます。
       </p>
       <p className="mt-4 text-xs font-bold text-[var(--muted)] tracking-wide">あなたが書いたメモ</p>
       <p className="mt-2 text-sm leading-relaxed text-[var(--muted)] whitespace-pre-wrap">{original}</p>

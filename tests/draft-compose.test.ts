@@ -4,8 +4,8 @@ import { analyzeKept, composeBullets, composeRaw, DRAFT_MODES, inputKey, type Co
 const base: ComposeInput = { mood: 3, energy: 3, events: '', challenges: '', gratitude: '', freeform: '' }
 
 /** 区間をつなぐと清書の本文に戻る（文字を落としていない）ことも毎回確かめる */
-function analyze(original: string, draft: string) {
-  const r = analyzeKept(original, draft)
+function analyze(original: string, draft: string, aiSource?: string) {
+  const r = analyzeKept(original, draft, aiSource)
   expect(r.segments.map((s) => s.text).join('')).toBe(draft)
   return r
 }
@@ -108,6 +108,70 @@ describe('analyzeKept', () => {
       expect(r.kept).toBeGreaterThanOrEqual(0)
       expect(r.kept).toBeLessThanOrEqual(1)
     }
+  })
+})
+
+describe('analyzeKept（aiSource: この下書きで AI が出した文章）', () => {
+  const AI_DRAFT = '今日は会議があって、とても疲れた一日だった。'
+  const USER_TYPED = '帰りに夕焼けを見た。'
+
+  it('下書き画面で本人が書き足した文（AI の文章に無い）は本人の言葉として数える', () => {
+    const r = analyze('会議 疲れた', `会議で疲れた。${USER_TYPED}`, '会議で疲れた。')
+    expect(r.own).toBe(1)
+    expect(r.addedChars).toBe(0)
+    expect(r.kept).toBe(1)
+    expect(r.segments).toEqual([
+      { text: '会議', added: false, connector: false },
+      { text: 'で', added: true, connector: true },
+      { text: `疲れた。${USER_TYPED}`, added: false, connector: false },
+    ])
+  })
+
+  it('AI の文章にある水増しは、aiSource を渡しても AI の言葉として数える', () => {
+    const r = analyze('会議 疲れた', AI_DRAFT, AI_DRAFT)
+    const without = analyze('会議 疲れた', AI_DRAFT)
+    expect(r.addedChars).toBe(22 - 7) // 「明日も頑張ろう」の無い分
+    expect(r).toEqual(without)
+    expect(r.segments.filter((s) => s.added).map((s) => s.text)).toEqual(['今日は', 'があって', 'とても', '一日だった'])
+  })
+
+  it('AI の水増しと本人の書き足しが混ざっていれば、AI の分だけ数える', () => {
+    const draft = `${AI_DRAFT}${USER_TYPED}`
+    const r = analyze('会議 疲れた', draft, AI_DRAFT)
+    expect(r.addedChars).toBe(15) // 今日は・があって・とても・一日だった
+    expect(r.own).toBeCloseTo(1 - 15 / 29, 6) // 記号を除いた 29 文字のうち AI の言葉は 15 文字
+    expect(r.kept).toBe(1)
+    expect(r.segments.filter((s) => s.added).map((s) => s.text)).toEqual(['今日は', 'があって', 'とても', '一日だった'])
+    expect(r.segments[r.segments.length - 1]).toEqual({ text: `。${USER_TYPED}`, added: false, connector: false })
+
+    // aiSource が無ければ、本人の書き足しも AI の言葉として数えていた（以前のふるまい）
+    const without = analyze('会議 疲れた', draft)
+    expect(without.addedChars).toBe(15 + 9)
+    expect(without.own).toBeLessThan(r.own)
+  })
+
+  it('AI を使っていない（aiSource が空）なら、書き足した言葉があっても 100% 本人の言葉', () => {
+    const draft = `会議 疲れた\n\n${USER_TYPED}`
+    const r = analyze('会議 疲れた', draft, '')
+    expect(r).toEqual({
+      segments: [{ text: draft, added: false, connector: false }],
+      own: 1,
+      kept: 1,
+      addedChars: 0,
+    })
+  })
+
+  it('aiSource が無ければ、メモに無い言葉はすべて AI の言葉（以前のふるまい）', () => {
+    const r = analyze('会議 疲れた', `会議で疲れた。${USER_TYPED}`)
+    expect(r.addedChars).toBe(9)
+    expect(r.own).toBeCloseTo(1 - 9 / 15, 6)
+    expect(r.segments.filter((s) => s.added).map((s) => s.text)).toEqual(['で', '帰りに夕焼けを見た'])
+  })
+
+  it('kept（メモが残った割合）は aiSource で変わらない', () => {
+    const draft = `会議で疲れた。${USER_TYPED}`
+    expect(analyze('会議 疲れた 散歩した', draft, '会議で疲れた。').kept).toBe(0.5)
+    expect(analyze('会議 疲れた 散歩した', draft).kept).toBe(0.5)
   })
 })
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { appendLaterNote, parseFreeform, serializeFreeform, withReflection, type FreeformParts } from '@/lib/freeform'
+import { appendLaterNote, parseFreeform, splitFreeformMemo, withReflection, type FreeformParts } from '@/lib/freeform'
 
 const FULL = [
   '朝ジム。夜はラーメン',
@@ -68,42 +68,57 @@ describe('parseFreeform', () => {
   })
 })
 
-describe('serializeFreeform', () => {
-  it('parse → serialize で元に戻る', () => {
-    expect(serializeFreeform(parseFreeform(FULL))).toBe(FULL)
+describe('splitFreeformMemo', () => {
+  it('空・null・undefined は両方空', () => {
+    expect(splitFreeformMemo(null)).toEqual({ memo: '', rest: '' })
+    expect(splitFreeformMemo(undefined)).toEqual({ memo: '', rest: '' })
+    expect(splitFreeformMemo('')).toEqual({ memo: '', rest: '' })
   })
 
-  it('serialize → parse でも部品が保たれる', () => {
-    const parts: FreeformParts = {
-      memo: 'メモ',
-      reflections: [{ question: 'Q', answer: 'A' }],
-      laterNotes: [{ date: '2026-10-11', text: 'あとで' }],
+  it('印が無ければ全体がメモ（空白・改行も詰めない）', () => {
+    expect(splitFreeformMemo('  ただのメモ\n2行目  \n')).toEqual({ memo: '  ただのメモ\n2行目  \n', rest: '' })
+  })
+
+  it('印から始まればメモは空で、全体が rest', () => {
+    expect(splitFreeformMemo('【ふりかえり】Q\n→ A')).toEqual({ memo: '', rest: '【ふりかえり】Q\n→ A' })
+    expect(splitFreeformMemo('【あとから 2026-10-12】一言')).toEqual({ memo: '', rest: '【あとから 2026-10-12】一言' })
+  })
+
+  it('メモのあとに印があれば、最初の印の手前で分ける（後ろの印はすべて rest に残す）', () => {
+    expect(splitFreeformMemo(FULL)).toEqual({
+      memo: '朝ジム。夜はラーメン\n\n',
+      rest: FULL.slice(FULL.indexOf('【ふりかえり】')),
+    })
+  })
+
+  it('「あとから」の印でも分ける', () => {
+    expect(splitFreeformMemo('メモ\n【あとから 2026-10-12】今の一言\n【ふりかえり】Q\n→ A')).toEqual({
+      memo: 'メモ\n',
+      rest: '【あとから 2026-10-12】今の一言\n【ふりかえり】Q\n→ A',
+    })
+  })
+
+  it('日付の形でない「あとから」は印として扱わない', () => {
+    expect(splitFreeformMemo('【あとから 明日】続き\n\n【ふりかえり】Q\n→ A')).toEqual({
+      memo: '【あとから 明日】続き\n\n',
+      rest: '【ふりかえり】Q\n→ A',
+    })
+  })
+
+  it('保存された文字列をそのまま切り出す（memo + rest で元に戻る・組み直さない）', () => {
+    for (const raw of [
+      FULL,
+      '  メモ  \n\n\n【ふりかえり】  Q \n→  A  \n',
+      'メモ【ふりかえり】',
+      '【ふりかえり】\n\n【あとから 2026-10-12】  ',
+      '【あとから 2026-10-12】一言【ふりかえり】が入った一言',
+      '印の無いメモ',
+    ]) {
+      const { memo, rest } = splitFreeformMemo(raw)
+      expect(memo + rest, JSON.stringify(raw)).toBe(raw)
+      // メモの側には印が残らない（最初の印で切っている）
+      expect(memo.includes('【ふりかえり】'), JSON.stringify(raw)).toBe(false)
     }
-    expect(parseFreeform(serializeFreeform(parts))).toEqual(parts)
-  })
-
-  it('順番は メモ → ふりかえり → あとからの一言', () => {
-    expect(
-      serializeFreeform({
-        memo: 'メモ',
-        reflections: [{ question: 'Q', answer: 'A' }],
-        laterNotes: [{ date: '2026-10-11', text: 'あとで' }],
-      })
-    ).toBe('メモ\n\n【ふりかえり】Q\n→ A\n\n【あとから 2026-10-11】あとで')
-  })
-
-  it('空の部品は書き出さない', () => {
-    expect(
-      serializeFreeform({
-        memo: '  ',
-        reflections: [
-          { question: '', answer: '' },
-          { question: '問いだけ', answer: ' ' },
-        ],
-        laterNotes: [{ date: '2026-10-11', text: '  ' }],
-      })
-    ).toBe('【ふりかえり】問いだけ')
-    expect(serializeFreeform({ memo: '', reflections: [], laterNotes: [] })).toBe('')
   })
 })
 
@@ -114,6 +129,11 @@ describe('withReflection', () => {
     )
   })
 
+  it('メモは書いたまま残す（前後の空白・改行を詰めない）', () => {
+    expect(withReflection('　今日は\n', 'Q', 'A')).toBe('　今日は\n\n\n【ふりかえり】Q\n→ A')
+    expect(withReflection(' メモ ', 'Q', 'A')).toBe(' メモ \n\n【ふりかえり】Q\n→ A')
+  })
+
   it('メモが空なら問いと答えだけ', () => {
     expect(withReflection('', 'Q', 'A')).toBe('【ふりかえり】Q\n→ A')
   })
@@ -121,6 +141,12 @@ describe('withReflection', () => {
   it('答えが空ならメモをそのまま返す（問いだけは残さない）', () => {
     expect(withReflection('メモ ', 'Q', '')).toBe('メモ ')
     expect(withReflection('メモ', 'Q', '   ')).toBe('メモ')
+    expect(withReflection('　今日は\n', 'Q', '\n')).toBe('　今日は\n')
+    expect(withReflection('', 'Q', '')).toBe('')
+  })
+
+  it('答えも書いたまま畳む', () => {
+    expect(withReflection('メモ', 'Q', ' A ')).toBe('メモ\n\n【ふりかえり】Q\n→  A ')
   })
 
   it('畳んだものは parseFreeform で取り出せる', () => {
@@ -128,6 +154,13 @@ describe('withReflection', () => {
       memo: 'メモ',
       reflections: [{ question: 'Q', answer: 'A' }],
       laterNotes: [],
+    })
+  })
+
+  it('畳んだものは splitFreeformMemo でメモとふりかえりに分かれる', () => {
+    expect(splitFreeformMemo(withReflection('　今日は\n', 'Q', 'A'))).toEqual({
+      memo: '　今日は\n\n\n',
+      rest: '【ふりかえり】Q\n→ A',
     })
   })
 })

@@ -41,15 +41,17 @@ function isUsable(r: ReflectionResult | null | undefined): r is Required<Reflect
 }
 
 function start(input: CheckinInput, key: string): Promise<ReflectionResult> {
-  const promise = apiPost<ReflectionResult>('/api/checkin-question', input, { retry: false })
+  const entry: { key: string; promise: Promise<ReflectionResult> } = { key, promise: Promise.resolve(SKIP) }
+  entry.promise = apiPost<ReflectionResult>('/api/checkin-question', input, { retry: false })
     .then((r) => (isUsable(r) ? r : SKIP))
     .catch(() => {
-      // 失敗は覚えておかない（次に頼まれたときに取り直す）
-      if (cache?.key === key) cache = null
+      // 失敗は覚えておかない（次に頼まれたときに取り直す）。
+      // ただし消すのは自分の分だけ（同じ入力で後から始めた、まだ途中の先読みは残す）
+      if (cache === entry) cache = null
       return SKIP
     })
-  cache = { key, promise }
-  return promise
+  cache = entry
+  return entry.promise
 }
 
 /** 問いを先に作りはじめる（材料が無い・同じ入力で作成済みなら何もしない） */

@@ -35,26 +35,20 @@ export function parseFreeform(raw: string | null | undefined): FreeformParts {
   return parts
 }
 
-/** 分けた部品を、保存する形（自由メモ → ふりかえり → あとからの一言）に戻す */
-export function serializeFreeform(parts: FreeformParts): string {
-  const blocks: string[] = []
-  if (parts.memo.trim()) blocks.push(parts.memo.trim())
-  for (const r of parts.reflections) {
-    const q = r.question.trim()
-    const a = r.answer.trim()
-    if (!q && !a) continue
-    blocks.push(a ? `【ふりかえり】${q}\n→ ${a}` : `【ふりかえり】${q}`)
-  }
-  for (const n of parts.laterNotes) {
-    if (n.text.trim()) blocks.push(`【あとから ${n.date}】${n.text.trim()}`)
-  }
-  return blocks.join('\n\n')
+/**
+ * 自由メモ（最初の印より前）と、それ以降（ふりかえり・あとからの一言）に分ける。
+ * どちらも保存されている文字列をそのまま切り出すだけで、組み直さない（本人の文字を並べ替えない）。
+ */
+export function splitFreeformMemo(raw: string | null | undefined): { memo: string; rest: string } {
+  const s = raw ?? ''
+  const first = s.search(/【(ふりかえり|あとから \d{4}-\d{2}-\d{2})】/)
+  return first < 0 ? { memo: s, rest: '' } : { memo: s.slice(0, first), rest: s.slice(first) }
 }
 
-/** 自由メモに、AI 内省ガイドの問いと答えを畳んだ文字列を作る（保存用） */
+/** 自由メモに、AI 内省ガイドの問いと答えを畳んだ文字列を作る（保存用。メモは書いたまま残す） */
 export function withReflection(memo: string, question: string, answer: string): string {
   if (!answer.trim()) return memo
-  return serializeFreeform({ memo, reflections: [{ question, answer }], laterNotes: [] })
+  return `${memo ? `${memo}\n\n` : ''}【ふりかえり】${question}\n→ ${answer}`
 }
 
 /** 当時の本文は変えずに、末尾へ「今の一言」を足す */

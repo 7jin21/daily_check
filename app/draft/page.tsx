@@ -9,6 +9,7 @@ import { apiPost } from '@/lib/api-client'
 import { generateOfflineDraft } from '@/lib/offline-draft'
 import { hasEntryWithWords, refreshEntryMeta, saveFullEntry } from '@/lib/entry-save'
 import { withReflection } from '@/lib/freeform'
+import { metaExcerpt } from '@/lib/entry-merge'
 import { todayJST } from '@/lib/jst'
 import { clearReflectionCache, requestReflection } from '@/lib/reflection-prefetch'
 import { analyzeKept, composeBullets, composeRaw, inputKey, type ComposeInput, type DraftMode } from '@/lib/draft-compose'
@@ -49,6 +50,7 @@ export default function DraftPage() {
     draftResult,
     editedDraft,
     draftMode,
+    aiText,
     isGenerating,
     setDraftResult,
     setEditedDraft,
@@ -56,6 +58,7 @@ export default function DraftPage() {
     setReflection,
     setDraftMode,
     setDraftInputKey,
+    addAiText,
     clearDraft,
     reset,
   } = useCheckinStore()
@@ -89,7 +92,13 @@ export default function DraftPage() {
     () => composeRaw({ mood: null, energy: null, events, challenges, gratitude, freeform, reflectionQ, reflectionA }),
     [events, challenges, gratitude, freeform, reflectionQ, reflectionA]
   )
-  const kept = useMemo(() => analyzeKept(original, editedDraft), [original, editedDraft])
+  // この下書きで AI が出した文章。メモに無い言葉のうち、これにも無いもの（下書き画面で自分で書き足した言葉）は
+  // 本人の言葉として数える。aiText を持たない古い下書きでも、AI の清書（draftResult）は AI の文章として扱う
+  const aiSource = useMemo(
+    () => [aiText, draftResult?.fromAI ? draftResult.draft : ''].filter(Boolean).join('\n'),
+    [aiText, draftResult]
+  )
+  const kept = useMemo(() => analyzeKept(original, editedDraft, aiSource), [original, editedDraft, aiSource])
 
   useEffect(() => {
     const st = useCheckinStore.getState()
@@ -148,6 +157,8 @@ export default function DraftPage() {
       abort.current?.abort()
       gen.current++
       rewrite.current++
+      // 途中で止めた生成の「生成中」を残さない（戻ってきたときに、動いていない待ち画面のまま固まるのを防ぐ）
+      useCheckinStore.getState().setIsGenerating(false)
     }
   }, [])
 
@@ -155,8 +166,10 @@ export default function DraftPage() {
     const el = textareaRef.current
     if (!el) return
     el.style.height = 'auto'
-    el.style.height = `${el.scrollHeight}px`
-  }, [editedDraft])
+    // 枠線の分も足す（scrollHeight は枠線を含まないため、そのままだと最後の行が少し欠ける）
+    el.style.height = `${el.scrollHeight + el.offsetHeight - el.clientHeight}px`
+    // 生成が終わって本文の欄が現れたときにも高さを合わせる（本文が変わらないままだと長い清書が欄で切れて見える）
+  }, [editedDraft, isGenerating, reflectPhase])
 
   /** AI が使えないとき: 本人のメモをそのまま使う（メモが空ならテンプレート） */
   const fallbackToOwnWords = (full: ComposeInput, entryTarget: string | null) => {
@@ -220,6 +233,7 @@ export default function DraftPage() {
       }
 
       setEditedDraft(text)
+      addAiText(text)
       // メタ情報（タグ・サマリー・感情）は本文確定後にバックグラウンドで取得。失敗時はローカル生成のメタ
       const offlineMeta = generateOfflineDraft(full, entryTarget)
       setDraftResult({
@@ -229,10 +243,19 @@ export default function DraftPage() {
         dominantEmotion: offlineMeta.dominantEmotion,
         fromAI: true,
       })
-      apiPost<{ tags: string[]; summary: string; dominantEmotion: string }>('/api/draft-meta', { draft: text }, { retry: false })
+      // draft-meta は 3000 字まで。長い清書は始まりと終わりから作る（超えると要約・タグが作れない）
+      apiPost<{ tags: string[]; summary: string; dominantEmotion: string }>('/api/draft-meta', { draft: metaExcerpt(text) }, { retry: false })
         .then((meta) => {
           // 保存・再生成・画面離脱のあとに届いた応答は捨てる（古い下書きを復活させない）
-          if (isCurrent() && !savedRef.current) setDraftResult({ draft: text, ...meta, fromAI: true })
+          if (!isCurrent() || savedRef.current) return
+          // AI が使えないとき draft-meta は 200 で空の結果を返す。空の項目は手元で作ったもののまま残す
+          setDraftResult({
+            draft: text,
+            tags: meta.tags?.length ? meta.tags : offlineMeta.tags,
+            summary: meta.summary || offlineMeta.summary,
+            dominantEmotion: meta.dominantEmotion || offlineMeta.dominantEmotion,
+            fromAI: true,
+          })
         })
         .catch(() => {
           /* オフラインメタのまま */
@@ -247,6 +270,7 @@ export default function DraftPage() {
         const meta = generateOfflineDraft(full, entryTarget)
         setDraftResult({ ...meta, draft: partial, fromAI: true })
         setEditedDraft(partial)
+        addAiText(partial)
         setNotice('partial')
       } else {
         console.warn('AI清書に失敗、本人のメモをそのまま使います:', err)
@@ -351,6 +375,7 @@ export default function DraftPage() {
       if (rid !== rewriteRef.current || savedRef.current) return
       setHistory((h) => [...h, { text: before, mode: draftMode }].slice(-10))
       setEditedDraft(result.draft)
+      addAiText(result.draft)
     } catch {
       if (rid === rewriteRef.current) setRewriteError('AIの書き直しに失敗しました。しばらくしてから再試行してください。')
     } finally {
@@ -418,6 +443,10 @@ export default function DraftPage() {
         return
       }
       setSaveError(classified)
+      // 保存は届いていたのに応答だけ失われた場合、次の保存は追記になる。案内を出し直す
+      hasEntryWithWords(entryDate)
+        .then((exists) => setWillAppend(exists))
+        .catch(() => {})
     } finally {
       setIsSaving(false)
     }

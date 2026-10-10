@@ -24,6 +24,7 @@ interface CheckinState extends CheckinInput {
   reflectionA: string          // それへのユーザーの回答（選択肢＋一言）
   draftMode: DraftMode         // 清書の整え方（原文のまま / 整える / 箇条書き）
   draftInputKey: string        // ドラフトを作ったときの入力（入力が変わったら清書し直すため）
+  aiText: string               // この下書きで AI が出した文章（清書・書き直し）。「あなたの言葉」の判定に使う
   // Actions
   setMood: (mood: number) => void
   setEnergy: (energy: number) => void
@@ -42,6 +43,7 @@ interface CheckinState extends CheckinInput {
   setReflection: (question: string, answer: string) => void
   setDraftMode: (mode: DraftMode) => void
   setDraftInputKey: (key: string) => void
+  addAiText: (text: string) => void // AI が出した文章を覚えておく（下書き画面で本人が書き足した言葉と区別するため）
   clearDraft: () => void       // ドラフトだけ捨てる（入力は残す）
   reset: () => void
   // Derived
@@ -52,7 +54,7 @@ const initialState: Omit<CheckinState, keyof Pick<CheckinState,
   'setMood' | 'setEnergy' | 'setEvents' | 'setChallenges' | 'setGratitude' |
   'setFreeform' | 'setCurrentStep' | 'nextStep' | 'prevStep' |
   'setCheckinDate' | 'setTargetDate' | 'setDraftResult' | 'setEditedDraft' | 'setIsGenerating' |
-  'setReflection' | 'setDraftMode' | 'setDraftInputKey' | 'clearDraft' | 'reset' | 'getInput'
+  'setReflection' | 'setDraftMode' | 'setDraftInputKey' | 'addAiText' | 'clearDraft' | 'reset' | 'getInput'
 >> = {
   mood: null,
   energy: null,
@@ -70,6 +72,7 @@ const initialState: Omit<CheckinState, keyof Pick<CheckinState,
   reflectionA: '',
   draftMode: 'tidy',
   draftInputKey: '',
+  aiText: '',
 }
 
 export const useCheckinStore = create<CheckinState>()(
@@ -94,7 +97,9 @@ export const useCheckinStore = create<CheckinState>()(
       setReflection: (reflectionQ, reflectionA) => set({ reflectionQ, reflectionA }),
       setDraftMode: (draftMode) => set({ draftMode }),
       setDraftInputKey: (draftInputKey) => set({ draftInputKey }),
-      clearDraft: () => set({ draftResult: null, editedDraft: '', draftInputKey: '', draftMode: 'tidy' }),
+      addAiText: (text) =>
+        set((state) => (text.trim() && !state.aiText.includes(text) ? { aiText: state.aiText ? `${state.aiText}\n${text}` : text } : {})),
+      clearDraft: () => set({ draftResult: null, editedDraft: '', draftInputKey: '', draftMode: 'tidy', aiText: '' }),
 
       reset: () => set({ ...initialState }),
 
@@ -128,6 +133,7 @@ export const useCheckinStore = create<CheckinState>()(
         reflectionA: state.reflectionA,
         draftMode: state.draftMode,
         draftInputKey: state.draftInputKey,
+        aiText: state.aiText,
       }),
     }
   )

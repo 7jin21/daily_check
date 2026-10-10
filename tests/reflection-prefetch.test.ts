@@ -124,6 +124,59 @@ describe('requestReflection', () => {
     expect(post).toHaveBeenCalledTimes(2)
   })
 
+  it('A → B → A と入力が戻ったあとに最初の A が失敗しても、後から始めた A の先読みを使う', async () => {
+    const other = { ...input, events: '会議で疲れた。でも褒められた' }
+    const firstA = deferred<ReflectionResult>()
+    const b = deferred<ReflectionResult>()
+    const secondA = deferred<ReflectionResult>()
+    post
+      .mockReturnValueOnce(firstA.promise)
+      .mockReturnValueOnce(b.promise)
+      .mockReturnValueOnce(secondA.promise)
+      .mockResolvedValue({ ...QUESTION, question: '4回目は呼ばれないはず' })
+
+    prefetchReflection(input) // A（1回目）
+    prefetchReflection(other) // B
+    prefetchReflection(input) // A（2回目。キャッシュは B なので作り直す）
+    expect(post).toHaveBeenCalledTimes(3)
+
+    // 最初の A の失敗が、2回目の A の後に届く（キャッシュを消すのは自分の分だけ）
+    firstA.reject(new Error('network'))
+    await new Promise((r) => setTimeout(r, 0))
+
+    const asked = requestReflection(input)
+    secondA.resolve(QUESTION)
+    await expect(asked).resolves.toEqual(QUESTION)
+    expect(post).toHaveBeenCalledTimes(3)
+    expect(post.mock.calls.map((c) => c[1])).toEqual([input, other, input])
+
+    // その後も同じ入力なら取り直さない
+    await expect(requestReflection(input)).resolves.toEqual(QUESTION)
+    expect(post).toHaveBeenCalledTimes(3)
+    b.resolve(QUESTION)
+  })
+
+  it('A → B → A の最初の A が、2回目の A を待っている間に失敗しても、2回目の問いを返す', async () => {
+    const other = { ...input, mood: 5 }
+    const firstA = deferred<ReflectionResult>()
+    const secondA = deferred<ReflectionResult>()
+    post
+      .mockReturnValueOnce(firstA.promise)
+      .mockResolvedValueOnce(QUESTION)
+      .mockReturnValueOnce(secondA.promise)
+    prefetchReflection(input)
+    prefetchReflection(other)
+    const asked = requestReflection(input) // 2回目の A を始めて、それを待つ
+
+    firstA.reject(new Error('500'))
+    await new Promise((r) => setTimeout(r, 0))
+    secondA.resolve({ ...QUESTION, question: '2回目の問い' })
+
+    await expect(asked).resolves.toEqual({ ...QUESTION, question: '2回目の問い' })
+    await expect(requestReflection(input)).resolves.toEqual({ ...QUESTION, question: '2回目の問い' })
+    expect(post).toHaveBeenCalledTimes(3)
+  })
+
   it('待ちすぎたら「問いなし」で進む（既定は7秒）', async () => {
     vi.useFakeTimers()
     const pending = deferred<ReflectionResult>()

@@ -259,10 +259,17 @@ function printTable(header: string[], rows: string[][], alignRight: boolean[]) {
 async function main() {
   const opts = parseArgs(process.argv.slice(2))
 
+  // process.loadEnvFile は Node 20.12 以上。古い Node で黙って読み飛ばすと「キーが無い」と誤解させるので明示する
+  if (typeof process.loadEnvFile !== 'function') {
+    exitWith(`この評価スクリプトには Node.js 20.12 以上が必要です（いまは ${process.version}）。`)
+  }
   try {
     process.loadEnvFile(path.join(process.cwd(), '.env.local'))
-  } catch {
-    // .env.local が無ければ、すでに設定されている環境変数だけで動かす
+  } catch (err) {
+    // .env.local が無ければ、すでに設定されている環境変数だけで動かす（それ以外の読み込みエラーは伝える）
+    if ((err as NodeJS.ErrnoException)?.code !== 'ENOENT') {
+      exitWith(`.env.local を読み込めませんでした: ${err instanceof Error ? err.message : String(err)}`)
+    }
   }
   if (!opts.mock && !process.env.GROQ_API_KEY) {
     exitWith(
