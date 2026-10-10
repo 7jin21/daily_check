@@ -156,7 +156,7 @@ describe('saveFullEntry', () => {
   it('その日の行が無ければ、書いた言葉をそのまま新しく保存する', async () => {
     const result = await saveFullEntry(entry)
 
-    expect(result).toEqual({ id: 'entry-1', merged: false, draft: entry.editedDraft, tags: entry.tags })
+    expect(result).toEqual({ id: 'entry-1', merged: false, appended: false, draft: entry.editedDraft, tags: entry.tags })
     expect(db.upserts).toHaveLength(1)
     expect(db.upserts[0].payload).toEqual({
       user_id: 'user-1',
@@ -204,7 +204,7 @@ describe('saveFullEntry', () => {
 
     // 新しい言葉の字下げ（全角スペース）は書いたまま残す。末尾の改行だけ落としてつなぐ
     const draft = '前の本文。\n\n　新しい本文。'
-    expect(result).toEqual({ id: 'entry-1', merged: true, draft, tags: ['仕事', '運動', '食事'] })
+    expect(result).toEqual({ id: 'entry-1', merged: true, appended: true, draft, tags: ['仕事', '運動', '食事'] })
     expect(db.upserts[0].payload).toEqual({
       user_id: 'user-1',
       entry_date: DATE,
@@ -222,6 +222,28 @@ describe('saveFullEntry', () => {
       dominant_emotion: '満足',
     })
     expect(db.upserts[0].opts).toEqual({ onConflict: 'user_id,entry_date' })
+  })
+
+  it('保存のやり直し（前回の保存が届いていた）では、言葉を二重にせず「追記」ともしない', async () => {
+    // 1回目の保存がそのまま入っている行に、同じ内容をもう一度保存する
+    db.existing = {
+      events: entry.events,
+      challenges: entry.challenges,
+      gratitude: entry.gratitude,
+      freeform: entry.freeform,
+      ai_draft: entry.aiDraft,
+      edited_draft: entry.editedDraft,
+      tags: entry.tags,
+      summary: entry.summary,
+      dominant_emotion: entry.dominantEmotion,
+    }
+    const result = await saveFullEntry(entry)
+    expect(result.merged).toBe(true)
+    expect(result.appended).toBe(false)
+    const payload = db.upserts[0].payload
+    for (const col of ['events', 'challenges', 'gratitude', 'freeform', 'ai_draft', 'edited_draft'] as const) {
+      expect((payload[col] as string).trimEnd(), col).toBe(((db.existing as Record<string, string>)[col] ?? '').trimEnd())
+    }
   })
 
   it('追記するとき、前の行に要約・感情が無ければ今回のものを入れる', async () => {

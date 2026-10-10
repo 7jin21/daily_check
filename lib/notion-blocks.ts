@@ -4,7 +4,7 @@
 
 /** 段落ブロック1つに入れられる文字数（Notion の rich_text.content の上限） */
 export const NOTION_TEXT_LIMIT = 2000
-/** 1回のリクエストで追加できる子ブロックの上限 */
+/** 1回のリクエストで追加できる子ブロックの上限（これを超える分は、何回かに分けて追加する） */
 export const NOTION_MAX_BLOCKS = 100
 
 /**
@@ -36,7 +36,14 @@ export function splitForNotion(text: string, limit: number = NOTION_TEXT_LIMIT):
     }
   }
   flush()
-  return chunks.slice(0, NOTION_MAX_BLOCKS)
+  return chunks
+}
+
+/** ブロックを、1回のリクエストで送れる数ずつに分ける（長い日記も切り捨てずに全部送るため） */
+export function inBatches<T>(items: T[], size: number = NOTION_MAX_BLOCKS): T[][] {
+  const out: T[][] = []
+  for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size))
+  return out
 }
 
 /** 本文を Notion の段落ブロックの配列にする */

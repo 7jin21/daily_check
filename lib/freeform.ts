@@ -9,13 +9,17 @@ export interface FreeformParts {
   laterNotes: { date: string; text: string }[]
 }
 
+// 印として扱うのは、欄の先頭か空行の直後にあるものだけ（アプリが書く印はいつもこの位置にある）。
+// 本人が文の途中に【ふりかえり】などと書いても、印とは見なさない（文を切ったり並べ替えたりしない）
+const MARK = /(^|\n\n)【(ふりかえり|あとから (\d{4}-\d{2}-\d{2}))】/g
+
 export function parseFreeform(raw: string | null | undefined): FreeformParts {
   const s = raw ?? ''
-  const re = /【(ふりかえり|あとから (\d{4}-\d{2}-\d{2}))】/g
+  const re = new RegExp(MARK.source, 'g')
   const marks: { index: number; end: number; later: boolean; date: string }[] = []
   let m: RegExpExecArray | null
   while ((m = re.exec(s))) {
-    marks.push({ index: m.index, end: re.lastIndex, later: m[1] !== 'ふりかえり', date: m[2] ?? '' })
+    marks.push({ index: m.index + m[1].length, end: re.lastIndex, later: m[2] !== 'ふりかえり', date: m[3] ?? '' })
   }
   const parts: FreeformParts = {
     memo: (marks.length ? s.slice(0, marks[0].index) : s).trim(),
@@ -41,8 +45,10 @@ export function parseFreeform(raw: string | null | undefined): FreeformParts {
  */
 export function splitFreeformMemo(raw: string | null | undefined): { memo: string; rest: string } {
   const s = raw ?? ''
-  const first = s.search(/【(ふりかえり|あとから \d{4}-\d{2}-\d{2})】/)
-  return first < 0 ? { memo: s, rest: '' } : { memo: s.slice(0, first), rest: s.slice(first) }
+  const m = new RegExp(MARK.source).exec(s)
+  if (!m) return { memo: s, rest: '' }
+  const first = m.index + m[1].length
+  return { memo: s.slice(0, first), rest: s.slice(first) }
 }
 
 /** 自由メモに、AI 内省ガイドの問いと答えを畳んだ文字列を作る（保存用。メモは書いたまま残す） */

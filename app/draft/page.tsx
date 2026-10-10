@@ -75,6 +75,9 @@ export default function DraftPage() {
   const [reflectQuestion, setReflectQuestion] = useState<{ question: string; options: string[] } | null>(null)
   const [history, setHistory] = useState<{ text: string; mode: DraftMode }[]>([])
   const [compareOpen, setCompareOpen] = useState(false)
+  // 配信中の清書。端末に保存する下書き（editedDraft）には、清書が終わってから入れる。
+  // 途中でアプリを閉じたり画面を離れたりしても、途中で切れた文が完成した下書きとして残らないように
+  const [streamText, setStreamText] = useState('')
 
   const abortRef = useRef<AbortController | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -157,8 +160,10 @@ export default function DraftPage() {
       abort.current?.abort()
       gen.current++
       rewrite.current++
-      // 途中で止めた生成の「生成中」を残さない（戻ってきたときに、動いていない待ち画面のまま固まるのを防ぐ）
-      useCheckinStore.getState().setIsGenerating(false)
+      // 清書の途中で画面を離れたら「生成中」を戻す（戻ってきたときに、動いていない待ち画面のまま固まらないように）。
+      // 途中までの清書は下書きに入れていないので、戻ると前の下書き（なければ新しい清書）になる
+      const st = useCheckinStore.getState()
+      if (st.isGenerating) st.setIsGenerating(false)
     }
   }, [])
 
@@ -194,6 +199,7 @@ export default function DraftPage() {
     const entryTarget = st.targetDate
     setIsGenerating(true)
     setNotice(null)
+    setStreamText('')
     setEditedDraft('')
     setDraftMode('tidy')
     setDraftInputKey(inputKey(full))
@@ -221,7 +227,7 @@ export default function DraftPage() {
         }
         if (done) break
         text += decoder.decode(value, { stream: true })
-        setEditedDraft(text)
+        setStreamText(text)
       }
       text = text.trim()
       if (!text) throw new Error('empty draft')
@@ -375,7 +381,13 @@ export default function DraftPage() {
       if (rid !== rewriteRef.current || savedRef.current) return
       setHistory((h) => [...h, { text: before, mode: draftMode }].slice(-10))
       setEditedDraft(result.draft)
-      addAiText(result.draft)
+      // AI の言葉として覚えるのは、書き直しで新しく足された言葉だけ（書き直す前の本文には本人が書き足した言葉もある）
+      addAiText(
+        analyzeKept(before, result.draft)
+          .segments.filter((s) => s.added && !s.connector)
+          .map((s) => s.text)
+          .join('\n')
+      )
     } catch {
       if (rid === rewriteRef.current) setRewriteError('AIの書き直しに失敗しました。しばらくしてから再試行してください。')
     } finally {
@@ -433,7 +445,8 @@ export default function DraftPage() {
       reset()
       // 先読みした内省の問いは、この日記のためのもの（次のチェックインで使い回さない）
       clearReflectionCache()
-      setSaved({ date: entryDate, merged: result.merged })
+      // 「追記しました」と出すのは、実際に言葉が足されたときだけ（保存のやり直しで何も足されなかったときは出さない）
+      setSaved({ date: entryDate, merged: result.appended })
     } catch (err) {
       console.error('保存エラー:', err)
       const classified = classifyError(err)
@@ -467,7 +480,7 @@ export default function DraftPage() {
   // 問いを待っている（最大7秒。失敗すれば自動で生成へ進む）
   if (reflectPhase === 'fetching') return <ReadingView />
 
-  if (isGenerating) return <GeneratingView text={editedDraft} onCancel={handleCancel} />
+  if (isGenerating) return <GeneratingView text={streamText} onCancel={handleCancel} />
 
   if (saved) {
     return (

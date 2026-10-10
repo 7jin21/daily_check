@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { NOTION_MAX_BLOCKS, NOTION_TEXT_LIMIT, splitForNotion, toNotionParagraphs } from '@/lib/notion-blocks'
+import { NOTION_MAX_BLOCKS, NOTION_TEXT_LIMIT, inBatches, splitForNotion, toNotionParagraphs } from '@/lib/notion-blocks'
 
 describe('splitForNotion', () => {
   it('上限以内ならそのまま1つ（改行もそのまま）', () => {
@@ -38,9 +38,20 @@ describe('splitForNotion', () => {
     expect(chunks.join('\n\n')).toBe(paras.join('\n\n'))
   })
 
-  it('ブロック数は Notion の上限で打ち切る', () => {
+  it('1回に送れる数（100ブロック）を超えても切り捨てない', () => {
     const text = 'え'.repeat(NOTION_TEXT_LIMIT * (NOTION_MAX_BLOCKS + 5))
-    expect(splitForNotion(text)).toHaveLength(NOTION_MAX_BLOCKS)
+    const chunks = splitForNotion(text)
+    expect(chunks).toHaveLength(NOTION_MAX_BLOCKS + 5)
+    expect(chunks.join('')).toBe(text)
+  })
+})
+
+describe('inBatches', () => {
+  it('100件ずつに分ける（最後は端数）', () => {
+    const items = Array.from({ length: 205 }, (_, i) => i)
+    expect(inBatches(items).map((b) => b.length)).toEqual([100, 100, 5])
+    expect(inBatches(items).flat()).toEqual(items)
+    expect(inBatches([])).toEqual([])
   })
 })
 

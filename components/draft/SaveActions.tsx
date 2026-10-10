@@ -36,7 +36,7 @@ export default function SaveActions({
         {/* 上書きで前の言葉が消えると思わせないよう、保存の前に「追記になる」ことを伝える */}
         {willAppend && (
           <p className="p-3 rounded-2xl text-xs leading-relaxed bg-[var(--surface-secondary)] border border-[var(--border)] text-[var(--muted)]">
-            この日の日記がすでにあります。保存すると、前の日記のあとに追記されます（前の内容は消えません）
+            この日の日記がすでにあります。保存すると、前の日記のあとに追記されます（前の内容は消えません。同じ内容をもう一度保存しても二重にはなりません）
           </p>
         )}
         <button

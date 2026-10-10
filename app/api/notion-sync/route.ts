@@ -4,7 +4,7 @@ import { createServerSupabaseClient } from '@/lib/supabase-server'
 import { decryptSecret } from '@/lib/crypto'
 import { moodEmoji } from '@/lib/constants'
 import { formatJSTDate } from '@/lib/jst'
-import { toNotionParagraphs } from '@/lib/notion-blocks'
+import { inBatches, toNotionParagraphs } from '@/lib/notion-blocks'
 
 interface NotionSyncBody {
   entryId: string
@@ -182,12 +182,17 @@ async function createNotionPage(
   properties: unknown,
   bodyBlocks: unknown[]
 ): Promise<string> {
+  // 1回に送れるのは100ブロックまで。ページは最初の100ブロックで作り、残りは続けて足す
+  const [first = [], ...rest] = inBatches(bodyBlocks)
   const data = await notionFetch(token, 'https://api.notion.com/v1/pages', 'POST', {
     parent: { database_id: databaseId },
     icon,
     properties,
-    children: bodyBlocks,
+    children: first,
   }) as { id: string }
+  for (const batch of rest) {
+    await notionFetch(token, `https://api.notion.com/v1/blocks/${data.id}/children`, 'PATCH', { children: batch })
+  }
   return data.id
 }
 
@@ -222,9 +227,9 @@ async function updateNotionPage(
     await notionFetch(token, `https://api.notion.com/v1/blocks/${id}`, 'DELETE')
   }
 
-  await notionFetch(token, `https://api.notion.com/v1/blocks/${pageId}/children`, 'PATCH', {
-    children: bodyBlocks,
-  })
+  for (const batch of inBatches(bodyBlocks)) {
+    await notionFetch(token, `https://api.notion.com/v1/blocks/${pageId}/children`, 'PATCH', { children: batch })
+  }
 
   return pageId
 }

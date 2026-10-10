@@ -134,9 +134,16 @@ describe('mergeFreeform', () => {
     expect(merged.includes(rest)).toBe(true)
   })
 
-  it('本人が書いた印に似た文字（中身の無い印）も、捨てずに並びのまま残す', () => {
-    expect(mergeFreeform('メモ【ふりかえり】', '新しいメモ')).toBe('メモ\n新しいメモ\n\n【ふりかえり】')
-    expect(parseFreeform('メモ【ふりかえり】').reflections).toEqual([]) // 部品として読むと消える形
+  it('文の途中に本人が書いた【ふりかえり】は印として扱わず、文を切らずにそのまま残す', () => {
+    expect(mergeFreeform('メモ【ふりかえり】', '新しいメモ')).toBe('メモ【ふりかえり】\n新しいメモ')
+    expect(mergeFreeform('今日は【ふりかえり】の練習をした。楽しかった', '夜のメモ')).toBe(
+      '今日は【ふりかえり】の練習をした。楽しかった\n夜のメモ'
+    )
+    // 新しいメモの途中の【ふりかえり】も切らない（後半だけが末尾へ動かない）
+    expect(mergeFreeform('朝のメモ', withReflection('夜メモ。【ふりかえり】という言葉が好き。続き', 'Q', 'A'))).toBe(
+      '朝のメモ\n夜メモ。【ふりかえり】という言葉が好き。続き\n\n【ふりかえり】Q\n→ A'
+    )
+    expect(parseFreeform('メモ【ふりかえり】')).toEqual({ memo: 'メモ【ふりかえり】', reflections: [], laterNotes: [] })
   })
 
   it('あとからの一言の中に【ふりかえり】が入っていても、並べ替えずに残す', () => {
@@ -195,6 +202,21 @@ describe('mergeFreeform', () => {
 })
 
 describe('mergeEntryText', () => {
+  it('前の本文の字下げ（全角スペース）も書かれたまま残す', () => {
+    const merged = mergeEntryText(
+      { events: null, challenges: null, gratitude: null, freeform: null, ai_draft: '　朝ジム。', edited_draft: '　今日は朝ジム。', tags: [] },
+      { events: '', challenges: '', gratitude: '', freeform: '', aiDraft: '　夜はラーメン。', editedDraft: '　夜はラーメン。', tags: [] }
+    )
+    expect(merged.edited_draft).toBe('　今日は朝ジム。\n\n　夜はラーメン。')
+    expect(merged.ai_draft).toBe('　朝ジム。\n\n　夜はラーメン。')
+    // 片方の列しか無い行でも、もう片方から書かれたまま引き継ぐ
+    const onlyAi = mergeEntryText(
+      { events: null, challenges: null, gratitude: null, freeform: null, ai_draft: '　前の清書', edited_draft: '  ', tags: null },
+      { events: '', challenges: '', gratitude: '', freeform: '', aiDraft: '新', editedDraft: '新', tags: [] }
+    )
+    expect(onlyAi.edited_draft).toBe('　前の清書\n\n新')
+  })
+
   const existing: StoredEntryText = {
     events: '朝ジム',
     challenges: null,
@@ -344,6 +366,16 @@ describe('mergeEntryText', () => {
 })
 
 describe('metaExcerpt', () => {
+  it('切れ目で絵文字（サロゲートペア）を割らない', () => {
+    for (const pad of [0, 1, 2, 3]) {
+      const text = 'あ'.repeat(pad) + '😄'.repeat(2000) + 'い'.repeat(pad)
+      const out = metaExcerpt(text, 101)
+      expect(out.length).toBeLessThanOrEqual(101)
+      // 対になっていないサロゲートが無い
+      expect(out).not.toMatch(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/)
+    }
+  })
+
   it('上限は /api/draft-meta と同じ 3000 文字', () => {
     expect(META_INPUT_LIMIT).toBe(3000)
   })

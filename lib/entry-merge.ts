@@ -105,8 +105,11 @@ export const META_INPUT_LIMIT = 3000
 export function metaExcerpt(text: string, limit: number = META_INPUT_LIMIT): string {
   if (text.length <= limit) return text
   const gap = '\n…\n'
-  const head = Math.floor((limit - gap.length) / 2)
-  const tail = limit - gap.length - head
+  let head = Math.floor((limit - gap.length) / 2)
+  let tail = limit - gap.length - head
+  // 絵文字など（サロゲートペア）を切れ目で割らない（割れた文字を AI に送らない）
+  if (/[\uD800-\uDBFF]/.test(text[head - 1] ?? '')) head -= 1
+  if (/[\uDC00-\uDFFF]/.test(text[text.length - tail] ?? '')) tail -= 1
   return `${text.slice(0, head)}${gap}${text.slice(text.length - tail)}`
 }
 
@@ -121,8 +124,10 @@ export function mergeEntryText(existing: StoredEntryText, incoming: IncomingEntr
   const freeform = mergeFreeform(existing.freeform, incoming.freeform)
 
   // 本文が片方の列にしか無い古い行（気分だけ → 本文だけ書き足した等）でも、前の本文を必ず残す
-  const previousEdited = existing.edited_draft?.trim() || existing.ai_draft?.trim() || ''
-  const previousAi = existing.ai_draft?.trim() || existing.edited_draft?.trim() || ''
+  // 列を選ぶときだけ空白を見て、本文そのものは書かれたまま渡す（字下げを落とさない。末尾は appendText が整える）
+  const pick = (a: string | null, b: string | null) => (a?.trim() ? a : b?.trim() ? b : '')
+  const previousEdited = pick(existing.edited_draft, existing.ai_draft)
+  const previousAi = pick(existing.ai_draft, existing.edited_draft)
 
   return {
     events: appendText(existing.events, incoming.events, '\n'),

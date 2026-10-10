@@ -92,10 +92,18 @@ describe('splitFreeformMemo', () => {
   })
 
   it('「あとから」の印でも分ける', () => {
-    expect(splitFreeformMemo('メモ\n【あとから 2026-10-12】今の一言\n【ふりかえり】Q\n→ A')).toEqual({
-      memo: 'メモ\n',
-      rest: '【あとから 2026-10-12】今の一言\n【ふりかえり】Q\n→ A',
+    expect(splitFreeformMemo('メモ\n\n【あとから 2026-10-12】今の一言\n\n【ふりかえり】Q\n→ A')).toEqual({
+      memo: 'メモ\n\n',
+      rest: '【あとから 2026-10-12】今の一言\n\n【ふりかえり】Q\n→ A',
     })
+  })
+
+  it('印は欄の先頭か空行の直後にあるものだけ（文の途中・改行1つのあとは本人の文字として扱う）', () => {
+    expect(splitFreeformMemo('メモ【ふりかえり】続き')).toEqual({ memo: 'メモ【ふりかえり】続き', rest: '' })
+    expect(splitFreeformMemo('メモ\n【あとから 2026-10-12】続き')).toEqual({ memo: 'メモ\n【あとから 2026-10-12】続き', rest: '' })
+    expect(parseFreeform('会議メモ【ふりかえり】は明日やる')).toEqual({ memo: '会議メモ【ふりかえり】は明日やる', reflections: [], laterNotes: [] })
+    // アプリが書く形（空行のあと）は印として読む
+    expect(parseFreeform('メモ\n\n【ふりかえり】Q\n→ A').reflections).toEqual([{ question: 'Q', answer: 'A' }])
   })
 
   it('日付の形でない「あとから」は印として扱わない', () => {
@@ -116,8 +124,8 @@ describe('splitFreeformMemo', () => {
     ]) {
       const { memo, rest } = splitFreeformMemo(raw)
       expect(memo + rest, JSON.stringify(raw)).toBe(raw)
-      // メモの側には印が残らない（最初の印で切っている）
-      expect(memo.includes('【ふりかえり】'), JSON.stringify(raw)).toBe(false)
+      // メモの側には（先頭か空行の直後の）印が残らない（最初の印で切っている）
+      expect(splitFreeformMemo(memo).rest, JSON.stringify(raw)).toBe('')
     }
   })
 })

@@ -56,8 +56,10 @@ export interface FullEntry {
 
 export interface SaveResult {
   id: string
-  /** 同じ日の日記に追記したか（false なら新規、または気分だけの記録に書き込んだ） */
+  /** 同じ日の日記に言葉があり、追記として保存したか（false なら新規、または気分だけの記録に書き込んだ） */
   merged: boolean
+  /** 追記で実際に言葉が足されたか（保存のやり直しで何も変わらなかったときは false） */
+  appended: boolean
   /** 保存された日記の本文（追記したときは前の本文＋今回の本文） */
   draft: string
   tags: string[]
@@ -112,7 +114,13 @@ export async function saveFullEntry(e: FullEntry): Promise<SaveResult> {
     .select('id')
     .single()
   if (error) throw new Error(error.message)
-  return { id: data.id as string, merged, draft: text.edited_draft, tags: text.tags }
+  const appended =
+    merged &&
+    (['events', 'challenges', 'gratitude', 'freeform', 'ai_draft', 'edited_draft'] as const).some(
+      // 末尾の空白・改行の違いは「足された」に数えない（つなぐときに末尾だけ整えるため）
+      (col) => (text[col] ?? '').trimEnd() !== (((existing as Partial<StoredEntryText>)[col] as string | null) ?? '').trimEnd()
+    )
+  return { id: data.id as string, merged, appended, draft: text.edited_draft, tags: text.tags }
 }
 
 interface DraftMeta {
