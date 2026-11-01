@@ -11,6 +11,7 @@ import { hasEntryWithWords, refreshEntryMeta, saveFullEntry } from '@/lib/entry-
 import { withReflection } from '@/lib/freeform'
 import { metaExcerpt } from '@/lib/entry-merge'
 import { todayJST } from '@/lib/jst'
+import { planDateRollover } from '@/lib/checkin-rollover'
 import { clearReflectionCache, requestReflection } from '@/lib/reflection-prefetch'
 import { analyzeKept, composeBullets, composeRaw, inputKey, type ComposeInput, type DraftMode } from '@/lib/draft-compose'
 import ReflectionQuestion from '@/components/checkin/ReflectionQuestion'
@@ -23,7 +24,8 @@ import DraftTags from '@/components/draft/DraftTags'
 import { ComparePanel, OwnWordsMeter } from '@/components/draft/OwnWords'
 import RewriteButtons, { type RewriteInstruction } from '@/components/draft/RewriteButtons'
 import SaveActions from '@/components/draft/SaveActions'
-import { classifyError } from '@/components/draft/classify-error'
+import { classifyError, rewriteErrorMessage } from '@/components/draft/classify-error'
+import { splitCutMark } from '@/lib/draft-prompt'
 
 /** ストアの最新値から、清書の材料（メモ＋内省の答え）を組み立てる */
 function currentComposeInput(): ComposeInput {
@@ -107,11 +109,17 @@ export default function DraftPage() {
     const st = useCheckinStore.getState()
     const today = todayJST()
 
-    // 前日以前に書き始めたデータでドラフトページに来た場合はチェックインへ戻す
-    if (st.checkinDate && st.checkinDate !== today) {
+    // 前日以前に書き始めた下書き: 言葉があれば消さずに、書き始めた日の記録として続ける（7日以内）。
+    // 言葉が無い・古すぎるものだけ消して、チェックインへ戻す
+    const plan = planDateRollover(st, today)
+    if (plan.kind === 'reset') {
       st.reset()
       router.replace('/checkin')
       return
+    }
+    if (plan.kind === 'carry') {
+      st.setTargetDate(plan.targetDate)
+      st.setCheckinDate(today)
     }
     const input = st.getInput()
     if (!input.mood && !input.energy) {
@@ -146,6 +154,22 @@ export default function DraftPage() {
     // 生成の「前」に、AIが内省の問いを1つだけ投げる（不要・失敗なら即生成へ）
     startReflectionThenGenerate()
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // 開いたまま日付が変わったとき（スリープ復帰・アプリ切り替え）: 保存先は書き始めた日のままなので、
+  // 見出しにもその日付を出す（下書きは消さない）
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === 'hidden') return
+      const st = useCheckinStore.getState()
+      const today = todayJST()
+      const plan = planDateRollover(st, today)
+      if (plan.kind !== 'carry') return
+      st.setTargetDate(plan.targetDate)
+      st.setCheckinDate(today)
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
   }, [])
 
   // 画面を離れたら進行中の生成を止め、遅れて届く応答はすべて無効にする
@@ -205,6 +229,15 @@ export default function DraftPage() {
     setDraftInputKey(inputKey(full))
 
     let text = ''
+    // 途中まで届いた清書は捨てずに残し、途中で止まったことを伝える（続きは手で直すか「清書し直す」）
+    const keepPartial = (partial: string, reason: unknown) => {
+      console.warn('清書が途中で止まりました:', reason)
+      const meta = generateOfflineDraft(full, entryTarget)
+      setDraftResult({ ...meta, draft: partial, fromAI: true })
+      setEditedDraft(partial)
+      addAiText(partial)
+      setNotice('partial')
+    }
     try {
       // 日記本文は text/plain でストリーミングされる。内省Q&Aがあれば文脈として渡す。
       // entryDate は過去日付の書き忘れ救済用（null なら今日扱い）
@@ -227,14 +260,22 @@ export default function DraftPage() {
         }
         if (done) break
         text += decoder.decode(value, { stream: true })
-        setStreamText(text)
+        setStreamText(splitCutMark(text).text)
       }
-      text = text.trim()
+      text += decoder.decode()
+      // 出力の上限に達した・途中で失敗したときは、サーバーが末尾に印を付けてくる（ストリームは正常に終わる）
+      const received = splitCutMark(text)
+      text = received.text.trim()
       if (!text) throw new Error('empty draft')
 
       if (isFallback) {
         // サーバーに AI が設定されていない → 本人のメモをそのまま使う
         fallbackToOwnWords(full, entryTarget)
+        return
+      }
+      if (received.cut) {
+        // 途中で切れた清書を完成品として出さない
+        keepPartial(text, 'cut off')
         return
       }
 
@@ -269,15 +310,9 @@ export default function DraftPage() {
     } catch (err) {
       if (!isCurrent()) return
       if (err instanceof DOMException && err.name === 'AbortError') return
-      const partial = text.trim()
+      const partial = splitCutMark(text).text.trim()
       if (partial) {
-        // 途中まで届いた清書は捨てずに残し、途中で止まったことを伝える
-        console.warn('清書が途中で止まりました:', err)
-        const meta = generateOfflineDraft(full, entryTarget)
-        setDraftResult({ ...meta, draft: partial, fromAI: true })
-        setEditedDraft(partial)
-        addAiText(partial)
-        setNotice('partial')
+        keepPartial(partial, err)
       } else {
         console.warn('AI清書に失敗、本人のメモをそのまま使います:', err)
         fallbackToOwnWords(full, entryTarget)
@@ -377,7 +412,8 @@ export default function DraftPage() {
     setRewritingKey(instruction)
     setRewriteError(null)
     try {
-      const result = await apiPost<{ draft: string }>('/api/rewrite-draft', { draft: before, instruction })
+      // 自動で再試行しない（長すぎて切れるなど、何度やっても同じ失敗を AI に繰り返させないため）
+      const result = await apiPost<{ draft: string }>('/api/rewrite-draft', { draft: before, instruction }, { retry: false })
       if (rid !== rewriteRef.current || savedRef.current) return
       setHistory((h) => [...h, { text: before, mode: draftMode }].slice(-10))
       setEditedDraft(result.draft)
@@ -388,8 +424,8 @@ export default function DraftPage() {
           .map((s) => s.text)
           .join('\n')
       )
-    } catch {
-      if (rid === rewriteRef.current) setRewriteError('AIの書き直しに失敗しました。しばらくしてから再試行してください。')
+    } catch (err) {
+      if (rid === rewriteRef.current) setRewriteError(rewriteErrorMessage(err))
     } finally {
       if (rid === rewriteRef.current) setRewritingKey(null)
     }
@@ -438,9 +474,12 @@ export default function DraftPage() {
         syncNotion(draftResult?.tags ?? [])
       }
 
-      // その日のひとことメモは日記に入ったので片付ける
+      // 日記に入ったひとことメモだけを片付ける（入りきらなかった・選ばなかったメモは、その日のうちは残す。
+      // 以前はすべて消していたため、上限で入らなかったメモがそのまま失われていた）
       const memos = useMemoStore.getState()
-      if (memos.date === entryDate) memos.clear()
+      if (memos.date === entryDate) {
+        memos.removeUsedIn([input.events, input.challenges, input.gratitude, input.freeform, editedDraft].join('\n'))
+      }
 
       reset()
       // 先読みした内省の問いは、この日記のためのもの（次のチェックインで使い回さない）

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { composeReflectionAnswer } from '@/lib/freeform'
 
 interface ReflectionQuestionProps {
   question: string
@@ -23,10 +24,10 @@ export default function ReflectionQuestion({
   const canSubmit = selected !== null || note.trim().length > 0
 
   const handleSubmit = () => {
-    const parts: string[] = []
-    if (selected) parts.push(selected)
-    if (note.trim()) parts.push(note.trim())
-    onSubmit(parts.join(' — '))
+    const answer = composeReflectionAnswer(selected, note)
+    // 「どれも近くない」だけを選んだときは答えなし（スキップと同じ）。本文に「どれも近くない」と書かない
+    if (answer) onSubmit(answer)
+    else onSkip()
   }
 
   return (

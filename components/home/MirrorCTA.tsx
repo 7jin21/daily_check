@@ -3,9 +3,10 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { STORAGE_KEYS } from '@/lib/constants'
+import { hasPendingCheckin, type PendingCheckin } from '@/lib/checkin-rollover'
 
 // 水面の上の呼びかけ。状態は3つ:
-// 記録済み → 今日の一文と「日記を読む」／書きかけ（localStorage に今日の入力途中）→「続きを書く」／未記録 →「今日を記録する」
+// 記録済み → 今日の一文と「日記を読む」／書きかけ（localStorage に入力途中。日付をまたいだ言葉のある書きかけも）→「続きを書く」／未記録 →「今日を記録する」
 // （書きかけの判定は localStorage が要るのでクライアントで行う）
 
 interface Props {
@@ -33,11 +34,10 @@ export default function MirrorCTA({ today, greeting, todaySummary, hasTodayEntry
     try {
       const raw = localStorage.getItem(STORAGE_KEYS.CHECKIN_DRAFT)
       if (!raw) return
-      const s = (JSON.parse(raw) as {
-        state?: { mood?: number | null; checkinDate?: string | null; targetDate?: string | null }
-      }).state
-      // 今日開始した入力で、気分だけでも選んであれば「書きかけ」（過去日付の入力は除く）
-      if (s && s.mood != null && s.checkinDate === today && !s.targetDate) setHasDraft(true)
+      const s = (JSON.parse(raw) as { state?: Partial<PendingCheckin> }).state
+      // 今日開始した入力で気分を選んである、または日付をまたいでも消さない「言葉のある書きかけ」が残っている
+      // （後者はチェックインを開くと、書き始めた日の記録として続きから書ける）
+      if (s && hasPendingCheckin(s, today)) setHasDraft(true)
     } catch {
       // localStorage が読めない環境では通常表示
     }

@@ -15,25 +15,39 @@ export interface PickItem {
 interface Props {
   title: string
   items: PickItem[]
-  onInsert: (items: PickItem[]) => void
+  /** 「今日あったこと」の文字数の上限（入りきらなかったときの案内に使う） */
+  maxChars: number
+  /** 一部が入りきらなかったときに添える一言（例: メモは消えずに残る） */
+  skippedNote?: string
+  /** 選んだ項目を入れて、実際に入った件数を返す（上限に入らない項目は入れない） */
+  onInsert: (items: PickItem[]) => number
 }
 
-export default function PickList({ title, items, onInsert }: Props) {
+export default function PickList({ title, items, maxChars, skippedNote, onInsert }: Props) {
   const [selected, setSelected] = useState<Set<string>>(() => new Set(items.map((i) => i.id)))
-  const [done, setDone] = useState(false)
+  const [result, setResult] = useState<{ inserted: number; skipped: number } | null>(null)
 
   if (items.length === 0) return null
 
-  if (done) {
+  // 入れたあと（1件でも入ったら一覧を閉じる。入らなかった分があれば、黙らずに伝える）
+  if (result && result.inserted > 0) {
     return (
       <p className="text-xs text-[var(--muted)] px-1" role="status">
-        ✓ {title}を「今日あったこと」に入れました。いらない行は消して大丈夫です。
+        {result.skipped === 0 ? (
+          <>✓ {title}を「今日あったこと」に入れました。いらない行は消して大丈夫です。</>
+        ) : (
+          <>
+            ✓ {result.inserted}件を「今日あったこと」に入れました。{result.skipped}件は文字数の上限（{maxChars}字）に入りきらないため、入れていません。
+            {skippedNote}
+          </>
+        )}
       </p>
     )
   }
 
   const toggle = (id: string) => {
     hapticTap()
+    setResult(null)
     setSelected((prev) => {
       const next = new Set(prev)
       if (next.has(id)) next.delete(id)
@@ -72,12 +86,18 @@ export default function PickList({ title, items, onInsert }: Props) {
         disabled={selected.size === 0}
         onClick={() => {
           hapticTap()
-          onInsert(items.filter((i) => selected.has(i.id)))
-          setDone(true)
+          const picked = items.filter((i) => selected.has(i.id))
+          const inserted = onInsert(picked)
+          setResult({ inserted, skipped: picked.length - inserted })
         }}
       >
         選んだ{selected.size}件を「今日あったこと」に入れる
       </button>
+      {result && result.inserted === 0 && (
+        <p className="mt-2 text-xs px-1" style={{ color: '#9c4a2f' }} role="alert">
+          「今日あったこと」が文字数の上限（{maxChars}字）に近いため、入れられませんでした。文章を短くするか、入れるものを減らしてください。
+        </p>
+      )}
     </div>
   )
 }

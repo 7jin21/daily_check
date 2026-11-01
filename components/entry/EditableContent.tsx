@@ -76,7 +76,8 @@ export default function EditableContent({
       if (dbErr) throw dbErr
       setSaved(draft)
       setIsEditing(false)
-      if (memosInserted && memoState.date === entryDate) memoState.clear()
+      // 日記に入ったメモだけを片付ける（入れたあとに消した行のメモは残す）
+      if (memosInserted && memoState.date === entryDate) memoState.removeUsedIn(draft)
 
       // 気分だけの記録に言葉を足したときは、要約・タグ・感情を本文から補う（一覧やホームの表示・分析に使う）
       // （失敗しても本文は保存済み。タグは今のまま Notion へ送る）

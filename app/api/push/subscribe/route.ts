@@ -40,6 +40,11 @@ export async function POST(req: NextRequest) {
     )
 
   if (error) {
+    // 42501（RLS 違反）: 同じ endpoint の行が別のアカウントのまま残っている（この端末を前に別の人が使っていた）。
+    // 他人の行は書き換えられないので 409 を返し、クライアントに購読を作り直してもらう（lib/push-client.ts）
+    if (error.code === '42501') {
+      return NextResponse.json({ error: 'この端末の通知は別のアカウントで登録されています' }, { status: 409 })
+    }
     console.error('Push subscription save error:', error)
     return NextResponse.json({ error: '購読の保存に失敗しました' }, { status: 500 })
   }

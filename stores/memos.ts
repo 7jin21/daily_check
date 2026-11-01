@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { STORAGE_KEYS } from '@/lib/constants'
 import { jstTimeHM, todayJST } from '@/lib/jst'
+import { memosUsedIn } from '@/lib/memo-insert'
 
 // 日中の「ひとこと」メモ（時刻つき）。夜のチェックインで選んで日記に入れる。
 // この端末の localStorage にだけ保存し、日付が変わったら持ち越さない（その日の素材なので）。
@@ -20,6 +21,8 @@ interface MemoState {
   items: Memo[]
   add: (text: string) => void
   remove: (id: string) => void
+  /** 日記に入ったメモだけを片付ける（入りきらなかった・選ばなかったメモは、その日のうちは残す） */
+  removeUsedIn: (text: string) => void
   clear: () => void
 }
 
@@ -43,6 +46,10 @@ export const useMemoStore = create<MemoState>()(
         set({ date: today, items: [memo, ...current].slice(0, MEMO_MAX_ITEMS) })
       },
       remove: (id) => set({ items: get().items.filter((m) => m.id !== id) }),
+      removeUsedIn: (text) => {
+        const used = new Set(memosUsedIn(get().items, text).map((m) => m.id))
+        if (used.size) set({ items: get().items.filter((m) => !used.has(m.id)) })
+      },
       clear: () => set({ date: null, items: [] }),
     }),
     { name: STORAGE_KEYS.MEMOS }

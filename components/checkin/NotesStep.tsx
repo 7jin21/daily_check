@@ -9,6 +9,7 @@ import { apiGet } from '@/lib/api-client'
 import { hapticTap } from '@/lib/haptics'
 import { jstTimeHM, todayJST } from '@/lib/jst'
 import { prefetchReflection } from '@/lib/reflection-prefetch'
+import { appendLinesWithin } from '@/lib/memo-insert'
 
 // チェックイン2画面目: テキスト4欄を1画面に集約。
 // 「出来事」は常時表示、残り3欄は折りたたみ（値があれば自動で開く）。
@@ -96,11 +97,16 @@ export default function NotesStep() {
     return () => clearTimeout(timer)
   }, [mood, energy, events, challenges, gratitude, freeform])
 
-  /** 選んだ行を「出来事」の末尾に足す（本人の言葉なので、清書でもそのまま残る） */
-  const insertLines = (picked: PickItem[]) => {
-    const lines = picked.map((p) => `・${p.meta ? `${p.meta} ` : ''}${p.label}`).join('\n')
-    const next = events.trim() ? `${events.trimEnd()}\n${lines}` : lines
-    setEvents(next.slice(0, MAX_CHARS))
+  /**
+   * 選んだ行を「出来事」の末尾に足す（本人の言葉なので、清書でもそのまま残る）。入った件数を返す。
+   * 欄の上限（500字）に入らない行は、途中で切らずに入れない（以前は黙って切り捨てていた）。
+   * 入らなかったメモは、日記に入ったメモだけを片付ける保存処理（app/draft/page.tsx）によって残る
+   */
+  const insertLines = (picked: PickItem[]): number => {
+    const lines = picked.map((p) => `・${p.meta ? `${p.meta} ` : ''}${p.label}`)
+    const { text, added } = appendLinesWithin(events, lines, MAX_CHARS)
+    if (added) setEvents(text)
+    return added
   }
 
   const calendarItems: PickItem[] = calendarEvents.map((e) => ({
@@ -126,9 +132,17 @@ export default function NotesStep() {
               key={`memo-${memos.length}`}
               title="今日のひとこと"
               items={memos.map((m) => ({ id: m.id, label: m.text, meta: m.time }))}
+              maxChars={MAX_CHARS}
+              skippedNote="入らなかったメモは消えずに残ります。"
               onInsert={insertLines}
             />
-            <PickList key={`cal-${calendarItems.length}`} title="今日の予定" items={calendarItems} onInsert={insertLines} />
+            <PickList
+              key={`cal-${calendarItems.length}`}
+              title="今日の予定"
+              items={calendarItems}
+              maxChars={MAX_CHARS}
+              onInsert={insertLines}
+            />
           </div>
         )}
         <TextStep

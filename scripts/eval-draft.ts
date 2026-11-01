@@ -1,13 +1,13 @@
 // 清書プロンプト（lib/draft-prompt.ts）の評価スクリプト。
 // AI が「代筆者」ではなく「清書係」に徹しているか（本人の言葉を残し、書いていないことを足していないか）を、
 // 決まった見本のメモで測る。プロンプトやモデルを変えたときに、前後の数字を比べて確かめるためのもの。
-// 本番の /api/generate-draft と同じプロンプト・同じ生成パラメータ（DRAFT_GENERATION）で清書する（ストリーミングはしない）。
+// 本番の /api/generate-draft と同じプロンプト・同じ生成パラメータ（DRAFT_GENERATION と draftMaxTokens）で清書する（ストリーミングはしない）。
 //
 // 測るもの（AI を使わない比較。lib/draft-compose.ts の analyzeKept）:
 //   本人の言葉 … 清書のうち本人の言葉が占める割合（own）。画面の「あなたの言葉 ◯%」と同じ数字。AI が文を足すと下がる
 //   メモの残り … メモのうち清書に残った割合（kept）。メモが削られると下がる
 //   長さの比   … 清書の文字数 ÷ メモの文字数（空白・記号を除く）。水増しすると大きくなる
-// 本人の言葉が 85% 未満、または長さの比が 1.5 を超えた清書（と、空の出力・API の失敗）に印を付ける。
+// 本人の言葉が 85% 未満、または長さの比が 1.5 を超えた清書（と、空の出力・出力の上限で途中で切れたもの・API の失敗）に印を付ける。
 //
 // 使い方:
 //   npm run eval:draft                  全ケースを1回ずつ清書して採点する（GROQ_API_KEY が必要。.env.local があれば読む）
@@ -18,7 +18,13 @@
 // 印が付いた清書があれば終了コード 1（--no-fail のときを除く）。モデルは GROQ_MODEL_QUALITY で上書きできる。
 import path from 'node:path'
 import { analyzeKept, composeRaw } from '@/lib/draft-compose'
-import { buildDraftUserPrompt, DRAFT_GENERATION, DRAFT_SYSTEM_PROMPT, type DraftPromptInput } from '@/lib/draft-prompt'
+import {
+  buildDraftUserPrompt,
+  DRAFT_GENERATION,
+  DRAFT_SYSTEM_PROMPT,
+  draftMaxTokens,
+  type DraftPromptInput,
+} from '@/lib/draft-prompt'
 
 /** これを下回ったら印を付ける（清書のうち本人の言葉の割合） */
 const OWN_MIN = 0.85
@@ -156,27 +162,30 @@ function parseArgs(argv: string[]): Options {
   return opts
 }
 
-type Generate = (prompt: string, c: EvalCase) => Promise<string>
+/** cut: 出力の上限（max_tokens）で途中で切れた */
+type Generate = (prompt: string, c: EvalCase) => Promise<{ draft: string; cut: boolean }>
 
 async function createGenerator(mock: boolean): Promise<{ model: string; generate: Generate }> {
   // 配線の確認用: 原文のまま（AI は使わない）。数字はすべて 100%・長さの比 1.00 になるはず
-  if (mock) return { model: 'mock（原文のまま・API なし）', generate: async (_prompt, c) => composeRaw(c.input) }
+  if (mock) return { model: 'mock（原文のまま・API なし）', generate: async (_prompt, c) => ({ draft: composeRaw(c.input), cut: false }) }
 
   // .env.local を読んだあとで読み込む（GROQ_MODEL_QUALITY の上書きを、モデル名が決まる前に効かせるため）
   const { getGroqClient, GROQ_MODELS } = await import('@/lib/groq')
   const groq = getGroqClient()
   return {
     model: GROQ_MODELS.quality,
-    generate: async (prompt) => {
+    generate: async (prompt, c) => {
       const completion = await groq.chat.completions.create({
         model: GROQ_MODELS.quality,
         ...DRAFT_GENERATION,
+        max_tokens: draftMaxTokens(c.input),
         messages: [
           { role: 'system', content: DRAFT_SYSTEM_PROMPT },
           { role: 'user', content: prompt },
         ],
       })
-      return completion.choices[0]?.message?.content?.trim() ?? ''
+      const choice = completion.choices[0]
+      return { draft: choice?.message?.content?.trim() ?? '', cut: choice?.finish_reason === 'length' }
     },
   }
 }
@@ -208,8 +217,9 @@ async function evaluate(c: EvalCase, run: number, generate: Generate, mock: bool
   const base = { name: c.name, run, memo, memoChars: textLength(memo) }
 
   let draft: string
+  let cut: boolean
   try {
-    draft = await generate(prompt, c)
+    ;({ draft, cut } = await generate(prompt, c))
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     return { ...base, draft: '', marked: `（失敗: ${message}）`, draftChars: 0, own: 0, kept: 0, ratio: 0, seconds: null, flags: ['エラー'] }
@@ -220,6 +230,7 @@ async function evaluate(c: EvalCase, run: number, generate: Generate, mock: bool
   const draftChars = textLength(draft)
   const ratio = base.memoChars ? draftChars / base.memoChars : 0
   const flags: string[] = []
+  if (cut) flags.push('途中で切れた')
   if (!draft) flags.push('空の出力')
   else {
     if (a.own < OWN_MIN) flags.push(`本人の言葉<${pct(OWN_MIN)}`)
@@ -284,7 +295,7 @@ async function main() {
     `モデル: ${model} / temperature: ${DRAFT_GENERATION.temperature} / reasoning_effort: ${DRAFT_GENERATION.reasoning_effort}` +
       ` / ケース: ${CASES.length} × ${opts.runs}回`
   )
-  console.log(`印の基準: 本人の言葉 < ${pct(OWN_MIN)} または 長さの比 > ${RATIO_MAX}（ほかに空の出力・API の失敗）`)
+  console.log(`印の基準: 本人の言葉 < ${pct(OWN_MIN)} または 長さの比 > ${RATIO_MAX}（ほかに空の出力・出力の上限で途中で切れたもの・API の失敗）`)
   console.log('')
 
   // 1件ずつ順に呼ぶ（並べて呼ぶと API の流量制限に当たりやすい）

@@ -15,7 +15,7 @@ export interface CheckinInput {
 
 interface CheckinState extends CheckinInput {
   currentStep: number
-  checkinDate: string | null   // "YYYY-MM-DD" (JST) — 入力を開始した日。別日なら自動リセット
+  checkinDate: string | null   // "YYYY-MM-DD" (JST) — 入力を開始した日。日付が変わったら lib/checkin-rollover.ts で扱いを決める（言葉のある書きかけは消さない）
   targetDate: string | null    // 記録の対象日。null = 今日。過去日付の書き忘れ救済で使う
   draftResult: DraftResult | null
   editedDraft: string          // ユーザーが編集したドラフト（ナビゲーション間で保持）

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createReadonlyServerClient } from '@/lib/supabase-server'
 import { getGroqClient, GROQ_MODELS } from '@/lib/groq'
-import { formatEntriesForPrompt } from '@/lib/prompt-context'
+import { formatEntriesForPrompt, PROMPT_ENTRY_LEGEND } from '@/lib/prompt-context'
 
 // 「AI に聞いてみる」: 直近の日記データを文脈に、ユーザーの質問へ1回だけ答える。
 // 例:「今週なんでこんなに疲れてたんだろう」「最近気分がいい日の共通点は？」
@@ -36,7 +36,8 @@ export async function POST(req: NextRequest) {
 
   const { data: entries, error } = await supabase
     .from('diary_entries')
-    .select('entry_date, mood, energy, events, challenges, gratitude, freeform, dominant_emotion')
+    // 本文の列は、メモ欄が空で本文にだけ言葉を書いた日のために読む（lib/prompt-context.ts の ownBodyText）
+    .select('entry_date, mood, energy, events, challenges, gratitude, freeform, dominant_emotion, edited_draft, ai_draft')
     .eq('user_id', user.id)
     .order('entry_date', { ascending: false })
     .limit(30)
@@ -46,7 +47,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ answer: 'まだ日記の記録がないため、お答えできる材料がありません。まずは今日のチェックインから始めてみましょう。' })
   }
 
-  const summary = formatEntriesForPrompt(entries, { events: 100, challenges: 80, gratitude: 60, freeform: 120 })
+  const summary = formatEntriesForPrompt(entries, {
+    events: 100,
+    challenges: 80,
+    gratitude: 60,
+    freeform: 120,
+    reflection: 120,
+    body: 200,
+  })
 
   try {
     const groq = getGroqClient()
@@ -64,7 +72,8 @@ export async function POST(req: NextRequest) {
 - 必ず日記データに基づいて答える。日付や記録内容を具体的に引用してよい
 - データから断定できないことは「記録からは〜のように見える」と推測であることを明示する
 - 決めつけ・説教・医療的な診断はしない。温かく、簡潔に（300字以内）
-- 【ふりかえり】で始まる部分は本人の内省の記録なので、感情の理由・価値観として重視する
+- ${PROMPT_ENTRY_LEGEND}
+- 【ふりかえり】は本人の内省の記録なので、感情の理由・価値観として重視する
 - 回答本文のみを出力する（前置き・見出しは不要）`,
         },
         {
