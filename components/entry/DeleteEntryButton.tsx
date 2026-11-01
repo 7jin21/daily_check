@@ -43,14 +43,14 @@ export default function DeleteEntryButton({ entryId, notionSynced }: Props) {
 
   return (
     <div className="mt-10 text-center">
-      <button
-        onClick={handleDelete}
-        disabled={isDeleting}
-        className="text-xs text-[#9c4a2f] dark:text-[#d39177] underline underline-offset-2 disabled:opacity-40"
-      >
-        {isDeleting ? '削除中…' : 'この日記を削除する'}
+      <button type="button" onClick={handleDelete} disabled={isDeleting} className="btn-quiet" data-tone="danger">
+        {isDeleting ? '削除しています…' : 'この日記を削除する'}
       </button>
-      {error && <p className="mt-2 text-xs" style={{ color: '#9c4a2f' }}>{error}</p>}
+      {error && (
+        <p className="mt-2 text-xs text-[var(--danger)]" role="alert">
+          {error}
+        </p>
+      )}
     </div>
   )
 }

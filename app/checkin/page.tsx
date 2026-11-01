@@ -8,13 +8,19 @@ import StateStep from '@/components/checkin/StateStep'
 import NotesStep from '@/components/checkin/NotesStep'
 import { hapticTap } from '@/lib/haptics'
 import { saveMoodOnly } from '@/lib/entry-save'
+import { markSaveEcho } from '@/lib/save-echo'
 import { prefetchReflection } from '@/lib/reflection-prefetch'
-import { formatJSTDate, todayJST } from '@/lib/jst'
+import { dayOfWeek, formatJSTDate, todayJST } from '@/lib/jst'
 import { hasUnsavedWords, isValidPastDate, planDateRollover } from '@/lib/checkin-rollover'
+import { ArrowRightIcon, ChevronLeftIcon, PenIcon } from '@/components/ui/icons'
+import { EnergyGlyph, MoodGlyph } from '@/components/ui/StateGlyphs'
+import { WEEKDAY_KANJI } from '@/lib/almanac'
+import Wbr from '@/components/ui/Wbr'
+import '@/components/checkin/checkin.css'
 
 export default function CheckinPage() {
   const router = useRouter()
-  const { currentStep, mood, energy, targetDate, events, challenges, gratitude, freeform, nextStep, prevStep } =
+  const { currentStep, mood, energy, targetDate, checkinDate, events, challenges, gratitude, freeform, nextStep, prevStep } =
     useCheckinStore()
 
   const [direction, setDirection] = useState<'forward' | 'back'>('forward')
@@ -80,7 +86,6 @@ export default function CheckinPage() {
   const stepIndex = Math.min(currentStep, STEPS.length - 1)
   const step = STEPS[stepIndex]
   const totalSteps = STEPS.length
-  const progress = ((stepIndex + 1) / totalSteps) * 100
 
   const handleNext = () => {
     hapticTap()
@@ -105,6 +110,8 @@ export default function CheckinPage() {
     const entryDate = state.targetDate ?? state.checkinDate ?? todayJST()
     try {
       await saveMoodOnly(entryDate, state.mood, state.energy)
+      // ホームに戻ったら、その日の丸に色が落ちる（保存したことが目で分かるように）
+      markSaveEcho(entryDate, state.mood)
       state.reset()
       router.replace(entryDate === todayJST() ? '/' : `/entries/${entryDate}`)
       router.refresh()
@@ -147,100 +154,105 @@ export default function CheckinPage() {
 
   if (!step) return null
 
-  return (
-    <div className="min-h-dvh flex flex-col px-4 pt-4">
-      {/* ヘッダー */}
-      <div className="flex items-center gap-3 mb-4">
-        <button
-          onClick={handleBack}
-          className="w-11 h-11 rounded-full bg-[var(--surface-secondary)] border border-[var(--border)] flex items-center justify-center text-xl text-[var(--foreground)] active:scale-90 transition-transform"
-          aria-label="戻る"
-        >
-          ‹
-        </button>
-        <div className="flex-1">
-          <div className="flex items-center justify-between text-xs text-[var(--muted-2)] mb-1.5">
-            <span className="font-medium">{stepIndex + 1} / {totalSteps}</span>
-            <span className="tabular-nums">{Math.round(progress)}%</span>
-          </div>
-          {/* プログレスバー（グロー付き） */}
-          <div className="h-2 bg-[var(--surface-secondary)] rounded-full overflow-hidden">
-            <div
-              className="h-full bg-[var(--accent)] rounded-full transition-all duration-300 progress-bar-glow"
-              style={{ width: `${progress}%` }}
-            />
-          </div>
-        </div>
-      </div>
+  // 何が足りないかを、押せないボタンの文字で伝える（押せない理由が分からないまま止まらないように）
+  const missing = mood === null && energy === null ? '気分と|エネルギー' : mood === null ? '気分' : energy === null ? 'エネルギー' : null
+  // 書いている日（過去の日付を書いているときはその日）。初回描画はサーバーと合わせるため、マウント後に出す
+  const entryDate = targetDate ?? checkinDate ?? null
+  const dateLabel = mounted && entryDate ? entryDate : mounted ? todayJST() : null
 
-      {/* 過去日付の記録バナー */}
+  return (
+    <div className="ck-page">
+      {/* 見出しの帯: 戻る ／ いまの段 ／ 日付 */}
+      <header className="ck-head">
+        <button type="button" onClick={handleBack} className="icon-btn" aria-label={stepIndex === 0 ? 'ホームに戻る' : '前の画面に戻る'}>
+          <ChevronLeftIcon />
+        </button>
+        <ol className="ck-steps" aria-label={`全${totalSteps}画面のうち${stepIndex + 1}画面目`}>
+          {STEPS.map((st, i) => (
+            <li key={st.id} data-state={i === stepIndex ? 'current' : i < stepIndex ? 'done' : 'todo'} aria-current={i === stepIndex ? 'step' : undefined}>
+              {st.id === 'state' ? '調子' : 'ことば'}
+            </li>
+          ))}
+        </ol>
+        <div className="ck-head-end">
+          {/* 2画面目では、選んだ調子を小さく添えておく */}
+          {step.id === 'notes' && mood !== null && energy !== null && (
+            <span className="flex items-center gap-1" aria-hidden="true">
+              <MoodGlyph mood={mood} size={20} />
+              <EnergyGlyph energy={energy} size={20} />
+            </span>
+          )}
+          {dateLabel && (
+            <span className="ck-date">
+              {Number(dateLabel.slice(5, 7))}.{Number(dateLabel.slice(8, 10))}
+              <small>{WEEKDAY_KANJI[dayOfWeek(dateLabel)]}</small>
+            </span>
+          )}
+        </div>
+      </header>
+
+      {/* 過去日付の記録 */}
       {targetDate && (
-        <div className="mb-4 px-4 py-2.5 rounded-2xl flex items-center justify-between text-sm"
-          style={{ background: 'rgba(197,137,95,0.12)', border: '1px solid rgba(197,137,95,0.35)', color: '#a4683f' }}
-        >
-          <span>🕰 <b>{formatJSTDate(targetDate, { month: 'long', day: 'numeric', weekday: 'short' })}</b> の記録をあとから書いています</span>
-          <button onClick={handleClearTargetDate} className="text-xs underline ml-3 flex-shrink-0">
+        <div className="notice ck-backfill" data-tone="warn">
+          <span>
+            <span className="font-bold">{formatJSTDate(targetDate, { month: 'long', day: 'numeric', weekday: 'short' })}</span>
+            の記録を、あとから書いています
+          </span>
+          <button type="button" onClick={handleClearTargetDate} className="btn-quiet">
             今日に戻す
           </button>
         </div>
       )}
 
-      {/* ステップタイトル */}
-      <div key={`title-${stepIndex}`} className="mb-5 animate-fade-in">
-        <h2 className="text-2xl font-bold text-[var(--foreground)]">
-          {targetDate && step.id === 'state' ? 'その日の調子は？' : step.title}
-        </h2>
-        <p className="text-[var(--muted)] text-sm mt-1">
-          {(mounted && getDailyDescription(step.id)) || step.description}
-        </p>
+      {/* 問い */}
+      <div key={`title-${stepIndex}`} className="ck-title animate-fade-in">
+        <h1>{targetDate && step.id === 'state' ? 'その日の調子は？' : step.title}</h1>
+        <p>{(mounted && getDailyDescription(step.id)) || step.description}</p>
       </div>
 
-      {/* ステップコンテンツ（方向付きアニメーション） */}
-      <div
-        key={stepIndex}
-        className={`flex-1 ${direction === 'forward' ? 'animate-enter-right' : 'animate-enter-left'}`}
-      >
+      {/* ステップの中身（方向付きアニメーション） */}
+      <div key={stepIndex} className={`flex-1 flex flex-col ${direction === 'forward' ? 'animate-enter-right' : 'animate-enter-left'}`}>
         {step.id === 'state' && <StateStep />}
         {step.id === 'notes' && <NotesStep />}
       </div>
 
-      {/* 次へボタン（メモが空なら、清書せずに気分だけで記録する） */}
-      <div className="pb-6 pt-4">
+      {/* 操作（親指の届くところ）。メモが空なら、清書せずに気分だけで記録する */}
+      <div className="ck-actions">
         {quickError && (
-          <p className="mb-3 text-center text-xs" style={{ color: '#9c4a2f' }} role="alert">
+          <p className="ck-error" role="alert">
             {quickError}
           </p>
         )}
         {step.id === 'notes' && !hasText ? (
-          <button
-            onClick={handleQuickSave}
-            disabled={!canProceed() || quickSaving}
-            className="w-full py-4 rounded-full bg-[var(--accent)] text-[#f7f4ea] font-bold text-base disabled:opacity-30 active:scale-[0.99] transition-transform glow-sky"
-          >
+          <button type="button" onClick={handleQuickSave} disabled={quickSaving} className="btn btn-primary btn-block">
             {quickSaving ? '記録しています…' : '気分だけで記録する'}
           </button>
         ) : (
-          <button
-            onClick={handleNext}
-            disabled={!canProceed() || quickSaving}
-            className="w-full py-4 rounded-full bg-[var(--accent)] text-[#f7f4ea] font-bold text-base disabled:opacity-30 active:scale-[0.99] transition-transform glow-sky"
-          >
-            {stepIndex < totalSteps - 1 ? '次へ →' : '日記に清書する ✨'}
+          <button type="button" onClick={handleNext} disabled={!canProceed() || quickSaving} className="btn btn-primary btn-block">
+            {step.id === 'state' ? (
+              missing ? (
+                <Wbr text={`${missing}を|選んでください`} />
+              ) : (
+                <>
+                  次へ
+                  <ArrowRightIcon size={18} className="btn-arrow" />
+                </>
+              )
+            ) : (
+              <>
+                <PenIcon size={18} />
+                日記に清書する
+              </>
+            )}
           </button>
         )}
         {step.id === 'state' && (
-          <button
-            onClick={handleQuickSave}
-            disabled={!canProceed() || quickSaving}
-            className="w-full mt-2 py-2 text-sm text-[var(--muted)] underline underline-offset-4 decoration-[var(--border)] disabled:opacity-30"
-          >
-            {quickSaving ? '記録しています…' : '今日は気分だけで記録する'}
+          <button type="button" onClick={handleQuickSave} disabled={!canProceed() || quickSaving} className="btn-quiet">
+            {quickSaving ? '記録しています…' : targetDate ? '気分だけで記録する' : '今日は気分だけで記録する'}
           </button>
         )}
         {step.id === 'notes' && (
-          <p className="text-center text-xs text-[var(--muted-2)] mt-2">
-            {hasText ? '書いた言葉のまま、読みやすく整えます' : '言葉は、あとから日記に書き足せます'}
-          </p>
+          <p className="ck-hint">{hasText ? '書いた言葉のまま、読みやすく整えます' : '言葉は、あとから日記に書き足せます'}</p>
         )}
       </div>
     </div>

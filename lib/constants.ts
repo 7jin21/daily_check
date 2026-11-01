@@ -1,21 +1,23 @@
 import { todayJST } from '@/lib/jst'
 
-// 気分の定数
+// 気分の定数。
+// emoji は通知の文面・Notion のページアイコンなど「文字だけの場所」で使う（アプリの画面では月の満ち欠けの図形 MoodGlyph を使う）。
+// color は CSS 変数（app/globals.css の --mood-1〜5）。色を変えるときは globals.css だけを直す
 export const MOODS = [
-  { value: 1, emoji: '😞', label: 'とても悪い', color: '#b5654a' },
-  { value: 2, emoji: '😕', label: '悪い', color: '#c5895f' },
-  { value: 3, emoji: '😐', label: '普通', color: '#cdbf9a' },
-  { value: 4, emoji: '🙂', label: '良い', color: '#9caa7e' },
-  { value: 5, emoji: '😄', label: 'とても良い', color: '#6f8a5f' },
+  { value: 1, emoji: '😞', label: 'とても悪い', color: 'var(--mood-1)' },
+  { value: 2, emoji: '😕', label: '悪い', color: 'var(--mood-2)' },
+  { value: 3, emoji: '😐', label: '普通', color: 'var(--mood-3)' },
+  { value: 4, emoji: '🙂', label: '良い', color: 'var(--mood-4)' },
+  { value: 5, emoji: '😄', label: 'とても良い', color: 'var(--mood-5)' },
 ] as const
 
-// エネルギーの定数
+// エネルギーの定数（画面では器の水位の図形 EnergyGlyph で表す）
 export const ENERGY = [
-  { value: 1, label: '枯渇', description: '何もできない', color: '#b5654a' },
-  { value: 2, label: '低い', description: '最小限のみ', color: '#c5895f' },
-  { value: 3, label: '普通', description: '日常通り', color: '#cdbf9a' },
-  { value: 4, label: '高い', description: '活発に動ける', color: '#9caa7e' },
-  { value: 5, label: '最高', description: '何でもできる', color: '#6f8a5f' },
+  { value: 1, label: '枯渇', description: '何もできない' },
+  { value: 2, label: '低い', description: '最小限のみ' },
+  { value: 3, label: '普通', description: '日常通り' },
+  { value: 4, label: '高い', description: '活発に動ける' },
+  { value: 5, label: '最高', description: '何でもできる' },
 ] as const
 
 // チェックインのステップ定数（2画面: 調子 → メモ。タップ数を最小にする）
@@ -41,7 +43,7 @@ const STEP_DESCRIPTIONS: Record<string, string[]> = {
     '書けるところだけでOK（すべて任意）',
     '印象に残ったことをひと言だけでも',
     'キーワードだけでも日記になります',
-    '音声入力🎤も使えます',
+    '話して入力することもできます',
     '今日の「ハイライト」は？',
     '全部スキップしてもOK',
     'ゆっくりでいいので、思い出してみて',
@@ -119,6 +121,8 @@ export function getDailyDescription(stepId: string, date: string = todayJST()): 
 /** 気分の値（1〜5）の絵文字・ラベル。範囲外なら undefined（呼び出し側で既定を決める） */
 export const moodEmoji = (value: number | null | undefined) => MOODS.find((m) => m.value === value)?.emoji
 export const moodLabel = (value: number | null | undefined) => MOODS.find((m) => m.value === value)?.label
+/** 気分の色（CSS 変数）。範囲外・未入力なら「普通」の色 */
+export const moodColor = (value: number | null | undefined) => MOODS.find((m) => m.value === value)?.color ?? 'var(--mood-3)'
 export const energyLabel = (value: number | null | undefined) => ENERGY.find((e) => e.value === value)?.label
 
 // ローカルストレージのキー

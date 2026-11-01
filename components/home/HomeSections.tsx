@@ -1,14 +1,12 @@
 import type { CSSProperties, ReactNode } from 'react'
 import Link from 'next/link'
-import { MOODS } from '@/lib/constants'
-import { dayOfWeek, subtractDays, type HomeEntry } from '@/lib/home-model'
+import { MOODS, moodColor, moodLabel } from '@/lib/constants'
+import { dayOfWeek, subtractDays, type HomeEntry, type HomeStats } from '@/lib/home-model'
 import { WEEKDAY_KANJI } from '@/lib/almanac'
+import Phrase from '@/components/ui/Phrase'
 import Reveal from './Reveal'
 
 // ホームの和紙シートに並ぶセクション群（すべてサーバーで描画できる純粋な表示部品）
-
-const moodColor = (mood: number | null | undefined) =>
-  MOODS.find((m) => m.value === mood)?.color ?? '#cdbf9a'
 
 const moodVar = (mood: number | null | undefined) => ({ '--mood': moodColor(mood) }) as CSSProperties
 
@@ -77,7 +75,7 @@ export function WeekRipples({ today, entries }: { today: string; entries: HomeEn
               ? `/checkin?date=${date}`
               : null
         const label = `${shortDate(date)}（${WEEKDAY_KANJI[dayOfWeek(date)]}）${
-          entry ? `気分 ${MOODS.find((m) => m.value === entry.mood)?.label ?? ''}` : isFuture ? '' : '記録なし'
+          entry ? `気分 ${moodLabel(entry.mood) ?? ''}` : isFuture ? '' : '記録なし'
         }`
         const body = (
           <>
@@ -87,11 +85,11 @@ export function WeekRipples({ today, entries }: { today: string; entries: HomeEn
           </>
         )
         return href ? (
-          <Link key={date} href={href} className="im-day" data-today={isToday} aria-label={label}>
+          <Link key={date} href={href} className="im-day" data-today={isToday} data-date={date} aria-label={label}>
             {body}
           </Link>
         ) : (
-          <div key={date} className="im-day" data-today={isToday} aria-label={label}>
+          <div key={date} className="im-day" data-today={isToday} data-date={date} aria-label={label}>
             {body}
           </div>
         )
@@ -101,24 +99,87 @@ export function WeekRipples({ today, entries }: { today: string; entries: HomeEn
 }
 
 // ───────── 数字の帯 ─────────
-export function StatsLine({ stats }: { stats: { total: number; avgMood: number; streak: number } }) {
-  const items = [
-    { label: '連続', value: String(stats.streak), unit: '日' },
-    { label: '記録', value: String(stats.total), unit: '件' },
-    { label: '平均の気分', value: stats.avgMood ? stats.avgMood.toFixed(1) : '—', unit: '/5' },
-  ]
+/**
+ * 連続記録のマス。途切れた日に大きな「0」を見せて責めないように、状態で出し分ける。
+ * - 続いている → 連続 N日（昨日だけ空いていれば「昨日を書くと M日」も添える）
+ * - 昨日だけ空いて途切れた → 戻せる日数を輪郭の数字で見せ、昨日の記録へ案内する（書き忘れ救済で連続は戻る）
+ * - それ以外で途切れた → これまでの最長（できたことを思い出せるように）
+ */
+function StreakCell({ stats, yesterday }: { stats: HomeStats; yesterday: string }) {
+  const backfill = `/checkin?date=${yesterday}`
+  if (stats.streak > 0) {
+    return (
+      <div className="im-stat">
+        <div className="im-label">連続</div>
+        <div className="im-stat-value">
+          {stats.streak}
+          <span className="im-stat-unit">日</span>
+        </div>
+        {stats.restorable && (
+          <Link href={backfill} className="im-stat-note">
+            <Phrase text={`昨日を書くと${stats.restorable}日`} />
+          </Link>
+        )}
+      </div>
+    )
+  }
+  if (stats.restorable) {
+    return (
+      <Link
+        href={backfill}
+        className="im-stat"
+        aria-label={`連続記録は昨日で途切れています。昨日の分を書けば ${stats.restorable}日 に戻ります`}
+      >
+        <div className="im-label">連続</div>
+        <div className="im-stat-value" data-ghost="true">
+          {stats.restorable}
+          <span className="im-stat-unit">日</span>
+        </div>
+        <span className="im-stat-note">
+          <Phrase text="昨日を書けば戻ります" />
+        </span>
+      </Link>
+    )
+  }
+  if (stats.longest > 0) {
+    return (
+      <div className="im-stat">
+        <div className="im-label">これまでの最長</div>
+        <div className="im-stat-value">
+          {stats.longest}
+          <span className="im-stat-unit">日</span>
+        </div>
+        <span className="im-stat-note" data-quiet="true">今日から、また。</span>
+      </div>
+    )
+  }
+  return (
+    <div className="im-stat">
+      <div className="im-label">連続</div>
+      <div className="im-stat-value">—</div>
+    </div>
+  )
+}
+
+export function StatsLine({ stats, yesterday }: { stats: HomeStats; yesterday: string }) {
   return (
     <Reveal className="im-section">
       <div className="im-stats">
-        {items.map((it) => (
-          <div key={it.label} className="im-stat">
-            <div className="im-label">{it.label}</div>
-            <div className="im-stat-value">
-              {it.value}
-              <span className="im-stat-unit">{it.unit}</span>
-            </div>
+        <StreakCell stats={stats} yesterday={yesterday} />
+        <div className="im-stat">
+          <div className="im-label">記録</div>
+          <div className="im-stat-value">
+            {stats.total}
+            <span className="im-stat-unit">件</span>
           </div>
-        ))}
+        </div>
+        <div className="im-stat">
+          <div className="im-label">平均の気分</div>
+          <div className="im-stat-value">
+            {stats.avgMood ? stats.avgMood.toFixed(1) : '—'}
+            <span className="im-stat-unit">/5</span>
+          </div>
+        </div>
       </div>
     </Reveal>
   )
@@ -217,7 +278,7 @@ export function Flashbacks({ items }: { items: { label: string; entry: HomeEntry
               {label}・{entry.entry_date.split('-').join('.')}
             </span>
             <span className="im-flash-text" style={{ display: 'block' }}>
-              {entry.summary || entry.dominant_emotion || 'この日の記録を読む'}
+              <Phrase text={entry.summary || entry.dominant_emotion || 'この日の記録を読む'} />
             </span>
             {/* 当時の本文はそのままに、今の見方を書き足せる */}
             <span className="im-flash-now">今は、どう思う？</span>
@@ -244,7 +305,7 @@ export function RecentList({ entries }: { entries: HomeEntry[] }) {
           </span>
           <span style={{ minWidth: 0 }}>
             <span className="im-row-text">
-              {e.summary || e.dominant_emotion || `気分「${MOODS.find((m) => m.value === e.mood)?.label ?? '—'}」だけの記録`}
+              <Phrase text={e.summary || e.dominant_emotion || `気分「${moodLabel(e.mood) ?? '—'}」だけの記録`} />
             </span>
             {e.tags?.length > 0 && (
               <span className="im-row-tags" style={{ display: 'block' }}>

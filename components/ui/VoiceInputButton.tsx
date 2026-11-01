@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback } from 'react'
+import { MicIcon, StopIcon } from '@/components/ui/icons'
 
 interface VoiceInputButtonProps {
   onResult: (transcript: string) => void
@@ -225,7 +226,7 @@ export default function VoiceInputButton({ onResult }: VoiceInputButtonProps) {
       {errorMsg && (
         <span
           role="status"
-          className="absolute bottom-full right-0 mb-2 whitespace-nowrap rounded-2xl bg-[#333a28] px-2 py-1 text-xs text-[#f5f2e7] shadow-lg"
+          className="absolute bottom-full right-0 mb-2 whitespace-nowrap rounded-2xl bg-[var(--deep)] px-3 py-1.5 text-xs text-[var(--on-deep)] shadow-lg"
         >
           {errorMsg}
         </span>
@@ -235,21 +236,16 @@ export default function VoiceInputButton({ onResult }: VoiceInputButtonProps) {
         type="button"
         disabled={status === 'transcribing'}
         aria-label={label}
-        className={`
-          w-11 h-11 rounded-full flex items-center justify-center transition-all
-          ${
-            status === 'recording'
-              ? 'bg-[#b5654a] text-white animate-pulse'
-              : status === 'transcribing'
-                ? 'bg-[var(--surface-secondary)] text-[var(--muted-2)] cursor-wait'
-                : 'bg-[var(--surface-secondary)] border border-[var(--border)] text-[var(--muted)]'
-          }
-        `}
+        aria-pressed={status === 'recording'}
+        className="voice-btn"
+        data-status={status}
       >
         {status === 'transcribing' ? (
-          <span className="w-4 h-4 rounded-full border-2 border-[var(--muted-2)] border-t-transparent animate-spin" />
+          <span className="spinner" style={{ width: 16, height: 16 }} />
+        ) : status === 'recording' ? (
+          <StopIcon size={16} />
         ) : (
-          '🎤'
+          <MicIcon size={20} />
         )}
       </button>
     </div>

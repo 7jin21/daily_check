@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { getSupabaseClient } from '@/lib/supabase'
 import { appendLaterNote } from '@/lib/freeform'
 import { todayJST } from '@/lib/jst'
+import { PlusIcon } from '@/components/ui/icons'
 
 // 過去の日記に「今の一言」を添える。当時の本文には手を触れず、freeform の末尾に日付つきで足す。
 const MAX = 300
@@ -55,8 +56,11 @@ export default function LaterNote({ entryId, autoOpen = false }: { entryId: stri
         onClick={() => setOpen(true)}
         className="w-full mt-4 py-4 px-5 rounded-2xl border border-dashed border-[var(--border)] text-left flex-col !items-start gap-1"
       >
-        <span className="text-sm font-bold text-[var(--foreground)]">＋ 今の一言を添える</span>
-        <span className="text-xs text-[var(--muted)]">当時の日記はそのままに、今の見方を書き足せます</span>
+        <span className="inline-flex items-center gap-1.5 text-sm font-bold font-ui text-[var(--foreground)]">
+          <PlusIcon size={16} />
+          今の一言を添える
+        </span>
+        <span className="text-xs font-ui text-[var(--muted)]">当時の日記はそのままに、今の見方を書き足せます</span>
       </button>
     )
   }
@@ -71,27 +75,25 @@ export default function LaterNote({ entryId, autoOpen = false }: { entryId: stri
         onChange={(e) => setText(e.target.value.slice(0, MAX))}
         rows={3}
         placeholder="例：あのとき悩んでいたこと、今は笑い話になった"
-        className="w-full p-3 rounded-2xl border border-[var(--border)] bg-[var(--surface-secondary)] text-[var(--foreground)] text-base resize-none focus:outline-none focus:ring-2 focus:ring-[var(--primary)] leading-relaxed"
+        aria-label="今の一言"
+        className="w-full p-3 rounded-2xl border border-[var(--border)] bg-[var(--surface-secondary)] text-[var(--foreground)] font-mincho resize-none focus:outline-none focus:ring-2 focus:ring-[var(--primary)] leading-loose"
       />
       {error && (
-        <p className="mt-1.5 text-xs" style={{ color: '#9c4a2f' }}>
+        <p className="mt-1.5 text-xs text-[var(--danger)]" role="alert">
           {error}
         </p>
       )}
       <div className="flex gap-2 mt-3">
-        <button
-          onClick={save}
-          disabled={saving || !text.trim()}
-          className="flex-1 py-2.5 rounded-full bg-[var(--accent)] text-[#f7f4ea] text-sm font-bold disabled:opacity-50 active:scale-95 transition-transform"
-        >
-          {saving ? '保存中…' : '添える'}
+        <button type="button" onClick={save} disabled={saving || !text.trim()} className="btn btn-primary btn-sm flex-1">
+          {saving ? '保存しています…' : '添える'}
         </button>
         <button
+          type="button"
           onClick={() => {
             setOpen(false)
             setText('')
           }}
-          className="px-4 py-2.5 rounded-full border border-[var(--border)] text-[var(--muted)] text-sm active:scale-95 transition-transform"
+          className="btn btn-secondary btn-sm"
         >
           やめる
         </button>

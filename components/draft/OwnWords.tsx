@@ -1,4 +1,5 @@
 import type { KeptAnalysis } from '@/lib/draft-compose'
+import { ChevronDownIcon } from '@/components/ui/icons'
 
 // 「あなたの言葉」がどれだけ残っているかを確かめる（清書係であって代筆者ではない、を目で見られるように）
 
@@ -10,7 +11,7 @@ export function OwnWordsMeter({ percent, open, onToggle }: { percent: number; op
         <span style={{ width: `${percent}%` }} />
       </span>
       あなたの言葉 {percent}%
-      <span className="text-[var(--muted-2)]">{open ? '▴' : '▾'}</span>
+      <ChevronDownIcon size={14} className="dv-meter-chevron" />
     </button>
   )
 }
@@ -29,8 +30,8 @@ interface ComparePanelProps {
 export function ComparePanel({ segments, original, keptPercent, addedChars, showUseRaw, disabled, onUseRaw }: ComparePanelProps) {
   return (
     <div className="mt-3 card animate-fade-in" style={{ padding: 16 }}>
-      <p className="text-xs font-bold text-[var(--muted)] tracking-wide">いまの本文</p>
-      <p className="mt-2 text-[15px] leading-loose text-[var(--foreground)] whitespace-pre-wrap">
+      <p className="label-ui">いまの本文</p>
+      <p className="mt-2 font-mincho text-[0.9375rem] leading-loose text-[var(--foreground)] whitespace-pre-wrap prose-ja">
         {segments.map((s, i) =>
           s.added ? (
             // 文をつなぐだけの助詞は「AI の言葉」に数えないので、印も控えめにする
@@ -45,12 +46,12 @@ export function ComparePanel({ segments, original, keptPercent, addedChars, show
       <p className="mt-2 text-xs text-[var(--muted)]">
         メモの {keptPercent}% を使っています・AIが足した言葉 {addedChars}字
       </p>
-      <p className="mt-1 text-[11px] text-[var(--muted)]">
+      <p className="mt-1 text-[0.6875rem] leading-relaxed text-[var(--muted)]">
         <mark className="ai-added">下線</mark> は AI が足した言葉（メモに無かった言葉）、<mark className="ai-joint">点線</mark>{' '}
         は文をつなぐための助詞です。ここで自分で書き足した言葉は、あなたの言葉として数えます。
       </p>
-      <p className="mt-4 text-xs font-bold text-[var(--muted)] tracking-wide">あなたが書いたメモ</p>
-      <p className="mt-2 text-sm leading-relaxed text-[var(--muted)] whitespace-pre-wrap">{original}</p>
+      <p className="mt-4 label-ui">あなたが書いたメモ</p>
+      <p className="mt-2 font-mincho text-sm leading-relaxed text-[var(--muted)] whitespace-pre-wrap">{original}</p>
       {showUseRaw && (
         <button type="button" onClick={onUseRaw} disabled={disabled} className="mt-3 draft-undo">
           メモのままにする

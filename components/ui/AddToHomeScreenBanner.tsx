@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { CloseIcon, MirrorMark, ShareIcon } from '@/components/ui/icons'
 
 const DISMISSED_KEY = 'pwa-banner-dismissed'
 
@@ -30,23 +31,20 @@ export default function AddToHomeScreenBanner() {
       style={{ bottom: 'calc(var(--bottom-nav-height) + env(safe-area-inset-bottom) + 12px)' }}
     >
       <div className="flex items-start gap-3">
-        <span className="text-2xl flex-shrink-0">📲</span>
+        <MirrorMark size={32} className="flex-shrink-0 text-[var(--gold)]" />
         <div className="flex-1 min-w-0">
-          <p className="font-bold text-[var(--foreground)] text-sm">ホーム画面に追加する</p>
-          <p className="text-xs text-[var(--muted)] mt-1 leading-relaxed">
-            Safariの下部メニューから
-            <span className="inline-flex items-center gap-1 mx-1 bg-[var(--surface-secondary)] rounded px-1 py-0.5 text-[var(--foreground)]">
-              共有 □↑
+          <p className="font-mincho font-semibold text-[var(--foreground)] text-sm">ホーム画面に置いておく</p>
+          <p className="text-xs font-ui text-[var(--muted)] mt-1 leading-relaxed">
+            Safari の
+            <span className="inline-flex items-center gap-1 mx-1 align-middle bg-[var(--surface-secondary)] rounded-md px-1.5 py-0.5 text-[var(--foreground)]">
+              <ShareIcon size={14} />
+              共有
             </span>
-            をタップ → 「ホーム画面に追加」を選択
+            から「ホーム画面に追加」を選ぶと、アプリのように開けます
           </p>
         </div>
-        <button
-          onClick={dismiss}
-          className="w-6 h-6 flex items-center justify-center text-[var(--muted-2)] flex-shrink-0 text-lg"
-          aria-label="閉じる"
-        >
-          ×
+        <button type="button" onClick={dismiss} className="flex-shrink-0 -mr-2 -mt-2 text-[var(--muted)]" aria-label="閉じる">
+          <CloseIcon size={18} />
         </button>
       </div>
     </div>

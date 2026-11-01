@@ -6,6 +6,27 @@ import { STORAGE_KEYS } from '@/lib/constants'
 import { todayJST } from '@/lib/jst'
 import { doneInLastWeek, FOCUS_MAX_CHARS, isFocusActive, loadFocus, saveFocus, type Focus } from '@/lib/focus'
 import { formatAge } from './shared'
+import InkRings from '@/components/ui/InkRings'
+import { AlertIcon, CheckIcon, MirrorMark } from '@/components/ui/icons'
+
+/** ふり返りの小さなカード。色は気分のトークンから（ハイライト＝晴れ、乗り越えたこと＝沈みかけ、など） */
+function ReportCard({ label, tone, children }: { label: string; tone: string; children: React.ReactNode }) {
+  return (
+    <div
+      className="card"
+      style={{
+        background: `color-mix(in srgb, ${tone} 9%, var(--surface))`,
+        borderColor: `color-mix(in srgb, ${tone} 30%, transparent)`,
+      }}
+    >
+      <p className="label-ui mb-1.5" style={{ color: 'var(--foreground)' }}>
+        <span aria-hidden="true" className="inline-block w-2 h-2 rounded-full mr-2 align-middle" style={{ background: tone }} />
+        {label}
+      </p>
+      {children}
+    </div>
+  )
+}
 
 interface WeeklyReport {
   narrative: string
@@ -97,14 +118,16 @@ export default function WeeklyReportSection() {
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-bold text-[var(--foreground)]">今週の振り返り</h2>
+        <h2 className="font-mincho text-lg font-semibold tracking-wide text-[var(--foreground)]">今週の振り返り</h2>
         <div className="flex flex-col items-end gap-0.5">
           <button
+            type="button"
             onClick={loadWeeklyReport}
             disabled={isWeeklyLoading}
-            className="text-[var(--primary)] text-sm font-medium disabled:opacity-50"
+            className="btn-quiet"
+            style={{ minHeight: 32, color: 'var(--primary)', fontWeight: 700 }}
           >
-            {isWeeklyLoading ? '生成中...' : weeklyReport ? '更新' : 'レポートを作成'}
+            {isWeeklyLoading ? '書いています…' : weeklyReport ? '更新する' : 'レポートを作る'}
           </button>
           {weeklyCachedAt && !isWeeklyLoading && (
             <span className="text-xs text-[var(--muted-2)]">{formatAge(weeklyCachedAt)}</span>
@@ -113,9 +136,9 @@ export default function WeeklyReportSection() {
       </div>
 
       {isWeeklyLoading && (
-        <div className="flex flex-col items-center justify-center py-10 gap-3">
-          <div className="spinner" style={{ width: 36, height: 36, borderWidth: 3 }} />
-          <p className="text-[var(--muted)] text-sm">今週の日記を振り返っています...</p>
+        <div className="flex flex-col items-center justify-center py-10 gap-5" role="status">
+          <InkRings size="md" />
+          <p className="font-mincho text-[var(--muted)] text-sm tracking-wide">今週の日記を、ふり返っています</p>
         </div>
       )}
 
@@ -127,14 +150,11 @@ export default function WeeklyReportSection() {
 
       {!isWeeklyLoading && !weeklyReport && !weeklyError && (
         <div className="card text-center py-8">
-          <p className="text-3xl mb-3">📅</p>
-          <p className="font-bold text-[var(--foreground)]">今週を振り返る</p>
-          <p className="text-sm text-[var(--muted)] mt-1 mb-4">直近7日間の日記からナラティブレポートを生成</p>
-          <button
-            onClick={loadWeeklyReport}
-            className="px-6 py-2.5 rounded-full bg-[var(--accent)] text-[#f7f4ea] font-bold text-sm"
-          >
-            レポートを作成
+          <MirrorMark size={40} className="empty-mark" />
+          <p className="font-mincho font-semibold text-[var(--foreground)]">今週を、ふり返る</p>
+          <p className="text-sm text-[var(--muted)] mt-1 mb-5">直近7日間の日記から、一週間の物語を書きます</p>
+          <button type="button" onClick={loadWeeklyReport} className="btn btn-primary btn-sm">
+            レポートを作る
           </button>
         </div>
       )}
@@ -142,47 +162,44 @@ export default function WeeklyReportSection() {
       {!isWeeklyLoading && weeklyReport && (
         <div className="space-y-3">
           {weeklyReport.isFallback && (
-            <p className="p-3 rounded-2xl text-xs" style={{ background: 'rgba(197,137,95,0.12)', border: '1px solid rgba(197,137,95,0.35)', color: '#a4683f' }}>
-              ⚠️ AIレポートを生成できなかったため、記録データからの簡易版を表示しています。「更新」で再試行できます。
-            </p>
+            <div className="notice" data-tone="warn" role="status">
+              <AlertIcon size={18} />
+              <p>AI レポートを作れなかったため、記録データからの簡易版を表示しています。「更新する」で再試行できます。</p>
+            </div>
           )}
           <div className="card">
-            <div className="flex items-center gap-2 mb-3">
-              <span className="text-xl">🗓</span>
-              <span className="font-bold text-[var(--foreground)]">
-                今週のキーワード：
-                <span className="ml-1 text-[var(--primary)]">{weeklyReport.weekMood}</span>
-              </span>
-              <span className="ml-auto text-xs text-[var(--muted-2)]">
+            <div className="flex items-baseline gap-2 mb-3 flex-wrap">
+              <span className="label-ui">今週のキーワード</span>
+              <span className="font-mincho font-semibold text-[var(--foreground)]">{weeklyReport.weekMood}</span>
+              <span className="ml-auto text-xs font-ui text-[var(--muted-2)]">
                 {weeklyReport.entryCount}件 / 平均気分 {weeklyReport.avgMood}
               </span>
             </div>
-            <p className="text-sm text-[var(--foreground)] leading-relaxed">
+            <p className="font-mincho text-[0.9375rem] text-[var(--foreground)] leading-loose prose-ja">
               {weeklyReport.narrative}
             </p>
           </div>
 
           <div className="grid grid-cols-1 gap-3">
             {weeklyReport.focusReview && (
-              <div className="card" style={{ background: 'rgba(205,191,154,0.14)', borderColor: 'rgba(205,191,154,0.4)' }}>
-                <p className="text-xs font-bold mb-1" style={{ color: '#8a7c4e' }}>🔁 先週のフォーカスは…</p>
-                <p className="text-sm text-[var(--foreground)]">{weeklyReport.focusReview}</p>
-              </div>
+              <ReportCard label="先週のフォーカスは" tone="var(--mood-3)">
+                <p className="font-mincho text-sm leading-relaxed text-[var(--foreground)]">{weeklyReport.focusReview}</p>
+              </ReportCard>
             )}
-            <div className="card" style={{ background: 'rgba(111,138,95,0.10)', borderColor: 'rgba(111,138,95,0.3)' }}>
-              <p className="text-xs font-bold mb-1" style={{ color: '#5a7350' }}>✨ 今週のハイライト</p>
-              <p className="text-sm text-[var(--foreground)]">{weeklyReport.highlight}</p>
-            </div>
-            <div className="card" style={{ background: 'rgba(197,137,95,0.10)', borderColor: 'rgba(197,137,95,0.3)' }}>
-              <p className="text-xs font-bold mb-1" style={{ color: '#a4683f' }}>💪 乗り越えたこと</p>
-              <p className="text-sm text-[var(--foreground)]">{weeklyReport.challenge}</p>
-            </div>
-            <div className="card" style={{ background: 'rgba(156,107,74,0.10)', borderColor: 'rgba(156,107,74,0.3)' }}>
-              <p className="text-xs font-bold mb-1" style={{ color: 'var(--primary)' }}>🎯 来週のフォーカス</p>
-              <p className="text-sm text-[var(--foreground)]">{weeklyReport.nextFocus}</p>
+            <ReportCard label="今週のハイライト" tone="var(--mood-5)">
+              <p className="font-mincho text-sm leading-relaxed text-[var(--foreground)]">{weeklyReport.highlight}</p>
+            </ReportCard>
+            <ReportCard label="乗り越えたこと" tone="var(--mood-2)">
+              <p className="font-mincho text-sm leading-relaxed text-[var(--foreground)]">{weeklyReport.challenge}</p>
+            </ReportCard>
+            <ReportCard label="来週のフォーカス" tone="var(--gold)">
+              <p className="font-mincho text-sm leading-relaxed text-[var(--foreground)]">{weeklyReport.nextFocus}</p>
               {/* 本人が採用・言い換えたものをホームに出し、できた日をワンタップで残せる */}
               {focus && focus.text === weeklyReport.nextFocus ? (
-                <p className="mt-3 text-xs font-bold text-[var(--primary)]">✓ 今週のフォーカスにしました（ホームで記録できます）</p>
+                <p className="mt-3 flex items-center gap-1.5 text-xs font-bold font-ui text-[var(--primary)]">
+                  <CheckIcon size={15} />
+                  今週のフォーカスにしました（ホームで記録できます）
+                </p>
               ) : focusEditing ? (
                 <div className="mt-3">
                   <input
@@ -193,44 +210,35 @@ export default function WeeklyReportSection() {
                     aria-label="今週のフォーカス"
                   />
                   <div className="flex gap-2 mt-2">
-                    <button
-                      onClick={() => adoptFocus(focusDraft)}
-                      disabled={!focusDraft.trim()}
-                      className="flex-1 py-2 rounded-full bg-[var(--accent)] text-[#f7f4ea] text-xs font-bold disabled:opacity-40"
-                    >
+                    <button type="button" onClick={() => adoptFocus(focusDraft)} disabled={!focusDraft.trim()} className="btn btn-primary btn-sm flex-1">
                       これにする
                     </button>
-                    <button
-                      onClick={() => setFocusEditing(false)}
-                      className="px-4 py-2 rounded-full border border-[var(--border)] text-[var(--muted)] text-xs"
-                    >
+                    <button type="button" onClick={() => setFocusEditing(false)} className="btn btn-secondary btn-sm">
                       やめる
                     </button>
                   </div>
                 </div>
               ) : (
                 <div className="flex gap-2 mt-3">
-                  <button
-                    onClick={() => adoptFocus(weeklyReport.nextFocus)}
-                    className="flex-1 py-2 rounded-full bg-[var(--accent)] text-[#f7f4ea] text-xs font-bold"
-                  >
+                  <button type="button" onClick={() => adoptFocus(weeklyReport.nextFocus)} className="btn btn-primary btn-sm flex-1">
                     今週のフォーカスにする
                   </button>
                   <button
+                    type="button"
                     onClick={() => {
                       setFocusDraft(weeklyReport.nextFocus)
                       setFocusEditing(true)
                     }}
-                    className="px-4 py-2 rounded-full border border-[var(--border)] text-[var(--muted)] text-xs"
+                    className="btn btn-secondary btn-sm"
                   >
                     言い換える
                   </button>
                 </div>
               )}
               {focus && focus.text !== weeklyReport.nextFocus && !focusEditing && (
-                <p className="mt-2 text-[11px] text-[var(--muted)]">いまのフォーカス: {focus.text}</p>
+                <p className="mt-2 text-[0.6875rem] text-[var(--muted)]">いまのフォーカス: {focus.text}</p>
               )}
-            </div>
+            </ReportCard>
           </div>
         </div>
       )}

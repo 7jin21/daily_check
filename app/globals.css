@@ -2,24 +2,61 @@
 @tailwind components;
 @tailwind utilities;
 
-/* CSS カスタムプロパティ — 和紙と墨（クリーム・墨・セージ・金）。ホームの「水鏡」と共通の基調 */
+/*
+ * 色のトークン — 和紙と墨（クリーム・墨・セージ・金）。ホームの「水鏡」と共通の基調。
+ * 画面の部品では色をじかに書かず、ここの変数を使う（ダークモード・調整を一か所で済ませるため）。
+ * 文字に使う色は、紙（--background / --surface / --surface-secondary）の上でコントラスト比 4.5:1 以上にしてある。
+ */
 :root {
   --background: #f3efe6;       /* 和紙（ページ背景） */
   --foreground: #24271f;       /* 墨（本文・見出し） */
   --surface: #fbf9f3;          /* カードの紙 */
-  --surface-secondary: #ebe6d8;/* やや濃い紙（スケルトン等） */
+  --surface-secondary: #ebe6d8;/* やや濃い紙（入力欄・押せない状態） */
   --border: #e2dccd;           /* カード・リストの細罫 */
   --divider: #ddd6c5;          /* セクション区切り罫 */
   --divider-strong: #3f4334;   /* 強い区切り罫（ヘッダー等） */
-  --primary: #5a744a;          /* セージ（リンク・アクセント）。紙の上で AA を満たす濃さ */
+  --primary: #536c44;          /* セージ（リンク・アクセント文字） */
   --primary-foreground: #fbf9f3;
-  --accent: #6b8756;           /* 深めのセージ（CTA ピルボタン） */
+  --accent: #6b8756;           /* セージ（面・メーター） */
   --accent-hover: #7a9464;
-  --gold: #a88746;             /* 金（アイキャッチ・リング） */
-  --blue: #8ba3b5;             /* ダスティブルー（統計・気分） */
-  --muted: #6f6c5d;            /* 補助テキスト（AA 4.5:1 以上） */
-  --muted-2: #8f8b78;          /* さらに淡い補助テキスト（大きめの文字・装飾用） */
+  --gold: #a88746;             /* 金（飾り・AI が足した言葉の印）。文字色には使わない */
+  --gold-ink: #7d6431;         /* 文字に使える深い金（4.5:1 以上） */
+  --blue: #8ba3b5;             /* ダスティブルー */
+  --muted: #615e50;            /* 補助テキスト（すべての紙の上で 5.2:1 以上） */
+  --muted-2: #6b6857;          /* さらに控えめな補助テキスト（4.5:1 以上） */
+  --faint: #a19c86;            /* 装飾専用（点・飾り数字・山括弧）。情報を持つ文字には使わない */
   --hairline: rgba(36, 39, 31, 0.12); /* 極細の罫 */
+
+  /* 気分（1 沈む → 5 晴れる）。月の満ち欠けの図形と組み合わせて使う（色だけで区別させない） */
+  --mood-1: #b5654a;
+  --mood-2: #c5895f;
+  --mood-3: #cdbf9a;
+  --mood-4: #9caa7e;
+  --mood-5: #6f8a5f;
+  /* 水（エネルギー）。器の水位の図形に使う */
+  --water: #7d98ab;
+  --water-soft: #c9d4da;
+
+  /* 主ボタン（生成りの文字が 5.7:1 になる深いセージ） */
+  --btn-bg: #4f673f;
+  --btn-bg-active: #435936;
+  --btn-fg: #f7f4ea;
+
+  /* お知らせ・エラー・よい変化 */
+  --notice: #8a5532;
+  --notice-bg: rgba(197, 137, 95, 0.12);
+  --notice-border: rgba(197, 137, 95, 0.38);
+  --danger: #9c4a2f;
+  --danger-bg: rgba(181, 101, 74, 0.1);
+  --danger-border: rgba(181, 101, 74, 0.35);
+  --positive: #4f6a40;
+
+  /* 濃い面（アバター・吹き出し） */
+  --deep: #333a28;
+  --on-deep: #f5f2e7;
+
+  --focus-ring: rgba(83, 108, 68, 0.55);
+
   /* Safe area insets (iPhone対応) */
   --safe-area-top: env(safe-area-inset-top);
   --safe-area-bottom: env(safe-area-inset-bottom);
@@ -48,10 +85,33 @@
   --accent: #7a9464;
   --accent-hover: #8aa673;
   --gold: #cfae6e;
+  --gold-ink: #d8b878;
   --blue: #93aabb;
   --muted: #a7a393;
-  --muted-2: #807d6f;
+  --muted-2: #959282;
+  --faint: #55534a;
   --hairline: rgba(236, 231, 218, 0.12);
+
+  --water: #8fa8ba;
+  --water-soft: #3a4750;
+
+  /* ダークでは明るいセージの面に墨の文字（9.2:1） */
+  --btn-bg: #a9c08f;
+  --btn-bg-active: #98b07e;
+  --btn-fg: #141612;
+
+  --notice: #d9a27a;
+  --notice-bg: rgba(217, 162, 122, 0.1);
+  --notice-border: rgba(217, 162, 122, 0.3);
+  --danger: #d39177;
+  --danger-bg: rgba(211, 145, 119, 0.1);
+  --danger-border: rgba(211, 145, 119, 0.32);
+  --positive: #a9c08f;
+
+  --deep: #2a2f23;
+  --on-deep: #efe9d3;
+
+  --focus-ring: rgba(169, 192, 143, 0.6);
 }
 
 /* 書体ユーティリティ */
@@ -84,11 +144,50 @@ body {
   color: var(--foreground);
   /* 明朝体を基調にした「上質な日記帳」の書体。欧文・数字はガラモン系セリフ */
   font-family: 'Cormorant Garamond', 'Shippori Mincho', 'Hiragino Mincho ProN', 'Yu Mincho', serif;
-  /* iOS のフォントサイズ自動調整を無効化 */
+  /* 明朝体は細く見えやすいので、基本ウェイトをやや強めに */
+  font-weight: 500;
+  /* iOS のフォントサイズ自動調整を無効化（文字の大きさは layout.tsx の Dynamic Type 対応で合わせる） */
   -webkit-text-size-adjust: 100%;
   /* テキスト選択のレンダリング最適化 */
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* ───────── 和文の組版 ───────── */
+
+/* 見出しは詰め組み（palt）にして、行の長さをそろえる */
+h1,
+h2,
+h3,
+.ttl {
+  font-feature-settings: 'palt' 1;
+  text-wrap: balance;
+}
+
+/* 文節の切れ目でだけ折り返す（components/ui/Phrase.tsx が BudouX で <wbr> を入れる）。短い見出し・引用向け */
+.phrase {
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+
+/* 和文の本文: 行頭禁則を厳しく・句読点をぶら下げる（Safari）・最後の行に1文字だけ残さない */
+.prose-ja {
+  line-break: strict;
+  hanging-punctuation: allow-end;
+  text-wrap: pretty;
+}
+
+/* 画面には出さず、読み上げにだけ渡す */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 /* Safe area 対応 */
@@ -119,7 +218,7 @@ body {
 .nav-capsule {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  height: var(--bottom-nav-height);
+  min-height: var(--bottom-nav-height);
   padding: 0 6px;
   border-radius: 999px;
   background: color-mix(in srgb, var(--surface) 80%, transparent);
@@ -151,9 +250,14 @@ body {
 .nav-item:active {
   transform: scale(0.94);
 }
+.nav-item:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -4px;
+  border-radius: 999px;
+}
 .nav-label {
   font-family: 'Zen Kaku Gothic New', 'Hiragino Sans', system-ui, sans-serif;
-  font-size: 10px;
+  font-size: 0.625rem;
   font-weight: 500;
   letter-spacing: 0.06em;
   margin-bottom: 6px;
@@ -178,11 +282,11 @@ a,
   justify-content: center;
 }
 
-/* input のズーム防止（iOS: 16px以上） */
+/* input のズーム防止（iOS: 16px以上。Dynamic Type で大きくするときは 1rem に合わせて大きくなる） */
 input,
 textarea,
 select {
-  font-size: 16px;
+  font-size: max(16px, 1rem);
 }
 
 /* スクロールバー非表示（iOS風） */
@@ -194,9 +298,215 @@ select {
   display: none;
 }
 
-/* 明朝体は細く見えやすいので、基本ウェイトをやや強めに */
-body {
+/* ───────── ボタン（全画面で共通。色は変数から） ───────── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 54px;
+  padding: 8px 24px;
+  border-radius: 999px;
+  font-family: 'Zen Kaku Gothic New', 'Hiragino Sans', system-ui, sans-serif;
+  font-size: 0.9375rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  line-height: 1.35;
+  text-align: center;
+  -webkit-user-select: none;
+  user-select: none;
+  transition: transform 0.2s cubic-bezier(0.2, 0.7, 0.2, 1), background-color 0.25s, color 0.25s, box-shadow 0.25s,
+    border-color 0.25s;
+}
+.btn:active:not(:disabled) {
+  transform: scale(0.98);
+}
+.btn:focus-visible,
+.icon-btn:focus-visible,
+.chip:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 3px;
+}
+.btn-block {
+  width: 100%;
+}
+.btn-primary {
+  background: var(--btn-bg);
+  color: var(--btn-fg);
+  box-shadow: 0 10px 26px color-mix(in srgb, var(--btn-bg) 28%, transparent);
+}
+.btn-primary:active:not(:disabled) {
+  background: var(--btn-bg-active);
+}
+/* ダークでは明るい面の影が光の輪に見えるので、暗い影だけにする */
+.dark .btn-primary {
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35);
+}
+.btn-secondary {
+  min-height: 48px;
+  background: transparent;
+  color: var(--foreground);
+  border: 1px solid var(--border);
   font-weight: 500;
+}
+.btn-sm {
+  min-height: 40px;
+  padding: 6px 16px;
+  font-size: 0.8125rem;
+}
+/* 押せないとき: 薄くして読めなくするのではなく、紙の色に沈めて文字は読めるままにする */
+.btn:disabled {
+  background: var(--surface-secondary);
+  color: var(--muted);
+  border-color: transparent;
+  box-shadow: none;
+  cursor: not-allowed;
+}
+/* 下線の文字リンク型（控えめな選択肢） */
+.btn-quiet {
+  min-height: 44px;
+  padding: 0 8px;
+  background: none;
+  font-family: 'Zen Kaku Gothic New', 'Hiragino Sans', system-ui, sans-serif;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, currentColor 35%, transparent);
+  text-underline-offset: 5px;
+}
+.btn-quiet:disabled {
+  opacity: 0.5;
+}
+.btn-quiet[data-tone='danger'] {
+  color: var(--danger);
+}
+.btn .btn-arrow {
+  margin-right: -6px;
+}
+
+/* 丸いアイコンボタン（戻るなど） */
+.icon-btn {
+  width: 44px;
+  height: 44px;
+  flex: none;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--foreground);
+  transition: transform 0.2s;
+}
+.icon-btn:active {
+  transform: scale(0.94);
+}
+
+/* 小さな選択肢・タグ */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  font-family: 'Zen Kaku Gothic New', 'Hiragino Sans', system-ui, sans-serif;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--muted);
+  transition: transform 0.2s, background-color 0.2s, color 0.2s;
+}
+.chip:active:not(:disabled) {
+  transform: scale(0.96);
+}
+.chip:disabled {
+  opacity: 0.45;
+}
+
+/* 音声入力のボタン（録音中は赤い輪が静かに脈打つ） */
+.voice-btn {
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface-secondary);
+  color: var(--muted);
+  transition: background-color 0.2s, color 0.2s;
+}
+.voice-btn[data-status='recording'] {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: var(--surface);
+  animation: voice-pulse 1.6s ease-out infinite;
+}
+.voice-btn[data-status='transcribing'] {
+  cursor: wait;
+}
+.voice-btn:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+@keyframes voice-pulse {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--danger) 45%, transparent); }
+  100% { box-shadow: 0 0 0 12px color-mix(in srgb, var(--danger) 0%, transparent); }
+}
+
+/* タグ（#仕事 など） */
+.tag-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface-secondary);
+  font-family: 'Zen Kaku Gothic New', system-ui, sans-serif;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--primary);
+}
+
+/* ───────── お知らせ（情報・注意・エラー） ───────── */
+.notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  background: var(--surface-secondary);
+  color: var(--muted);
+  font-family: 'Zen Kaku Gothic New', 'Hiragino Sans', system-ui, sans-serif;
+  font-size: 0.8125rem;
+  line-height: 1.7;
+}
+.notice > svg {
+  flex: none;
+  margin-top: 2px;
+}
+.notice b {
+  display: block;
+  font-weight: 700;
+}
+.notice[data-tone='warn'] {
+  background: var(--notice-bg);
+  border-color: var(--notice-border);
+  color: var(--notice);
+}
+.notice[data-tone='danger'] {
+  background: var(--danger-bg);
+  border-color: var(--danger-border);
+  color: var(--danger);
+}
+
+/* 何もないときの印（水平線に映る月） */
+.empty-mark {
+  color: var(--faint);
+  margin: 0 auto 18px;
 }
 
 /* カード共通スタイル（大きくやわらかい角丸＋淡い影） */
@@ -211,7 +521,7 @@ body {
 /* セクション見出しの装飾ラベル（Today's check-in 等の小キャップス・ガラモン） */
 .eyebrow {
   font-family: 'Cormorant Garamond', 'Shippori Mincho', serif;
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 600;
   letter-spacing: 0.26em;
   text-transform: uppercase;
@@ -227,23 +537,16 @@ body {
   border-bottom: 1px solid var(--divider);
 }
 
-/* グラデーションテキスト（セージ→ゴールド） */
-.gradient-text {
-  background: linear-gradient(135deg, #5f7a4c, #ab8b4e);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+/* 小さな UI 文字の見出し（カードの中の「AIが足した言葉」など） */
+.label-ui {
+  font-family: 'Zen Kaku Gothic New', 'Hiragino Sans', system-ui, sans-serif;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--muted);
 }
 
-/* フローティングアニメーション */
-@keyframes float {
-  0%, 100% { transform: translateY(0); }
-  50%       { transform: translateY(-10px); }
-}
-
-.animate-float {
-  animation: float 3.5s ease-in-out infinite;
-}
+/* ───────── 動き ───────── */
 
 /* ステップ切り替えアニメーション（方向付き） */
 @keyframes enter-from-right {
@@ -257,45 +560,17 @@ body {
 }
 
 .animate-enter-right {
-  animation: enter-from-right 0.22s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+  animation: enter-from-right 0.28s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
 }
 
 .animate-enter-left {
-  animation: enter-from-left 0.22s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+  animation: enter-from-left 0.28s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
 }
 
-/* 紙吹雪アニメーション */
-@keyframes confetti-fall {
-  0%   { transform: translateY(-20px) rotate(0deg) scale(1); opacity: 1; }
-  85%  { opacity: 1; }
-  100% { transform: translateY(110vh) rotate(700deg) scale(0.6); opacity: 0; }
-}
-
-.confetti-piece {
-  position: absolute;
-  animation: confetti-fall linear forwards;
-}
-
-/* グロー効果（セージのやわらかい影） */
-.glow-sky {
-  box-shadow: 0 8px 24px rgba(95, 122, 76, 0.3);
-}
-
-/* プログレスバー輝き */
-@keyframes progress-glow {
-  0%, 100% { box-shadow: 0 0 8px rgba(95, 122, 76, 0.45); }
-  50%       { box-shadow: 0 0 16px rgba(139, 163, 117, 0.55); }
-}
-
-.progress-bar-glow {
-  animation: progress-glow 2s ease-in-out infinite;
-}
-
-/* アニメーション */
 @keyframes slide-up {
   from {
     opacity: 0;
-    transform: translateY(20px);
+    transform: translateY(16px);
   }
   to {
     opacity: 1;
@@ -304,7 +579,7 @@ body {
 }
 
 .animate-slide-up {
-  animation: slide-up 0.3s ease-out;
+  animation: slide-up 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) both;
 }
 
 @keyframes fade-in {
@@ -313,10 +588,10 @@ body {
 }
 
 .animate-fade-in {
-  animation: fade-in 0.2s ease-out;
+  animation: fade-in 0.25s ease-out both;
 }
 
-/* ローディングスピナー */
+/* ローディングスピナー（小さな待ち。長い待ちは墨の輪 .ink-rings を使う） */
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
@@ -330,35 +605,7 @@ body {
   animation: spin 0.8s linear infinite;
 }
 
-/* 選択時のポップ（気分・エネルギー選択のマイクロインタラクション） */
-@keyframes pop {
-  0%   { transform: scale(1); }
-  40%  { transform: scale(1.35); }
-  70%  { transform: scale(0.92); }
-  100% { transform: scale(1); }
-}
-
-.animate-pop {
-  animation: pop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-
-/* AIストリーミング中のカーソル点滅 */
-@keyframes blink {
-  0%, 49%  { opacity: 1; }
-  50%, 100% { opacity: 0; }
-}
-
-.typing-cursor {
-  display: inline-block;
-  width: 2px;
-  height: 1.1em;
-  margin-left: 2px;
-  vertical-align: text-bottom;
-  background: var(--primary);
-  animation: blink 0.9s step-start infinite;
-}
-
-/* ───── 下書き画面: 整え方・自分の言葉の残り具合 ───── */
+/* ───────── 下書き画面: 整え方・自分の言葉の残り具合 ───────── */
 .draft-modes {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -370,8 +617,9 @@ body {
 }
 .draft-mode {
   border-radius: 999px;
-  font-size: 13px;
-  font-weight: 600;
+  font-family: 'Zen Kaku Gothic New', 'Hiragino Sans', system-ui, sans-serif;
+  font-size: 0.8125rem;
+  font-weight: 700;
   color: var(--muted);
   transition: background 0.2s, color 0.2s;
 }
@@ -392,7 +640,7 @@ body {
   border: 1px solid var(--border);
   background: var(--surface);
   font-family: 'Zen Kaku Gothic New', system-ui, sans-serif;
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 500;
   color: var(--foreground);
 }
@@ -415,6 +663,7 @@ body {
   height: 100%;
   background: var(--primary);
 }
+
 /* チェックイン: 今日のひとこと・予定から選んで入れるリスト */
 .pick {
   border: 1px solid var(--border);
@@ -429,12 +678,12 @@ body {
   padding: 0 4px 6px;
 }
 .pick-title {
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 700;
   color: var(--foreground);
 }
 .pick-count {
-  font-size: 11px;
+  font-size: 0.6875rem;
   color: var(--muted);
 }
 .pick-item {
@@ -443,7 +692,7 @@ body {
   gap: 10px;
   padding: 6px 4px;
   text-align: left;
-  font-size: 14px;
+  font-size: 0.875rem;
   color: var(--muted);
 }
 .pick-item[data-on='true'] {
@@ -455,19 +704,18 @@ body {
   height: 20px;
   border-radius: 6px;
   border: 1.5px solid var(--border);
-  font-size: 12px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  color: var(--primary-foreground);
 }
 .pick-item[data-on='true'] .pick-check {
   background: var(--primary);
   border-color: var(--primary);
-  color: var(--primary-foreground);
 }
 .pick-meta {
   flex: none;
-  font-size: 12px;
+  font-size: 0.75rem;
   color: var(--muted);
   font-variant-numeric: tabular-nums;
 }
@@ -480,7 +728,7 @@ body {
   min-height: 40px;
   border-radius: 999px;
   background: var(--surface-secondary);
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 700;
   color: var(--primary);
 }
@@ -502,7 +750,7 @@ body {
 }
 .evidence-date {
   flex: none;
-  font-size: 11px;
+  font-size: 0.6875rem;
   font-weight: 700;
   color: var(--muted);
   font-variant-numeric: tabular-nums;
@@ -510,7 +758,7 @@ body {
 .evidence-quote {
   flex: 1;
   min-width: 0;
-  font-size: 12px;
+  font-size: 0.75rem;
   line-height: 1.5;
   color: var(--foreground);
 }
@@ -547,14 +795,94 @@ mark.ai-joint {
   50% { opacity: 1; transform: scale(1); }
 }
 
-/* スケルトンローディング */
-.skeleton {
-  background: var(--surface-secondary);
-  border-radius: 12px;
-  animation: skeleton-pulse 1.4s ease-in-out infinite;
+/*
+ * 墨の輪（墨流し）。長い待ち（内省の問い・清書・分析）に使う。
+ * 紙に落とした墨が、輪になって静かに広がっていく。
+ */
+.ink-rings {
+  position: relative;
+  width: var(--ink-size, 120px);
+  height: var(--ink-size, 120px);
+  flex: none;
+}
+.ink-rings > i {
+  position: absolute;
+  inset: 0;
+  border: 1.2px solid color-mix(in srgb, var(--foreground) 55%, transparent);
+  border-radius: 48% 52% 50% 50% / 51% 47% 53% 49%;
+  opacity: 0;
+  transform: scale(0.06);
+  animation: ink-ring 4s cubic-bezier(0.2, 0.6, 0.3, 1) infinite;
+}
+.ink-rings > i:nth-child(2) { animation-delay: 1s; rotate: 40deg; }
+.ink-rings > i:nth-child(3) { animation-delay: 2s; rotate: 95deg; }
+.ink-rings > i:nth-child(4) { animation-delay: 3s; rotate: 150deg; }
+/* 中心の墨の一滴 */
+.ink-rings > b {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 14%;
+  height: 14%;
+  translate: -50% -50%;
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--foreground) 0%, color-mix(in srgb, var(--foreground) 60%, transparent) 55%, transparent 72%);
+  animation: ink-drop 4s ease-in-out infinite;
+}
+@keyframes ink-ring {
+  0% { transform: scale(0.06); opacity: 0; }
+  12% { opacity: 0.85; }
+  100% { transform: scale(1); opacity: 0; }
+}
+@keyframes ink-drop {
+  0%, 100% { transform: scale(0.9); opacity: 0.85; }
+  50% { transform: scale(1.15); opacity: 1; }
+}
+.ink-rings[data-size='sm'] {
+  --ink-size: 22px;
+}
+.ink-rings[data-size='md'] {
+  --ink-size: 64px;
+}
+.ink-rings[data-size='sm'] > i {
+  border-width: 1px;
 }
 
-@keyframes skeleton-pulse {
-  0%, 100% { opacity: 1; }
-  50%      { opacity: 0.45; }
+/* ───────── 動きを減らす設定 ───────── */
+@media (prefers-reduced-motion: reduce) {
+  .animate-enter-right,
+  .animate-enter-left,
+  .animate-slide-up,
+  .animate-fade-in {
+    animation: none !important;
+  }
+  .btn,
+  .icon-btn,
+  .chip {
+    transition: none;
+  }
+  .voice-btn[data-status='recording'] {
+    animation: none;
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--danger) 30%, transparent);
+  }
+  /* 止めると進んでいるか分からなくなるので、ゆっくり回す */
+  .spinner {
+    animation-duration: 2.4s;
+  }
+  .loading-moon {
+    animation: none;
+    opacity: 0.8;
+  }
+  /* 輪を広げずに、静かな同心円として置く */
+  .ink-rings > i {
+    animation: none;
+    opacity: 0.35;
+  }
+  .ink-rings > i:nth-child(1) { transform: scale(0.35); }
+  .ink-rings > i:nth-child(2) { transform: scale(0.6); }
+  .ink-rings > i:nth-child(3) { transform: scale(0.8); }
+  .ink-rings > i:nth-child(4) { transform: scale(1); }
+  .ink-rings > b {
+    animation: none;
+  }
 }

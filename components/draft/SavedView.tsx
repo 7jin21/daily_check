@@ -1,50 +1,86 @@
+'use client'
+
+import { useEffect, useRef, type CSSProperties } from 'react'
 import Link from 'next/link'
-import Confetti from '@/components/ui/Confetti'
+import Wbr from '@/components/ui/Wbr'
+import { BellIcon } from '@/components/ui/icons'
+import { formatJSTDate } from '@/lib/jst'
+import './draft.css'
 
 interface Props {
   entryDate: string
+  mood: number | null
   merged: boolean // 同じ日の日記に追記した（前の言葉は残っている）
   isToday: boolean
   showReminderNudge: boolean
 }
 
-// 保存したあとの画面。追記したときは「上書きではなく、前の日記に足した」ことが分かる見出しにする
-export default function SavedView({ entryDate, merged, isToday, showReminderNudge }: Props) {
-  const title = merged ? (isToday ? '今日の日記に追記しました' : 'この日の日記に追記しました') : '保存しました！'
+type Tone = 'low' | 'mid' | 'high'
+
+/** 気分に合わせたことば。しんどい日に「保存しました！」と祝わない（「|」は折り返してよい文節の切れ目） */
+function wordsFor(tone: Tone, merged: boolean, isToday: boolean): { title: string; sub: string } {
+  if (merged) return { title: '追記しました。', sub: '前の言葉は、|そのまま|残っています。' }
+  if (!isToday) return { title: 'この日の記録を、|残しました。', sub: '書き忘れた日も、|これで|埋まりました。' }
+  if (tone === 'low') return { title: 'おつかれさまでした。', sub: 'しんどい日の|言葉も、|ちゃんと|残りました。' }
+  if (tone === 'high') return { title: '今日を、|残しました。', sub: 'いい日の|言葉は、|いつか、|しんどい日の|支えに|なります。' }
+  return { title: '今日を、|残しました。', sub: 'なんでもない|一日も、|あなたの|言葉で|残りました。' }
+}
+
+// 保存したあとの画面「水面に一滴」。その日の気分の色の一滴が水面に落ちて、波紋になって広がる。
+// （以前は紙吹雪と「保存しました！」で、気分がとても悪い日にも同じように祝っていた）
+// しんどい日は、ゆっくり落ちて波紋も少なく、ことばも労いに変える。
+// ホームへ戻ると、その日の丸に色が落ちる（lib/save-echo.ts）。
+export default function SavedView({ entryDate, mood, merged, isToday, showReminderNudge }: Props) {
+  const titleRef = useRef<HTMLHeadingElement>(null)
+  const tone: Tone = mood === null ? 'mid' : mood <= 2 ? 'low' : mood >= 4 ? 'high' : 'mid'
+  const { title, sub } = wordsFor(tone, merged, isToday)
+
+  // 読み上げで「保存できた」ことがすぐ伝わるよう、見出しに焦点を移す
+  useEffect(() => {
+    titleRef.current?.focus({ preventScroll: true })
+  }, [])
+
+  const style = {
+    '--drop': `var(--mood-${mood ?? 3})`,
+    '--fall': tone === 'low' ? '1.1s' : '0.75s',
+    '--impact': tone === 'low' ? '1.25s' : '0.9s',
+  } as CSSProperties
+  const rings = tone === 'low' ? 2 : 3
 
   return (
-    <>
-      <Confetti />
-      <div className="min-h-dvh flex flex-col items-center justify-center px-4 gap-6 animate-fade-in">
-        <div className="text-7xl animate-float">✨</div>
-        <div className="text-center">
-          <p className="font-bold text-[var(--foreground)] text-2xl">{title}</p>
-          <p className="text-[var(--muted)] text-sm mt-1">今日も記録できました</p>
-        </div>
-        <div className="w-full space-y-3">
-          <Link
-            href={`/entries/${entryDate}`}
-            className="block w-full py-4 text-center rounded-full bg-[var(--accent)] text-[#f7f4ea] font-bold text-base active:scale-[0.99] transition-transform glow-sky"
-          >
-            日記を見る
-          </Link>
-          <Link
-            href="/"
-            className="block w-full py-3 text-center rounded-full border border-[var(--border)] text-[var(--muted)] text-base active:scale-95 transition-transform"
-          >
-            ホームに戻る
-          </Link>
-          {/* 記録の習慣化ナッジ: リマインダー未設定の場合のみ */}
-          {showReminderNudge && (
-            <Link
-              href="/settings"
-              className="block w-full py-2 text-center text-xs text-[var(--muted)] underline underline-offset-2"
-            >
-              🔔 リマインダーを設定して、記録を習慣にする
-            </Link>
-          )}
-        </div>
+    <div className="dv-saved" data-tone={tone} style={style}>
+      <div className="dv-saved-water" aria-hidden="true" />
+      <span className="dv-bloom" aria-hidden="true" />
+      {Array.from({ length: rings }, (_, i) => (
+        <span key={i} className="dv-ring" style={{ '--i': i } as CSSProperties} aria-hidden="true" />
+      ))}
+      <span className="dv-drop" aria-hidden="true" />
+
+      <div className="dv-saved-text">
+        <p className="dv-saved-eyebrow">{formatJSTDate(entryDate, { month: 'long', day: 'numeric', weekday: 'short' })}の記録</p>
+        <h1 ref={titleRef} tabIndex={-1} className="dv-saved-title">
+          <Wbr text={title} />
+        </h1>
+        <p className="dv-saved-sub">
+          <Wbr text={sub} />
+        </p>
       </div>
-    </>
+
+      <div className="dv-saved-actions">
+        <Link href={`/entries/${entryDate}`} className="btn btn-primary btn-block">
+          日記を読む
+        </Link>
+        <Link href="/" className="btn btn-secondary btn-block">
+          ホームに戻る
+        </Link>
+        {/* 記録の習慣化ナッジ: リマインダー未設定の場合のみ */}
+        {showReminderNudge && (
+          <Link href="/settings" className="btn-quiet">
+            <BellIcon size={16} />
+            夜にそっと知らせるリマインダーを設定する
+          </Link>
+        )}
+      </div>
+    </div>
   )
 }

@@ -1,0 +1,523 @@
+/*
+ * チェックイン（ck- 接頭辞）。
+ * 1画面目は小さな「水鏡」: 気分を選ぶと空がその色に染まって月が満ち、エネルギーを選ぶと水位が上がって、
+ * 水面に月が映る。ホームの水鏡と同じ言葉で、今日の自分を映す。
+ * 選ぶ部品は画面の下半分（親指の届くところ）に置く。
+ */
+
+/* 色と水位を、なめらかに移り変わらせるための登録（Safari 16.4 以降。未対応なら切り替わるだけ） */
+@property --ck-tint {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #ebe6d8;
+}
+@property --ck-level {
+  syntax: '<number>';
+  inherits: true;
+  initial-value: 0;
+}
+
+.ck-page {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  padding: 12px 16px 0;
+}
+
+/* ───────── 見出しの帯（戻る・いまの段・日付） ───────── */
+.ck-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+.ck-steps {
+  display: flex;
+  gap: 14px;
+  list-style: none;
+  font-family: 'Zen Kaku Gothic New', system-ui, sans-serif;
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  color: var(--muted);
+}
+.ck-steps li {
+  position: relative;
+  padding: 6px 0;
+}
+.ck-steps li[data-state='current'] {
+  color: var(--foreground);
+  font-weight: 700;
+}
+.ck-steps li::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 1.5px;
+  border-radius: 2px;
+  background: var(--border);
+}
+.ck-steps li[data-state='current']::after {
+  background: var(--foreground);
+}
+.ck-steps li[data-state='done']::after {
+  background: var(--muted-2);
+}
+.ck-head-end {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.ck-date {
+  font-family: 'Cormorant Garamond', 'Shippori Mincho', serif;
+  font-variant-numeric: lining-nums;
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.ck-date small {
+  font-family: 'Zen Kaku Gothic New', system-ui, sans-serif;
+  font-size: 0.6875rem;
+  margin-left: 3px;
+}
+
+/* 過去の日付を書いているとき */
+.ck-backfill {
+  margin-bottom: 14px;
+  align-items: center;
+  justify-content: space-between;
+}
+.ck-backfill .btn-quiet {
+  min-height: 32px;
+  color: inherit;
+  flex: none;
+}
+
+/* ───────── 問い ───────── */
+.ck-title {
+  margin-bottom: 16px;
+}
+.ck-title h1 {
+  font-family: 'Shippori Mincho', serif;
+  font-size: 1.5rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  line-height: 1.45;
+  color: var(--foreground);
+}
+.ck-title p {
+  margin-top: 6px;
+  font-family: 'Zen Kaku Gothic New', system-ui, sans-serif;
+  font-size: 0.8125rem;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
+/* ───────── 小さな水鏡（1画面目） ───────── */
+.ck-state {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.ck-stage {
+  --ck-tint: var(--surface-secondary);
+  /* 月の大きさと高さは、舞台の高さに対する割合（中の絶対配置の要素から見た %） */
+  --moon-size: min(36%, 116px);
+  --moon-y: 34%;
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 176px;
+  max-height: 380px;
+  border-radius: 28px;
+  overflow: hidden;
+  isolation: isolate;
+  border: 1px solid var(--hairline);
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklab, var(--ck-tint) 34%, var(--surface)) 0%,
+    color-mix(in oklab, var(--ck-tint) 12%, var(--surface)) 70%
+  );
+  transition: --ck-tint 0.9s ease, --ck-level 1s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+/* ごく淡い紙の粒子 */
+.ck-stage::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  opacity: 0.05;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 0.6 0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+.ck-moon {
+  position: absolute;
+  left: 50%;
+  top: var(--moon-y);
+  height: var(--moon-size);
+  width: auto;
+  aspect-ratio: 1;
+  translate: -50% -50%;
+  overflow: visible;
+}
+/* 月の光（光っている形に沿ってにじむ）。光っている部分が多いほど強く */
+.ck-moon-glow {
+  fill: var(--ck-tint);
+  opacity: 0;
+  transition: opacity 0.9s;
+}
+.ck-stage[data-mood] .ck-moon-glow {
+  opacity: calc(0.35 + var(--ck-lit, 0) * 0.4);
+}
+/* 影になっている側は空のまま（輪郭だけ）。光っている形（三日月・半月…）がそのまま読めるように */
+.ck-moon-disc {
+  fill: none;
+  stroke: color-mix(in srgb, var(--ck-tint) 40%, transparent);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+/* まだ選んでいないときは、点線の輪だけ */
+.ck-stage:not([data-mood]) .ck-moon-disc {
+  fill: none;
+  stroke: var(--faint);
+  stroke-dasharray: 3 4;
+}
+.ck-moon-lit {
+  fill: var(--ck-tint);
+}
+/* 月の海（ごく淡い模様。光っている部分にだけ見える） */
+.ck-moon-seas {
+  fill: var(--foreground);
+  opacity: 0.07;
+}
+
+/* 水（エネルギー）。水位 --ck-level（0〜1）は舞台の高さに対する割合 */
+.ck-water {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  translate: 0 calc((1 - var(--ck-level)) * 100%);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--water) 34%, transparent) 0%,
+    color-mix(in srgb, var(--water) 62%, transparent) 60%
+  );
+}
+/* まだ選んでいないときは、浅い水たまりだけ見せておく（ここに水が満ちる、という手がかり） */
+.ck-stage:not([data-energy]) .ck-water {
+  opacity: 0.45;
+}
+/* 水面のさざ波（横に長い波を、ゆっくり流す） */
+.ck-wave {
+  position: absolute;
+  left: 0;
+  top: -7px;
+  width: 200%;
+  height: 8px;
+  fill: color-mix(in srgb, var(--water) 34%, transparent);
+  animation: ck-wave 7s linear infinite;
+}
+@keyframes ck-wave {
+  to { transform: translateX(-50%); }
+}
+/* 水面のきらめきの線 */
+.ck-water::before {
+  content: '';
+  position: absolute;
+  left: 8%;
+  right: 8%;
+  top: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--surface) 80%, transparent), transparent);
+}
+/* 水面に映る月（水面をはさんだ鏡像。水が浅いと、映る月も欠ける） */
+.ck-reflection {
+  position: absolute;
+  left: 50%;
+  /* 水の箱は舞台と同じ高さなので、% は舞台の高さに対する割合になる */
+  top: calc((1 - var(--ck-level)) * 100% - var(--moon-y));
+  height: var(--moon-size);
+  width: auto;
+  aspect-ratio: 1;
+  translate: -50% -50%;
+  scale: 1 -1;
+  opacity: 0.36;
+  filter: blur(1.2px);
+  -webkit-mask-image: linear-gradient(0deg, #000 0%, rgba(0, 0, 0, 0.3) 45%, transparent 75%);
+  mask-image: linear-gradient(0deg, #000 0%, rgba(0, 0, 0, 0.3) 45%, transparent 75%);
+}
+.ck-stage:not([data-mood]) .ck-reflection {
+  display: none;
+}
+
+/* 選んだ調子のことば（舞台の下） */
+.ck-caption {
+  text-wrap: balance;
+  min-height: 1.6em;
+  margin: 12px 0 4px;
+  text-align: center;
+  font-family: 'Shippori Mincho', serif;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  color: var(--foreground);
+}
+.ck-caption[data-empty='true'] {
+  font-family: 'Zen Kaku Gothic New', system-ui, sans-serif;
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+.ck-caption i {
+  font-style: normal;
+  color: var(--faint);
+  margin: 0 0.6em;
+}
+
+/* ───────── 選ぶ部品（5段階×2） ───────── */
+.ck-picker {
+  margin-top: 14px;
+}
+.ck-picker-label {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin: 0 4px 6px;
+  font-family: 'Zen Kaku Gothic New', system-ui, sans-serif;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--muted);
+}
+.ck-picker-label span {
+  font-weight: 500;
+  letter-spacing: 0.04em;
+}
+.ck-options {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 4px;
+}
+.ck-option {
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  padding: 10px 0 8px;
+  border-radius: 18px;
+  font-family: 'Zen Kaku Gothic New', system-ui, sans-serif;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  line-height: 1.2;
+  color: var(--muted);
+  white-space: nowrap;
+  transition: background-color 0.25s, box-shadow 0.25s, color 0.25s;
+}
+.ck-option svg {
+  border-radius: 50%;
+  transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.25s;
+}
+/* 選んだものは、ホームの「今日」と同じ細い輪で囲む */
+.ck-option[aria-checked='true'] {
+  color: var(--foreground);
+  font-weight: 700;
+}
+.ck-option[aria-checked='true'] svg {
+  transform: scale(1.06);
+  box-shadow: 0 0 0 2px var(--background), 0 0 0 3.5px var(--foreground);
+}
+.ck-option:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* ───────── 下の操作（親指の届くところ） ───────── */
+.ck-actions {
+  padding: 14px 0 calc(16px + env(safe-area-inset-bottom));
+}
+.ck-actions .btn-quiet {
+  display: flex;
+  margin: 6px auto 0;
+}
+.ck-hint {
+  text-wrap: balance;
+  margin-top: 8px;
+  text-align: center;
+  font-family: 'Zen Kaku Gothic New', system-ui, sans-serif;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+.ck-error {
+  margin-bottom: 10px;
+  text-align: center;
+  font-family: 'Zen Kaku Gothic New', system-ui, sans-serif;
+  font-size: 0.75rem;
+  color: var(--danger);
+}
+
+/* ───────── 2画面目（ことば） ───────── */
+.ck-field-label {
+  margin: 0 4px 8px;
+  font-family: 'Zen Kaku Gothic New', system-ui, sans-serif;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+.ck-textarea-wrap {
+  position: relative;
+}
+.ck-textarea {
+  width: 100%;
+  padding: 16px 16px 48px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--foreground);
+  font-family: 'Shippori Mincho', serif;
+  line-height: 1.9;
+  letter-spacing: 0.02em;
+  resize: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.ck-textarea::placeholder {
+  color: var(--muted-2);
+}
+.ck-textarea:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 14%, transparent);
+}
+.ck-counter {
+  position: absolute;
+  left: 16px;
+  bottom: 14px;
+  font-family: 'Zen Kaku Gothic New', system-ui, sans-serif;
+  font-size: 0.6875rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted-2);
+}
+.ck-counter[data-near='true'] {
+  color: var(--notice);
+  font-weight: 700;
+}
+.ck-voice {
+  position: absolute;
+  right: 10px;
+  bottom: 8px;
+}
+.ck-fold {
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  background: var(--surface);
+}
+.ck-fold-head {
+  width: 100%;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  text-align: left;
+  font-family: 'Zen Kaku Gothic New', system-ui, sans-serif;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--foreground);
+}
+.ck-fold-head small {
+  margin-left: 8px;
+  font-weight: 500;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+.ck-fold-head svg {
+  flex: none;
+  color: var(--muted);
+  transition: transform 0.25s;
+}
+.ck-fold-head[aria-expanded='true'] svg {
+  transform: rotate(180deg);
+}
+.ck-fold .ck-textarea {
+  background: var(--background);
+}
+
+/* ───────── ひとつだけの問い（内省ガイド） ───────── */
+.ck-reflect-option {
+  width: 100%;
+  justify-content: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: 18px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  text-align: left;
+  font-family: 'Shippori Mincho', serif;
+  font-size: 0.9375rem;
+  line-height: 1.6;
+  color: var(--foreground);
+  transition: border-color 0.2s, background-color 0.2s, box-shadow 0.2s;
+}
+.ck-reflect-option[aria-checked='true'] {
+  border-color: var(--foreground);
+  box-shadow: inset 0 0 0 0.5px var(--foreground);
+}
+.ck-radio {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1.5px solid var(--border);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--btn-fg);
+  transition: background-color 0.2s, border-color 0.2s;
+}
+.ck-reflect-option[aria-checked='true'] .ck-radio {
+  background: var(--btn-bg);
+  border-color: var(--btn-bg);
+}
+
+/* 背の低い画面（iPhone SE など）: 舞台と余白を詰めて、選ぶ部品とボタンを一画面に収める */
+@media (max-height: 700px) {
+  .ck-head {
+    margin-bottom: 10px;
+  }
+  .ck-title {
+    margin-bottom: 10px;
+  }
+  .ck-title h1 {
+    font-size: 1.3125rem;
+  }
+  .ck-stage {
+    min-height: 120px;
+  }
+  .ck-picker {
+    margin-top: 8px;
+  }
+  .ck-option {
+    padding: 6px 0 4px;
+  }
+  .ck-actions {
+    padding-top: 10px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ck-stage {
+    transition: none;
+  }
+  .ck-wave {
+    animation: none;
+  }
+  .ck-option,
+  .ck-option svg,
+  .ck-moon-glow {
+    transition: none;
+  }
+}

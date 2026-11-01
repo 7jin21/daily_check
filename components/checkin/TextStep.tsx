@@ -10,9 +10,12 @@ interface TextStepProps {
   placeholder?: string
   rows?: number
   showHint?: boolean
+  /** 読み上げ用の欄の名前（見えている見出しの id を渡す） */
+  labelledBy?: string
 }
 
-export default function TextStep({ value, onChange, placeholder, rows = 6, showHint = true }: TextStepProps) {
+// メモの入力欄（紙のように明朝で書ける。音声入力つき）
+export default function TextStep({ value, onChange, placeholder, rows = 6, showHint = true, labelledBy }: TextStepProps) {
   const handleVoiceResult = (transcript: string) => {
     const next = value ? `${value} ${transcript}` : transcript
     onChange(next.slice(0, MAX_CHARS))
@@ -26,35 +29,25 @@ export default function TextStep({ value, onChange, placeholder, rows = 6, showH
   const isNearLimit = remaining <= 50
 
   return (
-    <div className="space-y-3">
-      <div className="relative">
+    <div>
+      <div className="ck-textarea-wrap">
         <textarea
           value={value}
           onChange={handleChange}
           placeholder={placeholder}
           rows={rows}
-          className="
-            w-full p-4 pb-10 rounded-2xl border border-[var(--border)]
-            bg-[var(--surface)] text-[var(--foreground)]
-            placeholder:text-[var(--muted-2)] text-base resize-none
-            focus:outline-none focus:border-[var(--primary)] transition-colors
-          "
+          aria-labelledby={labelledBy}
+          className="ck-textarea"
         />
-        {/* 文字数カウンター */}
-        <span
-          className={`absolute bottom-3 left-4 text-xs tabular-nums ${
-            isNearLimit ? 'text-[#a4683f]' : 'text-[var(--muted-2)]'
-          }`}
-        >
-          {value.length}/{MAX_CHARS}
+        {/* 文字数（上限が近づいたら色を変えて知らせる） */}
+        <span className="ck-counter" data-near={isNearLimit} aria-live={isNearLimit ? 'polite' : 'off'}>
+          {isNearLimit ? `あと${remaining}字` : `${value.length}/${MAX_CHARS}`}
         </span>
-        <div className="absolute bottom-3 right-3">
+        <div className="ck-voice">
           <VoiceInputButton onResult={handleVoiceResult} />
         </div>
       </div>
-      {showHint && (
-        <p className="text-xs text-[var(--muted-2)] px-1">キーワードや短文でOK。音声入力も使えます 🎤</p>
-      )}
+      {showHint && <p className="ck-hint" style={{ textAlign: 'left', padding: '0 4px' }}>キーワードや短い文でも、日記になります</p>}
     </div>
   )
 }

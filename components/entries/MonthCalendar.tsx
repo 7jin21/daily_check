@@ -1,5 +1,7 @@
 import Link from 'next/link'
 import { daysBetween } from '@/lib/jst'
+import { MOODS, moodColor, moodLabel } from '@/lib/constants'
+import { ChevronLeftIcon, ChevronRightIcon, PlusIcon } from '@/components/ui/icons'
 
 interface DayEntry {
   entry_date: string
@@ -15,10 +17,6 @@ interface Props {
   prevHref: string
   nextHref: string | null // null = 今月より先には進めない
   todayHref: string | null // null = 既に今月を表示中
-}
-
-const MOOD_COLOR: Record<number, string> = {
-  1: '#b5654a', 2: '#c5895f', 3: '#cdbf9a', 4: '#9caa7e', 5: '#6f8a5f',
 }
 
 const WEEKDAY_LABELS = ['日', '月', '火', '水', '木', '金', '土']
@@ -41,35 +39,24 @@ export default function MonthCalendar({ year, month, entries, todayJST, prevHref
     <div>
       {/* 月ナビゲーション */}
       <div className="flex items-center justify-between mb-5">
-        <Link
-          href={prevHref}
-          className="w-10 h-10 rounded-full bg-[var(--surface-secondary)] border border-[var(--border)] flex items-center justify-center text-lg text-[var(--foreground)]"
-          aria-label="前の月"
-        >
-          ‹
+        <Link href={prevHref} className="icon-btn" aria-label="前の月">
+          <ChevronLeftIcon size={20} />
         </Link>
         <div className="text-center">
-          <h2 className="text-base font-bold text-[var(--foreground)]">{monthLabel}</h2>
+          <h2 className="font-mincho text-lg font-semibold tracking-wider text-[var(--foreground)]">{monthLabel}</h2>
           {todayHref && (
-            <Link href={todayHref} className="text-xs text-[var(--primary)] underline underline-offset-2">
+            <Link href={todayHref} className="btn-quiet" style={{ minHeight: 32, color: 'var(--primary)' }}>
               今月に戻る
             </Link>
           )}
         </div>
         {nextHref ? (
-          <Link
-            href={nextHref}
-            className="w-10 h-10 rounded-full bg-[var(--surface-secondary)] border border-[var(--border)] flex items-center justify-center text-lg text-[var(--foreground)]"
-            aria-label="次の月"
-          >
-            ›
+          <Link href={nextHref} className="icon-btn" aria-label="次の月">
+            <ChevronRightIcon size={20} />
           </Link>
         ) : (
-          <span
-            className="w-10 h-10 rounded-full border border-[var(--border)] flex items-center justify-center text-lg text-[var(--muted-2)] opacity-40"
-            aria-hidden="true"
-          >
-            ›
+          <span className="icon-btn opacity-40" aria-hidden="true">
+            <ChevronRightIcon size={20} />
           </span>
         )}
       </div>
@@ -77,7 +64,7 @@ export default function MonthCalendar({ year, month, entries, todayJST, prevHref
       {/* 曜日ヘッダー */}
       <div className="grid grid-cols-7 gap-1 mb-1">
         {WEEKDAY_LABELS.map((label) => (
-          <div key={label} className="text-center text-[11px] text-[var(--muted-2)] py-1">
+          <div key={label} className="text-center text-[0.6875rem] font-ui text-[var(--muted-2)] py-1">
             {label}
           </div>
         ))}
@@ -107,18 +94,15 @@ export default function MonthCalendar({ year, month, entries, todayJST, prevHref
           const cellContent = (
             <div className="flex flex-col items-center justify-center gap-1 w-full h-full">
               <span
-                className="text-[13px] leading-none"
+                className="text-[0.8125rem] leading-none font-display"
                 style={{ color: isFuture ? 'var(--muted-2)' : 'var(--foreground)', fontWeight: isToday ? 700 : 500 }}
               >
                 {dayNum}
               </span>
               {entry ? (
-                <span
-                  className="w-2 h-2 rounded-full"
-                  style={{ backgroundColor: MOOD_COLOR[entry.mood] ?? '#cdbf9a' }}
-                />
+                <span className="w-2 h-2 rounded-full" style={{ backgroundColor: moodColor(entry.mood) }} />
               ) : backfillable ? (
-                <span className="text-[10px] leading-none text-[var(--muted-2)]">+</span>
+                <PlusIcon size={10} strokeWidth={2} className="text-[var(--muted-2)]" />
               ) : (
                 <span className="w-2 h-2" />
               )}
@@ -127,7 +111,7 @@ export default function MonthCalendar({ year, month, entries, todayJST, prevHref
 
           const baseClass = 'aspect-square rounded-2xl flex items-center justify-center'
           const style: React.CSSProperties = entry
-            ? { backgroundColor: `${MOOD_COLOR[entry.mood] ?? '#cdbf9a'}1f` }
+            ? { backgroundColor: `color-mix(in srgb, ${moodColor(entry.mood)} 14%, transparent)` }
             : isToday
               ? { border: '1.5px dashed var(--primary)' }
               : backfillable
@@ -142,6 +126,7 @@ export default function MonthCalendar({ year, month, entries, todayJST, prevHref
                 className={`${baseClass} active:opacity-70 transition-opacity`}
                 style={style}
                 title={entry?.summary ?? undefined}
+                aria-label={`${month}月${dayNum}日${entry ? `（気分 ${moodLabel(entry.mood) ?? '—'}）` : isToday ? '（今日の記録をする）' : '（あとから書く）'}`}
               >
                 {cellContent}
               </Link>
@@ -158,15 +143,15 @@ export default function MonthCalendar({ year, month, entries, todayJST, prevHref
 
       {/* 凡例 */}
       <div className="flex items-center justify-between mt-5">
-        <span className="text-[11px] text-[var(--muted)]">
+        <span className="text-[0.6875rem] font-ui text-[var(--muted)]">
           この月は <span className="font-bold text-[var(--foreground)]">{recordedCount}日</span> 記録
         </span>
-        <div className="flex items-center gap-1.5">
-          <span className="text-[10px] text-[var(--muted-2)]">悪</span>
-          {[1, 2, 3, 4, 5].map((m) => (
-            <div key={m} style={{ width: 10, height: 10, borderRadius: 999, backgroundColor: MOOD_COLOR[m] }} />
+        <div className="flex items-center gap-1.5" aria-hidden="true">
+          <span className="text-[0.625rem] font-ui text-[var(--muted-2)]">沈む</span>
+          {MOODS.map((m) => (
+            <div key={m.value} style={{ width: 10, height: 10, borderRadius: 999, backgroundColor: m.color }} />
           ))}
-          <span className="text-[10px] text-[var(--muted-2)]">良</span>
+          <span className="text-[0.625rem] font-ui text-[var(--muted-2)]">晴れる</span>
         </div>
       </div>
     </div>
