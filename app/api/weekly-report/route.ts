@@ -54,7 +54,7 @@ export async function POST(req: NextRequest) {
 
   const { data: entries, error } = await supabase
     .from('diary_entries')
-    // 本文の列は、メモ欄が空で本文にだけ言葉を書いた日のために読む（lib/prompt-context.ts の ownBodyText）
+    // 本文への直接入力・保存後の訂正も読む。prompt-context が本人原文と編集本文を区別する。
     .select('entry_date, mood, energy, events, challenges, gratitude, freeform, dominant_emotion, edited_draft, ai_draft')
     .eq('user_id', user.id)
     .gte('entry_date', from)

@@ -312,6 +312,7 @@ npm install
    - `001_init.sql` （テーブル・RLS・トリガー）
    - `002_google_refresh_token.sql` （Google Calendar 連携用）
    - `003_push_subscriptions.sql` （プッシュ通知の購読情報）
+   - `20261101221850_notion_sync_lease.sql` （Notion 同期の排他制御・作成途中の回復状態）
 
 #### 2-3. API キーを控える
 
@@ -445,6 +446,14 @@ npm run dev
 - 本文が 2000 文字（Notion の段落 1 つに入る上限）を超える日は、段落（空行）の切れ目で **2000 文字ごとの段落ブロックに分けて**送ります。切り捨てはしません（Notion に 1 回で送れるのは 100 ブロックまでなので、それを超える日は 100 ブロックずつ続けて足します。以前は 2000 文字で切っていたため、追記で長くなった日の後半が届きませんでした。`lib/notion-blocks.ts`）
 
 ---
+
+### 同時同期と障害からの回復
+
+本番リリース前に `supabase/migrations/20261101221850_notion_sync_lease.sql` を適用してください。日記ごとの同期権をDBで管理するため、別のVercelインスタンスから同時に呼ばれてもページを重複作成しません。同期する本文は権利取得後にDBから読み直します。
+
+作成済みページのIDが判明している場合は、次回同期で同じページを再利用します。作成リクエストの結果が不明でIDも得られなかった場合は、重複を避けるため `sync_recovery_required` で停止します。この場合はNotion側の作成結果を確認してから、対象日記の `notion_sync_state.page_id` を設定するか、未作成を確認した場合に限り `create_pending` を解除してください。状態不明のまま行を削除して再送しないでください。日記本体の保存には影響しません。
+
+設定画面の「連携解除」は環境変数の既定値があっても同期を停止します。DBの `notion_token` は `null` が既定値の継承、空文字が明示解除を表します。
 
 ## プッシュ通知（リマインダー）の設定
 
@@ -590,7 +599,7 @@ npm run build        # 本番ビルドが通るか（型エラー・lint も同�
 ## テストと CI
 
 ```bash
-npm test             # 単体テスト（vitest。tests/ 以下の *.test.ts）
+npm test             # 単体・回帰テスト（Vitest の *.test.ts と Node の *.test.cjs）
 npm run typecheck    # 型チェック（tsc --noEmit）
 npm run lint         # ESLint（next lint）
 ```

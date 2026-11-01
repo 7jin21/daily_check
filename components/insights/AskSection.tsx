@@ -1,32 +1,40 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { apiPost } from '@/lib/api-client'
 import InkRings from '@/components/ui/InkRings'
+import { useInsightsSession } from './InsightsSessionBoundary'
 
 // 「AIに聞いてみる」: 直近の日記をもとに、本人の質問に答える
 export default function AskSection() {
+  const { userId, session } = useInsightsSession()
   const [question, setQuestion] = useState('')
   const [answer, setAnswer] = useState<string | null>(null)
   const [askedQuestion, setAskedQuestion] = useState<string | null>(null)
   const [isAsking, setIsAsking] = useState(false)
   const [askError, setAskError] = useState<string | null>(null)
 
+  useEffect(() => () => session.cancel('ask'), [session])
+
   const handleAsk = async () => {
     const q = question.trim()
     if (!q || isAsking) return
+    const request = session.begin('ask', userId)
+    if (!request) return
     setIsAsking(true)
     setAskError(null)
     setAnswer(null)
     try {
-      const result = await apiPost<{ answer: string }>('/api/ask', { question: q }, { retry: false })
+      const result = await apiPost<{ answer: string }>('/api/ask', { question: q }, { signal: request.signal })
+      if (!request.isCurrent()) return
       setAnswer(result.answer)
       setAskedQuestion(q)
       setQuestion('')
     } catch (err) {
-      setAskError(err instanceof Error ? err.message : '回答の生成に失敗しました')
+      if (request.isActive()) setAskError(request.signal.aborted ? '時間がかかっています。もう一度お試しください' : err instanceof Error ? err.message : '回答の生成に失敗しました')
     } finally {
-      setIsAsking(false)
+      if (request.isActive()) setIsAsking(false)
+      request.finish()
     }
   }
 
@@ -42,7 +50,10 @@ export default function AskSection() {
             type="text"
             value={question}
             onChange={(e) => setQuestion(e.target.value.slice(0, 200))}
-            onKeyDown={(e) => { if (e.key === 'Enter') handleAsk() }}
+            onKeyDown={(e) => {
+              if (e.nativeEvent.isComposing || e.nativeEvent.keyCode === 229) return
+              if (e.key === 'Enter') handleAsk()
+            }}
             placeholder="日記について聞く…"
             aria-label="日記について聞きたいこと"
             className="flex-1 min-w-0 px-4 py-3 rounded-2xl border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] placeholder:text-[var(--muted-2)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"

@@ -100,10 +100,11 @@ describe('本文にしか言葉が無い日（気分だけ → あとから日�
     expect(formatEntriesForPrompt([written], { ...LIMITS, body: 4 })).toBe('[2026-10-10] 気分:4/5 エネルギー:3/5 / 日記: 帰り道、')
   })
 
-  it('メモ欄に言葉がある日は本文を渡さない（清書には AI の言葉が混ざるため。メモ欄が本人の言葉）', () => {
+  it('メモ欄がある日の編集本文は、本人の原文と分けて補助材料にする', () => {
     const e: PromptEntry = { ...written, events: '会議', edited_draft: '会議があった。とても実りある一日だった。' }
     expect(ownBodyText(e)).toBe('')
     expect(formatEntriesForPrompt([e], LIMITS)).not.toContain('日記:')
+    expect(formatEntriesForPrompt([e], LIMITS)).toContain('編集後の本文（AI清書を含む場合あり）: 会議があった。とても実りある一日だった。')
   })
 
   it('AI の清書が関わった日（ai_draft がある日）は、メモ欄が空でも本文を渡さない', () => {
@@ -121,5 +122,30 @@ describe('本文にしか言葉が無い日（気分だけ → あとから日�
   it('本文も無ければ何も足さない', () => {
     expect(ownBodyText(blank)).toBe('')
     expect(ownBodyText({ ...blank, edited_draft: '  \n' })).toBe('')
+  })
+
+  it('編集していないAI清書を分析の追加材料にしない', () => {
+    const text = '会議の経験から多くを学び、心が満たされた。'
+    const out = formatEntriesForPrompt([{ ...blank, events: '会議', ai_draft: text, edited_draft: text }], LIMITS)
+    expect(out).not.toContain(text)
+    expect(out).not.toContain('編集後の本文')
+  })
+
+  it('AI清書後の訂正は原文と区別して渡す', () => {
+    const e: PromptEntry = { ...blank, events: '会議の予定', ai_draft: '会議に出席した。', edited_draft: '訂正：会議は中止だった。' }
+    const out = formatEntriesForPrompt([e], LIMITS)
+    expect(out).toContain('出来事: 会議の予定')
+    expect(out).toContain('編集後の本文（AI清書を含む場合あり）: 訂正：会議は中止だった。')
+    expect(ownBodyText(e)).toBe('')
+  })
+
+  it('長い本文末尾の追記も、絵文字を割らずに補助材料へ渡す', () => {
+    const e: PromptEntry = { ...blank, events: '朝のメモ', ai_draft: '朝の本文', edited_draft: `朝の出来事${'😊'.repeat(100)}夜に追記した言葉` }
+    const out = formatEntriesForPrompt([e], { ...LIMITS, body: 30 })
+    const body = out.split('編集後の本文（AI清書を含む場合あり）: ')[1]
+    expect(Array.from(body)).toHaveLength(30)
+    expect(body).toContain(' … ')
+    expect(body).toContain('夜に追記した言葉')
+    expect(body).not.toMatch(/\uFFFD/)
   })
 })

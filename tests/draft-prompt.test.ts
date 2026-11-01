@@ -169,6 +169,15 @@ describe('draftMaxTokens（清書の出力の上限）', () => {
     // 以前の 1536 固定では、1,500 字を超えるあたりのメモの清書が途中で切れていた
     expect(draftMaxTokens({ ...base, events: 'あ'.repeat(1500) })).toBeGreaterThan(1536)
   })
+
+  it('APIが受け付ける4欄×1000字と内省回答にも、推論分の余裕を確保する', () => {
+    const input = {
+      ...base, events: 'あ'.repeat(1000), challenges: 'い'.repeat(1000),
+      gratitude: 'う'.repeat(1000), freeform: 'え'.repeat(1000), reflectionA: 'お'.repeat(300),
+    }
+    expect(draftMaxTokens(input)).toBeGreaterThanOrEqual(Math.ceil(countInputChars(input) * 1.3) + 1024)
+    expect(draftMaxTokens(input)).toBeLessThanOrEqual(8192)
+  })
 })
 
 describe('rewriteMaxTokens（書き直しの出力の上限）', () => {

@@ -3,7 +3,8 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { apiPost } from '@/lib/api-client'
-import { STORAGE_KEYS } from '@/lib/constants'
+import { readInsightsCache, writeInsightsCache } from '@/lib/insights-session'
+import { useInsightsSession } from './InsightsSessionBoundary'
 import PersonalityCard from './PersonalityCard'
 import { formatAge, MOOD_COLOR } from './shared'
 import InkRings from '@/components/ui/InkRings'
@@ -32,12 +33,6 @@ interface AnalysisResult {
   isFallback?: boolean
 }
 
-interface CachedAnalysis {
-  result: AnalysisResult
-  timestamp: number
-}
-
-const CACHE_KEY = STORAGE_KEYS.INSIGHTS_CACHE
 const CACHE_TTL = 24 * 60 * 60 * 1000
 
 const TREND_ICON = { improving: TrendUpIcon, stable: TrendFlatIcon, declining: TrendDownIcon }
@@ -61,6 +56,7 @@ function isValidAnalysis(r: unknown): r is AnalysisResult {
 
 // 「AI パーソナル分析」: 過去の日記から傾向・強み・価値観・感情トリガーを読み取る
 export default function AnalysisSection() {
+  const { userId, session } = useInsightsSession()
   const [analysis, setAnalysis] = useState<AnalysisResult | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -68,23 +64,21 @@ export default function AnalysisSection() {
   const [cachedAt, setCachedAt] = useState<number | null>(null)
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(CACHE_KEY)
-      if (raw) {
-        const cached: CachedAnalysis = JSON.parse(raw)
-        if (Date.now() - cached.timestamp < CACHE_TTL && isValidAnalysis(cached.result)) {
-          setAnalysis(cached.result)
-          setCachedAt(cached.timestamp)
-        }
-      }
-    } catch { /* ignore */ }
-  }, [])
+    const cached = readInsightsCache('analysis', userId, CACHE_TTL, isValidAnalysis)
+    setAnalysis(cached?.result ?? null)
+    setCachedAt(cached?.timestamp ?? null)
+    return () => session.cancel('analysis')
+  }, [session, userId])
 
   const loadAnalysis = async () => {
+    const request = session.begin('analysis', userId)
+    if (!request) return
     setIsLoading(true)
     setError(null)
+    setHasEnoughData(true)
     try {
-      const result = await apiPost<AnalysisResult | { status: string }>('/api/analyze', {}, { retry: false })
+      const result = await apiPost<AnalysisResult | { status: string }>('/api/analyze', {}, { signal: request.signal })
+      if (!request.isCurrent()) return
       if ('status' in result) {
         if (result.status === 'insufficient_data') setHasEnoughData(false)
         else setError('データの取得に失敗しました')
@@ -94,15 +88,16 @@ export default function AnalysisSection() {
         const now = Date.now()
         // フォールバック（AI不通時の簡易版）はキャッシュしない
         if (!result.isFallback) {
-          try { localStorage.setItem(CACHE_KEY, JSON.stringify({ result, timestamp: now })) } catch { /* ignore */ }
+          writeInsightsCache('analysis', request, result, now)
         }
         setAnalysis(result)
         setCachedAt(now)
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'データの取得に失敗しました')
+      if (request.isActive()) setError(request.signal.aborted ? '時間がかかっています。もう一度お試しください' : err instanceof Error ? err.message : 'データの取得に失敗しました')
     } finally {
-      setIsLoading(false)
+      if (request.isActive()) setIsLoading(false)
+      request.finish()
     }
   }
 

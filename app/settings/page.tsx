@@ -31,6 +31,8 @@ export default function SettingsPage() {
   const [isSaving, setIsSaving] = useState(false)
   const [saveMessage, setSaveMessage] = useState<string | null>(null)
   const [userEmail, setUserEmail] = useState<string | null>(null)
+  const [isSigningOut, setIsSigningOut] = useState(false)
+  const [signOutError, setSignOutError] = useState<string | null>(null)
 
   // サーバー側設定（DB が唯一の真実 — /api/settings 経由で読み書き）
   const [hasNotionToken, setHasNotionToken] = useState(false)
@@ -104,15 +106,19 @@ export default function SettingsPage() {
 
   // 通知トグル: Web Push の購読/解除を実際に行う
   const handleToggleNotifications = async () => {
-    if (isTogglingPush) return
+    if (isTogglingPush || isSigningOut) return
     setPushMessage(null)
 
     // OFF にする
     if (settings.notificationsEnabled) {
       setIsTogglingPush(true)
-      await unsubscribeFromPush()
-      updateSettings({ notificationsEnabled: false })
-      setPushMessage('リマインダーをオフにしました')
+      const result = await unsubscribeFromPush()
+      if (result.ok) {
+        updateSettings({ notificationsEnabled: false })
+        setPushMessage('リマインダーをオフにしました')
+      } else {
+        setPushMessage('通知を停止できませんでした。接続を確認して、もう一度お試しください。')
+      }
       setIsTogglingPush(false)
       return
     }
@@ -144,17 +150,27 @@ export default function SettingsPage() {
   }
 
   const handleSignOut = async () => {
-    const supabase = getSupabaseClient()
-    // 先にこの端末の通知の購読を解除する（サインアウト後は削除 API が 401 になる）。
-    // 残すと前の人のリマインダーが届き続け、次にこの端末を使う人は通知を登録できない
-    await unsubscribeThisDevice()
-    await supabase.auth.signOut()
-    // 共有端末対策: 前ユーザーの下書き・AI分析キャッシュ等を残さない
-    useCheckinStore.getState().reset()
-    useSettingsStore.getState().reset()
-    useMemoStore.getState().clear()
-    clearUserLocalData()
-    router.push('/login')
+    if (isSigningOut || isTogglingPush || isSaving) return
+    setIsSigningOut(true)
+    setSignOutError(null)
+    try {
+      // 認証が有効なうちに、この端末への通知が止まったことを確認する。
+      const result = await unsubscribeThisDevice()
+      if (!result.ok) throw new Error('通知を停止できませんでした。接続を確認して、もう一度お試しください。')
+      updateSettings({ notificationsEnabled: false })
+      const { error } = await getSupabaseClient().auth.signOut()
+      if (error) throw new Error('サインアウトできませんでした。もう一度お試しください。')
+      useCheckinStore.getState().reset()
+      useSettingsStore.getState().reset()
+      useMemoStore.getState().clear()
+      clearUserLocalData()
+      router.replace('/login')
+      router.refresh()
+    } catch (err) {
+      setSignOutError(err instanceof Error ? err.message : 'サインアウトできませんでした。もう一度お試しください。')
+    } finally {
+      setIsSigningOut(false)
+    }
   }
 
   return (
@@ -205,7 +221,7 @@ export default function SettingsPage() {
           </div>
           <button
             onClick={handleToggleNotifications}
-            disabled={isTogglingPush}
+            disabled={isTogglingPush || isSigningOut}
             className={`w-12 h-7 rounded-full transition-colors disabled:opacity-50 ${
               settings.notificationsEnabled ? 'bg-[var(--primary)]' : 'bg-[var(--surface-secondary)] border border-[var(--border)]'
             }`}
@@ -345,11 +361,13 @@ export default function SettingsPage() {
       <button
         type="button"
         onClick={handleSignOut}
+        disabled={isSigningOut || isTogglingPush || isSaving}
         className="btn btn-secondary btn-block"
         style={{ color: 'var(--danger)', borderColor: 'var(--danger-border)' }}
       >
-        サインアウト
+        {isSigningOut ? 'サインアウト中…' : 'サインアウト'}
       </button>
+      {signOutError && <p className="text-sm" style={{ color: 'var(--danger)' }} role="alert">{signOutError}</p>}
     </div>
   )
 }

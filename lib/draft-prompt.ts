@@ -26,6 +26,7 @@ export const DRAFT_GENERATION = {
 // 出力の上限の目安。日本語の日記文は gpt-oss で 1 トークン ≒ 1.2 文字なので、1 文字 1 トークンで見積もれば余裕がある。
 // gpt-oss は推論のトークンも max_tokens に数えるため、その分を足す
 const DRAFT_MIN_TOKENS = 1536
+const DRAFT_MAX_TOKENS_CAP = 8192
 const MAX_TOKENS_CAP = 4096
 const REASONING_ALLOWANCE = 1024
 
@@ -35,7 +36,7 @@ const REASONING_ALLOWANCE = 1024
  */
 export function draftMaxTokens(input: DraftPromptInput): number {
   const target = Math.ceil(countInputChars(input) * 1.3)
-  return Math.min(MAX_TOKENS_CAP, Math.max(DRAFT_MIN_TOKENS, target + REASONING_ALLOWANCE))
+  return Math.min(DRAFT_MAX_TOKENS_CAP, Math.max(DRAFT_MIN_TOKENS, target + REASONING_ALLOWANCE))
 }
 
 /**

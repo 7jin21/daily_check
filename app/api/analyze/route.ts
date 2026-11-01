@@ -53,7 +53,7 @@ export async function POST() {
 
   // freeform には AI 内省ガイドの回答（【ふりかえり】行）が畳まれている。
   // 価値観・感情の理由を読み取る最重要素材なので必ず含める（prompt-context がメモとは別枠で渡す）。
-  // 本文の列は、メモ欄が空で本文にだけ言葉を書いた日（気分だけ → あとから書き足し）のために読む
+  // 本文への直接入力・保存後の訂正も読む。prompt-context が本人原文と編集本文を区別する。
   const { data: entries, error } = await supabase
     .from('diary_entries')
     .select('entry_date, mood, energy, events, challenges, gratitude, freeform, tags, dominant_emotion, edited_draft, ai_draft')

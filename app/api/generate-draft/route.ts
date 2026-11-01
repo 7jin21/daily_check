@@ -10,8 +10,10 @@ import {
   draftMaxTokens,
   type DraftPromptInput,
 } from '@/lib/draft-prompt'
+import type { DraftStreamFrame } from '@/lib/draft-stream'
 
-// 日記本文を text/plain でストリーミング返却する。
+// 新クライアントには NDJSON で本文と完了通知を分け、通信が終わっただけでは完成品にしない。
+// Accept を指定しない旧クライアントには従来の text/plain + DRAFT_CUT_MARK を返す。
 // タグ・サマリー等のメタ情報は本文確定後に /api/draft-meta で取得する（クライアント側）。
 // オフラインフォールバック時は X-Draft-Fallback: 1 ヘッダーを付けて全文を一括返却。
 // 清書が途中で止まった（出力の上限・途中の失敗）ときは、本文の末尾に DRAFT_CUT_MARK を付ける。
@@ -22,6 +24,7 @@ const TEXT_FIELDS = ['events', 'challenges', 'gratitude', 'freeform'] as const
 const PLAIN_HEADERS = { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-cache' }
 
 export async function POST(req: NextRequest) {
+  const framed = req.headers.get('accept')?.includes('application/x-ndjson') ?? false
   // 1. セッション確認
   const supabase = await createReadonlyServerClient()
   const {
@@ -88,35 +91,56 @@ export async function POST(req: NextRequest) {
         { role: 'system', content: DRAFT_SYSTEM_PROMPT },
         { role: 'user', content: buildDraftUserPrompt(input, entryDate) },
       ],
-    })
+    }, { signal: req.signal })
 
     const encoder = new TextEncoder()
+    let cancelled = false
+    const abortModel = () => stream.controller.abort()
+    req.signal.addEventListener('abort', abortModel, { once: true })
+    if (req.signal.aborted) abortModel()
     const readable = new ReadableStream({
       async start(controller) {
-        // 途中で止まったことは、届いた本文のあとに印（DRAFT_CUT_MARK）を付けてクライアントに伝える。
-        // 出力の上限（max_tokens）で止まったときも、ストリーム自体は正常に終わるので、finish_reason を見る
-        // （正常終了に見せかけると、切れた本文が完成品として残る）
-        let cut = false
+        let terminalSent = false
+        const send = (frame: DraftStreamFrame) => {
+          if (cancelled || terminalSent) return
+          if (framed) controller.enqueue(encoder.encode(`${JSON.stringify(frame)}\n`))
+          else if (frame.type === 'delta') controller.enqueue(encoder.encode(frame.text))
+          else if (frame.type === 'error') controller.enqueue(encoder.encode(DRAFT_CUT_MARK))
+          if (frame.type !== 'delta') terminalSent = true
+        }
         try {
           for await (const chunk of stream) {
+            if (cancelled) break
             const choice = chunk.choices[0]
             const delta = choice?.delta?.content ?? ''
-            if (delta) controller.enqueue(encoder.encode(delta))
-            if (choice?.finish_reason === 'length') cut = true
+            if (delta) send({ type: 'delta', text: delta })
+            if (choice?.finish_reason) {
+              send(choice.finish_reason === 'stop'
+                ? { type: 'done' }
+                : { type: 'error', reason: choice.finish_reason === 'length' ? 'length' : 'interrupted' })
+              break
+            }
           }
+          // finish_reason の欠落も中断として扱う（接続終了だけでは成功を確認できない）。
+          if (!terminalSent) send({ type: 'error', reason: 'interrupted' })
         } catch (err) {
           console.error('GROQ stream error:', err)
-          cut = true
+          send({ type: 'error', reason: 'interrupted' })
+        } finally {
+          req.signal.removeEventListener('abort', abortModel)
         }
-        if (cut) {
-          console.warn('清書が途中で止まりました（出力の上限または途中の失敗）')
-          controller.enqueue(encoder.encode(DRAFT_CUT_MARK))
-        }
-        controller.close()
+        if (!cancelled) controller.close()
+      },
+      cancel() {
+        cancelled = true
+        abortModel()
+        req.signal.removeEventListener('abort', abortModel)
       },
     })
 
-    return new NextResponse(readable, { headers: PLAIN_HEADERS })
+    return new NextResponse(readable, {
+      headers: { ...PLAIN_HEADERS, Vary: 'Accept', ...(framed ? { 'Content-Type': 'application/x-ndjson; charset=utf-8' } : {}) },
+    })
   } catch (err) {
     console.error('GROQ draft generation error:', err)
     // フォールバック

@@ -20,6 +20,8 @@ interface CheckinState extends CheckinInput {
   draftResult: DraftResult | null
   editedDraft: string          // ユーザーが編集したドラフト（ナビゲーション間で保持）
   isGenerating: boolean
+  draftIncomplete: boolean    // 生成途中の本文。再読み込み後も完成した清書と区別する
+  resetVersion: number        // リセット以前の非同期応答で新しい入力を変更しないための世代
   reflectionQ: string          // AIが投げた内省の問い（任意）
   reflectionA: string          // それへのユーザーの回答（選択肢＋一言）
   draftMode: DraftMode         // 清書の整え方（原文のまま / 整える / 箇条書き）
@@ -40,10 +42,12 @@ interface CheckinState extends CheckinInput {
   setDraftResult: (result: DraftResult) => void
   setEditedDraft: (text: string) => void
   setIsGenerating: (isGenerating: boolean) => void
+  setDraftIncomplete: (incomplete: boolean) => void
   setReflection: (question: string, answer: string) => void
   setDraftMode: (mode: DraftMode) => void
   setDraftInputKey: (key: string) => void
   addAiText: (text: string) => void // AI が出した文章を覚えておく（下書き画面で本人が書き足した言葉と区別するため）
+  setAiText: (text: string) => void // 配信中のAI本文を累積重複させず更新する
   clearDraft: () => void       // ドラフトだけ捨てる（入力は残す）
   reset: () => void
   // Derived
@@ -53,8 +57,8 @@ interface CheckinState extends CheckinInput {
 const initialState: Omit<CheckinState, keyof Pick<CheckinState,
   'setMood' | 'setEnergy' | 'setEvents' | 'setChallenges' | 'setGratitude' |
   'setFreeform' | 'setCurrentStep' | 'nextStep' | 'prevStep' |
-  'setCheckinDate' | 'setTargetDate' | 'setDraftResult' | 'setEditedDraft' | 'setIsGenerating' |
-  'setReflection' | 'setDraftMode' | 'setDraftInputKey' | 'addAiText' | 'clearDraft' | 'reset' | 'getInput'
+  'setCheckinDate' | 'setTargetDate' | 'setDraftResult' | 'setEditedDraft' | 'setIsGenerating' | 'setDraftIncomplete' |
+  'setReflection' | 'setDraftMode' | 'setDraftInputKey' | 'addAiText' | 'setAiText' | 'clearDraft' | 'reset' | 'getInput'
 >> = {
   mood: null,
   energy: null,
@@ -68,6 +72,8 @@ const initialState: Omit<CheckinState, keyof Pick<CheckinState,
   draftResult: null,
   editedDraft: '',
   isGenerating: false,
+  draftIncomplete: false,
+  resetVersion: 0,
   reflectionQ: '',
   reflectionA: '',
   draftMode: 'tidy',
@@ -94,14 +100,19 @@ export const useCheckinStore = create<CheckinState>()(
       setDraftResult: (draftResult) => set({ draftResult }),
       setEditedDraft: (editedDraft) => set({ editedDraft }),
       setIsGenerating: (isGenerating) => set({ isGenerating }),
+      setDraftIncomplete: (draftIncomplete) => set({ draftIncomplete }),
       setReflection: (reflectionQ, reflectionA) => set({ reflectionQ, reflectionA }),
       setDraftMode: (draftMode) => set({ draftMode }),
       setDraftInputKey: (draftInputKey) => set({ draftInputKey }),
+      setAiText: (aiText) => set({ aiText }),
       addAiText: (text) =>
         set((state) => (text.trim() && !state.aiText.includes(text) ? { aiText: state.aiText ? `${state.aiText}\n${text}` : text } : {})),
-      clearDraft: () => set({ draftResult: null, editedDraft: '', draftInputKey: '', draftMode: 'tidy', aiText: '' }),
+      clearDraft: () => set((state) => ({
+        draftResult: null, editedDraft: '', draftInputKey: '', draftMode: 'tidy', aiText: '',
+        isGenerating: false, draftIncomplete: false, resetVersion: state.resetVersion + 1,
+      })),
 
-      reset: () => set({ ...initialState }),
+      reset: () => set((state) => ({ ...initialState, resetVersion: state.resetVersion + 1 })),
 
       getInput: () => {
         const state = get()
@@ -117,6 +128,16 @@ export const useCheckinStore = create<CheckinState>()(
     }),
     {
       name: STORAGE_KEYS.CHECKIN_DRAFT,
+      merge: (persisted, current) => {
+        const saved = (persisted ?? {}) as Partial<CheckinState>
+        return {
+          ...current,
+          ...saved,
+          isGenerating: false,
+          resetVersion: current.resetVersion,
+          draftIncomplete: saved.draftIncomplete ?? Boolean(saved.editedDraft && !saved.draftResult),
+        }
+      },
       partialize: (state) => ({
         mood: state.mood,
         energy: state.energy,
@@ -134,6 +155,7 @@ export const useCheckinStore = create<CheckinState>()(
         draftMode: state.draftMode,
         draftInputKey: state.draftInputKey,
         aiText: state.aiText,
+        draftIncomplete: state.draftIncomplete,
       }),
     }
   )

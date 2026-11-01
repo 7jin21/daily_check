@@ -149,7 +149,11 @@ export function clearUserLocalData() {
     localStorage.removeItem(STORAGE_KEYS.MEMOS)
     localStorage.removeItem(STORAGE_KEYS.FOCUS)
     Object.keys(localStorage)
-      .filter((key) => key.startsWith(STORAGE_KEYS.MILESTONE_PREFIX))
+      .filter((key) =>
+        key.startsWith(STORAGE_KEYS.MILESTONE_PREFIX) ||
+        key.startsWith(`${STORAGE_KEYS.INSIGHTS_CACHE}:`) ||
+        key.startsWith(`${STORAGE_KEYS.WEEKLY_REPORT_CACHE}:`)
+      )
       .forEach((key) => localStorage.removeItem(key))
   } catch {
     // localStorage が使えない環境では何もしない

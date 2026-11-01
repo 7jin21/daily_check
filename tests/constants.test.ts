@@ -1,9 +1,33 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { energyLabel, getDailyDescription, moodEmoji, moodLabel } from '@/lib/constants'
+import { clearUserLocalData, energyLabel, getDailyDescription, moodEmoji, moodLabel, STORAGE_KEYS } from '@/lib/constants'
 import { subtractDays } from '@/lib/jst'
 import { TIME_ZONES, withTZ } from './helpers'
 
 const STEP_IDS = ['state', 'notes', 'mood', 'energy', 'events', 'challenges', 'gratitude', 'freeform']
+
+describe('clearUserLocalData', () => {
+  afterEach(() => vi.unstubAllGlobals())
+
+  it('clears legacy and every user-scoped insights cache while retaining device preferences', () => {
+    const storage: Record<string, unknown> = {
+      [STORAGE_KEYS.INSIGHTS_CACHE]: 'legacy',
+      [STORAGE_KEYS.WEEKLY_REPORT_CACHE]: 'legacy',
+      [`${STORAGE_KEYS.INSIGHTS_CACHE}:user-a`]: 'private analysis',
+      [`${STORAGE_KEYS.WEEKLY_REPORT_CACHE}:user-a`]: 'private weekly report',
+      [`${STORAGE_KEYS.INSIGHTS_CACHE}:user-b`]: 'older private analysis',
+      [`${STORAGE_KEYS.MILESTONE_PREFIX}7`]: 'seen',
+      [STORAGE_KEYS.CHECKIN_DRAFT]: 'private draft',
+      [STORAGE_KEYS.MEMOS]: 'private memo',
+      [STORAGE_KEYS.FOCUS]: 'private focus',
+      theme: 'dark',
+      'pwa-banner-dismissed': 'true',
+    }
+    Object.defineProperty(storage, 'removeItem', { value: (key: string) => { delete storage[key] } })
+    vi.stubGlobal('localStorage', storage)
+    clearUserLocalData()
+    expect(Object.keys(storage).sort()).toEqual(['pwa-banner-dismissed', 'theme'])
+  })
+})
 
 /** start から n 日分の日付 */
 function datesFrom(start: string, n: number): string[] {

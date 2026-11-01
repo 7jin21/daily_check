@@ -9,6 +9,7 @@ import { ChevronRightIcon } from '@/components/ui/icons'
 import { dayOfWeek, formatJSTDate, subtractDays, todayJST } from '@/lib/jst'
 import { hasWords, type StoredEntryText } from '@/lib/entry-merge'
 import { MOOD_COLOR } from './shared'
+import { useInsightsSession } from './InsightsSessionBoundary'
 
 interface LocalStats {
   recorded: number
@@ -111,10 +112,8 @@ function buildLocalStats(data: StatsRow[]): LocalStats {
   }
 }
 
-async function fetchLocalStats(): Promise<LocalStats | null> {
+async function fetchLocalStats(userId: string, signal: AbortSignal): Promise<LocalStats | null> {
   const supabase = getSupabaseClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return null
 
   // 今日を含む30日（JST の暦で数える。端末のタイムゾーンで1日ずれないように）
   const from = subtractDays(todayJST(), 29)
@@ -123,10 +122,11 @@ async function fetchLocalStats(): Promise<LocalStats | null> {
   const { data } = await supabase
     .from('diary_entries')
     .select('entry_date, mood, dominant_emotion, tags, events, challenges, gratitude, freeform, ai_draft, edited_draft')
-    .eq('user_id', user.id)
+    .eq('user_id', userId)
     .gte('entry_date', from)
     .order('entry_date', { ascending: false })
     .limit(30)
+    .abortSignal(signal)
 
   if (!data) return null
   return buildLocalStats(data as StatsRow[])
@@ -134,13 +134,18 @@ async function fetchLocalStats(): Promise<LocalStats | null> {
 
 // 過去30日の記録から端末側で集計する統計（AI を待たずにすぐ出せる）
 export default function LocalStatsSection() {
+  const { userId, session } = useInsightsSession()
   const [localStats, setLocalStats] = useState<LocalStats | null>(null)
 
   useEffect(() => {
-    fetchLocalStats()
-      .then((stats) => { if (stats) setLocalStats(stats) })
+    const request = session.begin('stats', userId)
+    if (!request) return
+    fetchLocalStats(request.userId, request.signal)
+      .then((stats) => { if (request.isCurrent() && stats) setLocalStats(stats) })
       .catch(() => { /* ignore */ })
-  }, [])
+      .finally(request.finish)
+    return () => session.cancel('stats')
+  }, [session, userId])
 
   if (!localStats) return null
 

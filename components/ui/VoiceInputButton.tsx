@@ -46,11 +46,17 @@ export default function VoiceInputButton({ onResult }: VoiceInputButtonProps) {
 
   const recorderRef = useRef<MediaRecorder | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
-  const chunksRef = useRef<Blob[]>([])
-  const mimeRef = useRef<string | undefined>(undefined)
+  const onResultRef = useRef(onResult)
+  const transcriptionRef = useRef<AbortController | null>(null)
   const autoStopRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const mountedRef = useRef(true) // アンマウント後の state 更新・マイクリーク防止
   const startingRef = useRef(false) // getUserMedia 許可待ち中の二度押し再入防止
+  const lifecycleRef = useRef(0) // 許可待ち中に画面が破棄された操作も無効にする
+
+  // 録音・文字起こし中に手入力しても、最新の入力へ追記する。
+  useEffect(() => {
+    onResultRef.current = onResult
+  }, [onResult])
 
   useEffect(() => {
     setIsSupported(
@@ -66,20 +72,32 @@ export default function VoiceInputButton({ onResult }: VoiceInputButtonProps) {
     streamRef.current = null
   }, [])
 
-  // アンマウント時に録音とマイクを確実に止める
+  // アンマウント時に録音・通信を止め、遅れて届いた結果を入力へ戻さない。
   useEffect(() => {
     mountedRef.current = true
+    const lifecycle = lifecycleRef
     return () => {
       mountedRef.current = false
+      lifecycle.current++
+      startingRef.current = false
+      transcriptionRef.current?.abort()
+      transcriptionRef.current = null
       if (autoStopRef.current) clearTimeout(autoStopRef.current)
+      autoStopRef.current = null
+      const recorder = recorderRef.current
+      recorderRef.current = null
       try {
-        if (recorderRef.current?.state === 'recording') recorderRef.current.stop()
+        if (recorder) {
+          recorder.ondataavailable = null
+          recorder.onstop = null
+          if (recorder.state === 'recording') recorder.stop()
+        }
       } catch {
         // 既に停止済みなどは無視
       }
-      streamRef.current?.getTracks().forEach((t) => t.stop())
+      releaseStream()
     }
-  }, [])
+  }, [releaseStream])
 
   // エラーメッセージは数秒で自動的に消す
   useEffect(() => {
@@ -90,40 +108,52 @@ export default function VoiceInputButton({ onResult }: VoiceInputButtonProps) {
 
   // 録音した Blob をサーバーへ送って文字起こし
   const transcribe = useCallback(
-    async (blob: Blob) => {
+    async (blob: Blob, mime: string) => {
+      if (!mountedRef.current) return
+      transcriptionRef.current?.abort()
+      const controller = new AbortController()
+      transcriptionRef.current = controller
+      const isCurrent = () =>
+        mountedRef.current && !controller.signal.aborted && transcriptionRef.current === controller
       setStatus('transcribing')
       try {
         const form = new FormData()
-        form.append('audio', blob, `recording.${extForMime(mimeRef.current)}`)
-        const res = await fetch('/api/transcribe', { method: 'POST', body: form })
+        form.append('audio', blob, `recording.${extForMime(mime)}`)
+        const res = await fetch('/api/transcribe', { method: 'POST', body: form, signal: controller.signal })
         if (!res.ok) {
           const data = (await res.json().catch(() => null)) as { error?: string } | null
-          if (mountedRef.current) setErrorMsg(data?.error ?? '文字起こしに失敗しました')
+          if (isCurrent()) setErrorMsg(data?.error ?? '文字起こしに失敗しました')
           return
         }
         const data = (await res.json()) as { text?: string }
+        if (!isCurrent()) return
         const text = (data.text ?? '').trim()
-        if (text) onResult(text)
-        else if (mountedRef.current) setErrorMsg('音声が聞き取れませんでした')
+        if (text) onResultRef.current(text)
+        else setErrorMsg('音声が聞き取れませんでした')
       } catch {
-        if (mountedRef.current) setErrorMsg('通信に失敗しました')
+        if (isCurrent()) setErrorMsg('通信に失敗しました')
       } finally {
-        if (mountedRef.current) setStatus('idle')
+        if (transcriptionRef.current === controller) {
+          transcriptionRef.current = null
+          if (mountedRef.current) setStatus('idle')
+        }
       }
     },
-    [onResult]
+    []
   )
 
   const startRecording = useCallback(async () => {
     // getUserMedia は非同期。許可待ちの間に再度押されても二重起動しない
-    if (startingRef.current || recorderRef.current?.state === 'recording') return
+    if (startingRef.current || recorderRef.current || transcriptionRef.current) return
     startingRef.current = true
+    const lifecycle = lifecycleRef.current
     setErrorMsg(null)
 
     let stream: MediaStream
     try {
       stream = await navigator.mediaDevices.getUserMedia({ audio: true })
     } catch (err) {
+      if (lifecycle !== lifecycleRef.current) return
       startingRef.current = false
       const name = (err as DOMException)?.name ?? ''
       if (mountedRef.current) setErrorMsg(MEDIA_ERROR_MESSAGES[name] ?? 'マイクを起動できませんでした')
@@ -131,16 +161,15 @@ export default function VoiceInputButton({ onResult }: VoiceInputButtonProps) {
     }
 
     // 許可待ちの間にアンマウントされていたら、取得したマイクを即解放して中断（リーク防止）
-    if (!mountedRef.current) {
+    if (!mountedRef.current || lifecycle !== lifecycleRef.current) {
       stream.getTracks().forEach((t) => t.stop())
-      startingRef.current = false
+      if (lifecycle === lifecycleRef.current) startingRef.current = false
       return
     }
 
     streamRef.current = stream
     const mime = pickMimeType()
-    mimeRef.current = mime
-    chunksRef.current = []
+    const chunks: Blob[] = []
 
     let recorder: MediaRecorder
     try {
@@ -153,23 +182,25 @@ export default function VoiceInputButton({ onResult }: VoiceInputButtonProps) {
     }
 
     recorder.ondataavailable = (e) => {
-      if (e.data.size > 0) chunksRef.current.push(e.data)
+      if (e.data.size > 0) chunks.push(e.data)
     }
     recorder.onstop = () => {
+      if (recorderRef.current !== recorder) return
+      recorderRef.current = null
       if (autoStopRef.current) {
         clearTimeout(autoStopRef.current)
         autoStopRef.current = null
       }
       releaseStream()
-      const blob = new Blob(chunksRef.current, { type: mimeRef.current || 'audio/webm' })
-      chunksRef.current = []
+      const recordedMime = recorder.mimeType || mime || 'audio/webm'
+      const blob = new Blob(chunks, { type: recordedMime })
       if (!mountedRef.current) return // アンマウント済みなら破棄（無駄な送信をしない）
       if (blob.size === 0) {
         setErrorMsg('録音できませんでした')
         setStatus('idle')
         return
       }
-      void transcribe(blob)
+      void transcribe(blob, recordedMime)
     }
 
     recorderRef.current = recorder
@@ -178,6 +209,7 @@ export default function VoiceInputButton({ onResult }: VoiceInputButtonProps) {
     try {
       recorder.start()
     } catch {
+      recorderRef.current = null
       releaseStream()
       startingRef.current = false
       setErrorMsg('録音を開始できませんでした')
@@ -198,14 +230,19 @@ export default function VoiceInputButton({ onResult }: VoiceInputButtonProps) {
   }, [releaseStream, transcribe])
 
   const stopRecording = useCallback(() => {
+    const recorder = recorderRef.current
+    // stop() から onstop までの間に再度押されても、録音結果を捨てない。
+    if (!recorder || recorder.state === 'inactive') return
     try {
-      if (recorderRef.current?.state === 'recording') {
-        recorderRef.current.stop() // → onstop で文字起こしへ
+      if (recorder.state === 'recording') {
+        setStatus('transcribing')
+        recorder.stop() // → onstop で文字起こしへ
         return
       }
     } catch {
       // 下のフォールバックで後始末
     }
+    recorderRef.current = null
     releaseStream()
     setStatus('idle')
   }, [releaseStream])

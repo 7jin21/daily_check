@@ -25,24 +25,49 @@ export function isPushConfigured(): boolean {
   return !!process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
 }
 
-/** Service Worker の登録が無い環境でも待ち続けないための上限（サインアウトを止めない） */
+/** 登録状態の照会は期限を設ける。失敗を「購読なし」と扱わない。 */
 const REGISTRATION_TIMEOUT_MS = 3000
+
+async function withTimeout<T>(operation: Promise<T>, timeoutMs: number): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  try {
+    return await Promise.race([
+      operation,
+      new Promise<T>((_, reject) => {
+        timer = setTimeout(() => reject(new Error('通知の準備がタイムアウトしました')), timeoutMs)
+      }),
+    ])
+  } finally {
+    if (timer !== undefined) clearTimeout(timer)
+  }
+}
 
 /** この端末の Push 購読（無ければ null）。navigator.serviceWorker.ready は登録が無いと永遠に待つので使わない */
 async function currentSubscription(): Promise<PushSubscription | null> {
-  const registration = await Promise.race([
-    navigator.serviceWorker.getRegistration(),
-    new Promise<undefined>((resolve) => setTimeout(() => resolve(undefined), REGISTRATION_TIMEOUT_MS)),
-  ])
-  return (await registration?.pushManager.getSubscription()) ?? null
+  const registration = await withTimeout(navigator.serviceWorker.getRegistration(), REGISTRATION_TIMEOUT_MS)
+  if (!registration) return null
+  return withTimeout(registration.pushManager.getSubscription(), REGISTRATION_TIMEOUT_MS)
 }
 
-async function deleteServerSubscription(endpoint: string | null): Promise<void> {
-  await fetch('/api/push/subscribe', {
-    method: 'DELETE',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(endpoint ? { endpoint } : {}),
-  })
+async function deleteServerSubscription(endpoint: string): Promise<void> {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), 10_000)
+  try {
+    const response = await fetch('/api/push/subscribe', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ endpoint }),
+      signal: controller.signal,
+    })
+    if (!response.ok) throw new Error('サーバーの通知購読を削除できませんでした')
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+async function stopBrowserSubscription(subscription: PushSubscription): Promise<boolean> {
+  const removed = await withTimeout(subscription.unsubscribe(), REGISTRATION_TIMEOUT_MS)
+  return removed || !(await currentSubscription())
 }
 
 export async function subscribeToPush(): Promise<PushSubscribeResult> {
@@ -55,7 +80,8 @@ export async function subscribeToPush(): Promise<PushSubscribeResult> {
     const permission = await Notification.requestPermission()
     if (permission !== 'granted') return { ok: false, reason: 'denied' }
 
-    const registration = await navigator.serviceWorker.ready
+    // ready は SW 未登録時に終わらない。期限後の完了から購読処理を再開しない。
+    const registration = await withTimeout(navigator.serviceWorker.ready, 10_000)
     const create = () =>
       registration.pushManager.subscribe({
         userVisibleOnly: true,
@@ -71,7 +97,7 @@ export async function subscribeToPush(): Promise<PushSubscribeResult> {
       // （以前の版はサインアウトで購読を消さなかった）。購読を作り直して、この人の分として登録する。
       // 古い購読は無効になるので、残った行は次の配信で 410 になり自動で消える
       if (!(err instanceof ApiError && err.status === 409)) throw err
-      await subscription.unsubscribe()
+      if (!(await stopBrowserSubscription(subscription))) return { ok: false, reason: 'error' }
       await save(await create())
     }
     return { ok: true }
@@ -81,17 +107,9 @@ export async function subscribeToPush(): Promise<PushSubscribeResult> {
   }
 }
 
-/** 通知トグルを OFF にしたとき（この端末の購読を解除。端末の購読が分からないときはこのユーザーの全端末分） */
-export async function unsubscribeFromPush(): Promise<void> {
-  if (!isPushSupported()) return
-  try {
-    const subscription = await currentSubscription()
-    const endpoint = subscription?.endpoint ?? null
-    if (subscription) await subscription.unsubscribe()
-    await deleteServerSubscription(endpoint)
-  } catch (err) {
-    console.error('Push 解除に失敗:', err)
-  }
+/** 通知トグルを OFF にしたときも、この端末だけを解除する。 */
+export async function unsubscribeFromPush(): Promise<{ ok: boolean }> {
+  return unsubscribeThisDevice()
 }
 
 /**
@@ -101,14 +119,16 @@ export async function unsubscribeFromPush(): Promise<void> {
  * サーバーの行はログインしている間にしか消せないので、先に消す（電波が無くて消せなくても、
  * 端末の購読を解除すれば次の配信で 410 になり、サーバー側も自動で片付く）
  */
-export async function unsubscribeThisDevice(): Promise<void> {
-  if (!isPushSupported()) return
+export async function unsubscribeThisDevice(): Promise<{ ok: boolean }> {
+  if (!isPushSupported()) return { ok: true }
   try {
     const subscription = await currentSubscription()
-    if (!subscription) return
+    if (!subscription) return { ok: true }
     await deleteServerSubscription(subscription.endpoint).catch((err) => console.warn('購読の削除に失敗（端末側は解除する）:', err))
-    await subscription.unsubscribe()
+    // 別アカウントの古い購読はサーバーで消せないため、ブラウザ側の解除確認を必須にする。
+    return { ok: await stopBrowserSubscription(subscription) }
   } catch (err) {
     console.error('Push 解除に失敗:', err)
+    return { ok: false }
   }
 }

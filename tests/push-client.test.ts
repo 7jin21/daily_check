@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { subscribeToPush, unsubscribeThisDevice } from '@/lib/push-client'
+import { subscribeToPush, unsubscribeFromPush, unsubscribeThisDevice } from '@/lib/push-client'
 
 // ブラウザの Push まわり（Service Worker・PushManager・fetch）を、呼ばれた順に記録する偽物に差し替える
 const log: string[] = []
@@ -21,10 +21,10 @@ function fakeSubscription(endpoint: string) {
   }
 }
 
-function stubBrowser(getRegistration: () => Promise<unknown> = async () => registration) {
+function stubBrowser(getRegistration: () => Promise<unknown> = async () => registration, ready?: Promise<unknown>) {
   vi.stubGlobal('window', { PushManager: function PushManager() {}, Notification: {} })
   vi.stubGlobal('Notification', { requestPermission: async () => 'granted' })
-  vi.stubGlobal('navigator', { serviceWorker: { getRegistration, get ready() { return Promise.resolve(registration) } } })
+  vi.stubGlobal('navigator', { serviceWorker: { getRegistration, get ready() { return ready ?? Promise.resolve(registration) } } })
   vi.stubGlobal(
     'fetch',
     vi.fn(async (url: string, init: RequestInit) => {
@@ -83,17 +83,18 @@ describe('unsubscribeThisDevice（サインアウトの前）', () => {
     expect(log).toEqual([])
   })
 
-  it('Service Worker が登録されていなくても待ち続けない（サインアウトを止めない）', async () => {
+  it('未登録なら成功、登録照会が終わらないときは未登録と誤認せず失敗を返す', async () => {
     stubBrowser(async () => undefined)
-    await unsubscribeThisDevice()
+    await expect(unsubscribeThisDevice()).resolves.toEqual({ ok: true })
     expect(log).toEqual([])
 
-    // 登録の問い合わせが返ってこない環境でも、上限の時間で先へ進む
+    // 登録の問い合わせが返ってこない環境では、安全に止めたと確認できない
     vi.useFakeTimers()
     stubBrowser(() => new Promise(() => {}))
     const done = unsubscribeThisDevice()
     await vi.advanceTimersByTimeAsync(3000)
-    await expect(done).resolves.toBeUndefined()
+    await expect(done).resolves.toEqual({ ok: false })
+    expect(vi.getTimerCount()).toBe(0)
   })
 
   it('電波が無くてサーバーの行を消せなくても、端末の購読は解除する（次の配信で 410 になり自動で片付く）', async () => {
@@ -101,6 +102,33 @@ describe('unsubscribeThisDevice（サインアウトの前）', () => {
     stubBrowser()
     await unsubscribeThisDevice()
     expect(log).toEqual(['DELETE https://push.example/old', 'unsubscribe https://push.example/old'])
+  })
+
+  it('通知OFFでも未登録の端末から他端末の購読を削除しない', async () => {
+    stubBrowser(async () => undefined)
+    await expect(unsubscribeFromPush()).resolves.toEqual({ ok: true })
+    expect(log).toEqual([])
+  })
+
+  it('ブラウザの解除が失敗したらサーバー削除が成功しても失敗を返す', async () => {
+    subscription!.unsubscribe.mockResolvedValue(false)
+    stubBrowser()
+    await expect(unsubscribeThisDevice()).resolves.toEqual({ ok: false })
+    expect(log).toEqual(['DELETE https://push.example/old'])
+  })
+
+  it('サーバー削除がタイムアウトしてもブラウザの購読は解除しタイマーを残さない', async () => {
+    vi.useFakeTimers()
+    stubBrowser()
+    vi.stubGlobal('fetch', vi.fn((_url: string, init: RequestInit) => new Promise((_resolve, reject) => {
+      log.push('DELETE pending')
+      init.signal!.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')), { once: true })
+    })))
+    const done = unsubscribeThisDevice()
+    await vi.advanceTimersByTimeAsync(10_000)
+    await expect(done).resolves.toEqual({ ok: true })
+    expect(log).toEqual(['DELETE pending', 'unsubscribe https://push.example/old'])
+    expect(vi.getTimerCount()).toBe(0)
   })
 })
 
@@ -128,5 +156,36 @@ describe('subscribeToPush', () => {
     stubBrowser()
     await expect(subscribeToPush()).resolves.toEqual({ ok: false, reason: 'error' })
     expect(log).toEqual(['POST https://push.example/old → 500'])
+  })
+
+  it('Service Worker準備待ちを10秒で終了し、遅れて準備できても購読処理を再開しない', async () => {
+    vi.useFakeTimers()
+    let resolveReady!: (value: unknown) => void
+    const ready = new Promise((resolve) => { resolveReady = resolve })
+    stubBrowser(async () => registration, ready)
+    const done = subscribeToPush()
+    await vi.advanceTimersByTimeAsync(10_000)
+    await expect(done).resolves.toEqual({ ok: false, reason: 'error' })
+    expect(vi.getTimerCount()).toBe(0)
+    expect(log).toEqual([])
+    resolveReady(registration)
+    await vi.advanceTimersByTimeAsync(0)
+    expect(log).toEqual([])
+  })
+
+  it('準備済みなら期限を解除し、正常に購読を登録する', async () => {
+    vi.useFakeTimers()
+    stubBrowser()
+    await expect(subscribeToPush()).resolves.toEqual({ ok: true })
+    expect(log).toEqual(['POST https://push.example/old → 200'])
+    expect(vi.getTimerCount()).toBe(0)
+  })
+
+  it('409の古い購読を停止できない場合は新規購読を作らず失敗を返す', async () => {
+    postStatuses = [409]
+    subscription!.unsubscribe.mockResolvedValue(false)
+    stubBrowser()
+    await expect(subscribeToPush()).resolves.toEqual({ ok: false, reason: 'error' })
+    expect(log).toEqual(['POST https://push.example/old → 409'])
   })
 })

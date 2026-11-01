@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import { apiPost } from '@/lib/api-client'
-import { STORAGE_KEYS } from '@/lib/constants'
+import { readInsightsCache, writeInsightsCache } from '@/lib/insights-session'
+import { useInsightsSession } from './InsightsSessionBoundary'
 import { todayJST } from '@/lib/jst'
 import { doneInLastWeek, FOCUS_MAX_CHARS, isFocusActive, loadFocus, saveFocus, type Focus } from '@/lib/focus'
 import { formatAge } from './shared'
@@ -40,16 +41,18 @@ interface WeeklyReport {
   isFallback?: boolean
 }
 
-interface CachedWeeklyReport {
-  result: WeeklyReport
-  timestamp: number
-}
-
-const WEEKLY_CACHE_KEY = STORAGE_KEYS.WEEKLY_REPORT_CACHE
 const WEEKLY_CACHE_TTL = 6 * 60 * 60 * 1000
+
+function isValidWeeklyReport(value: unknown): value is WeeklyReport {
+  if (!value || typeof value !== 'object') return false
+  const report = value as Record<string, unknown>
+  return ['narrative', 'highlight', 'challenge', 'nextFocus', 'weekMood'].every((key) => typeof report[key] === 'string') &&
+    typeof report.entryCount === 'number' && typeof report.avgMood === 'number'
+}
 
 // 「今週の振り返り」: 直近7日の週次レポートと、来週のフォーカスの採用
 export default function WeeklyReportSection() {
+  const { userId, session } = useInsightsSession()
   const [weeklyReport, setWeeklyReport] = useState<WeeklyReport | null>(null)
   const [isWeeklyLoading, setIsWeeklyLoading] = useState(false)
   const [weeklyError, setWeeklyError] = useState<string | null>(null)
@@ -60,19 +63,13 @@ export default function WeeklyReportSection() {
   const [focusDraft, setFocusDraft] = useState('')
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(WEEKLY_CACHE_KEY)
-      if (raw) {
-        const cached: CachedWeeklyReport = JSON.parse(raw)
-        if (Date.now() - cached.timestamp < WEEKLY_CACHE_TTL) {
-          setWeeklyReport(cached.result)
-          setWeeklyCachedAt(cached.timestamp)
-        }
-      }
-    } catch { /* ignore */ }
+    const cached = readInsightsCache('weekly', userId, WEEKLY_CACHE_TTL, isValidWeeklyReport)
+    setWeeklyReport(cached?.result ?? null)
+    setWeeklyCachedAt(cached?.timestamp ?? null)
     const f = loadFocus()
     if (isFocusActive(f, todayJST())) setFocus(f)
-  }, [])
+    return () => session.cancel('weekly')
+  }, [session, userId])
 
   const adoptFocus = (text: string) => {
     const t = text.trim().slice(0, FOCUS_MAX_CHARS)
@@ -84,6 +81,8 @@ export default function WeeklyReportSection() {
   }
 
   const loadWeeklyReport = async () => {
+    const request = session.begin('weekly', userId)
+    if (!request) return
     setIsWeeklyLoading(true)
     setWeeklyError(null)
     try {
@@ -95,23 +94,27 @@ export default function WeeklyReportSection() {
         adopted
           ? { previousFocus: adopted.text, focusDone: doneInLastWeek(adopted, todayJST()) }
           : { previousFocus: weeklyReport?.nextFocus ?? undefined },
-        { retry: false }
+        { signal: request.signal }
       )
+      if (!request.isCurrent()) return
       if ('status' in result) {
         setWeeklyError(result.status === 'no_data' ? '今週の記録がありません' : '取得に失敗しました')
+      } else if (!isValidWeeklyReport(result)) {
+        setWeeklyError('レポートを読み取れませんでした。もう一度お試しください')
       } else {
         const now = Date.now()
         // フォールバック（AI不通時の簡易版）はキャッシュしない — 次回は本物を試す
         if (!result.isFallback) {
-          try { localStorage.setItem(WEEKLY_CACHE_KEY, JSON.stringify({ result, timestamp: now })) } catch { /* ignore */ }
+          writeInsightsCache('weekly', request, result, now)
         }
         setWeeklyReport(result)
         setWeeklyCachedAt(now)
       }
     } catch (err) {
-      setWeeklyError(err instanceof Error ? err.message : '取得に失敗しました')
+      if (request.isActive()) setWeeklyError(request.signal.aborted ? '時間がかかっています。もう一度お試しください' : err instanceof Error ? err.message : '取得に失敗しました')
     } finally {
-      setIsWeeklyLoading(false)
+      if (request.isActive()) setIsWeeklyLoading(false)
+      request.finish()
     }
   }
 

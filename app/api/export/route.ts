@@ -42,18 +42,27 @@ export async function GET(req: NextRequest) {
 
   const format = req.nextUrl.searchParams.get('format') === 'csv' ? 'csv' : 'json'
 
-  const { data: entries, error } = await supabase
-    .from('diary_entries')
-    .select(EXPORT_COLUMNS.join(', '))
-    .eq('user_id', user.id)
-    .order('entry_date', { ascending: true })
-    .limit(10000)
-
-  if (error) {
-    return NextResponse.json({ error: 'データ取得に失敗しました' }, { status: 500 })
+  const rows: ExportRow[] = []
+  let lastDate: string | null = null
+  // 日付はユーザー内で一意。サーバー側の取得上限が要求件数より小さくても、
+  // 短いページで打ち切らず空になるまで取得する。途中の失敗は不完全なバックアップにしない。
+  while (true) {
+    let query = supabase
+      .from('diary_entries')
+      .select(EXPORT_COLUMNS.join(', '))
+      .eq('user_id', user.id)
+      .order('entry_date', { ascending: true })
+      .limit(1000)
+    if (lastDate) query = query.gt('entry_date', lastDate)
+    const { data, error } = await query
+    if (error) {
+      return NextResponse.json({ error: 'データ取得に失敗しました' }, { status: 500 })
+    }
+    const page = (data ?? []) as unknown as ExportRow[]
+    if (page.length === 0) break
+    rows.push(...page)
+    lastDate = page[page.length - 1].entry_date as string
   }
-
-  const rows = (entries ?? []) as unknown as ExportRow[]
   const dateStamp = todayJST()
 
   if (format === 'csv') {

@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { getSupabaseClient } from '@/lib/supabase'
-import { apiPost } from '@/lib/api-client'
+import { syncNotion } from '@/lib/notion-client'
 import { refreshEntryMeta } from '@/lib/entry-save'
 import { todaysMemos, useMemoStore } from '@/stores/memos'
 import { PlusIcon } from '@/components/ui/icons'
@@ -90,7 +90,7 @@ export default function EditableContent({
 
       // Notion にも編集内容を反映（同期済みページは更新される。失敗しても保存には影響しない）
       if (mood != null && energy != null) {
-        apiPost('/api/notion-sync', { entryId, entryDate, draft, tags: nextTags, mood, energy }, { retry: false }).catch(
+        syncNotion({ entryId, entryDate, draft, tags: nextTags, mood, energy }).catch(
           (syncErr) => console.warn('Notion再同期失敗（無視）:', syncErr)
         )
       }

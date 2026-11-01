@@ -62,11 +62,16 @@ export async function GET(req: NextRequest) {
   const userIds = Array.from(new Set(subs.map((s) => s.user_id)))
 
   // 4. 今日すでに記録済みのユーザーを除外
-  const { data: todayEntries } = await supabase
+  const { data: todayEntries, error: todayError } = await supabase
     .from('diary_entries')
     .select('user_id')
     .eq('entry_date', today)
     .in('user_id', userIds)
+  if (todayError) {
+    // 照会失敗を「未記録」と見なすと記録済みの人にも送ってしまうため、配信を中止する。
+    console.error('Cron: 今日の記録確認に失敗:', todayError)
+    return NextResponse.json({ error: '今日の記録を確認できなかったため、通知を中止しました' }, { status: 500 })
+  }
   const recordedToday = new Set((todayEntries ?? []).map((e) => e.user_id))
 
   // 5. 昨日の気分（文面のパーソナライズ用）

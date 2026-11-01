@@ -6,6 +6,8 @@ import { useCheckinStore } from '@/stores/checkin'
 import { useSettingsStore } from '@/stores/settings'
 import { useMemoStore } from '@/stores/memos'
 import { apiPost } from '@/lib/api-client'
+import { syncNotion } from '@/lib/notion-client'
+import { readDraftStream } from '@/lib/draft-stream'
 import { generateOfflineDraft } from '@/lib/offline-draft'
 import { hasEntryWithWords, refreshEntryMeta, saveFullEntry } from '@/lib/entry-save'
 import { withReflection } from '@/lib/freeform'
@@ -42,6 +44,17 @@ function currentEntryDate(): string {
   return st.targetDate ?? st.checkinDate ?? todayJST()
 }
 
+/** 保存待ちの間に対象日・入力・本文が変わったら、古い保存で消さない。 */
+function currentSaveSnapshot(): string {
+  const st = useCheckinStore.getState()
+  return JSON.stringify({
+    resetVersion: st.resetVersion, entryDate: currentEntryDate(),
+    input: st.getInput(), reflectionQ: st.reflectionQ, reflectionA: st.reflectionA,
+    editedDraft: st.editedDraft, draftMode: st.draftMode,
+    draftInputKey: st.draftInputKey, draftIncomplete: st.draftIncomplete,
+  })
+}
+
 export default function DraftPage() {
   const router = useRouter()
   const {
@@ -57,14 +70,16 @@ export default function DraftPage() {
     draftMode,
     aiText,
     isGenerating,
+    draftIncomplete,
     setDraftResult,
     setEditedDraft,
     setIsGenerating,
+    setDraftIncomplete,
     setReflection,
     setDraftMode,
     setDraftInputKey,
     addAiText,
-    clearDraft,
+    setAiText,
     reset,
   } = useCheckinStore()
   const notificationsEnabled = useSettingsStore((s) => s.settings.notificationsEnabled)
@@ -78,21 +93,21 @@ export default function DraftPage() {
   const [rewriteError, setRewriteError] = useState<string | null>(null)
   const [reflectPhase, setReflectPhase] = useState<'pending' | 'fetching' | 'asking' | 'done'>('pending')
   const [reflectQuestion, setReflectQuestion] = useState<{ question: string; options: string[] } | null>(null)
-  const [history, setHistory] = useState<{ text: string; mode: DraftMode }[]>([])
+  const [history, setHistory] = useState<{ text: string; mode: DraftMode; incomplete: boolean }[]>([])
   const [compareOpen, setCompareOpen] = useState(false)
-  // 配信中の清書。端末に保存する下書き（editedDraft）には、清書が終わってから入れる。
-  // 途中でアプリを閉じたり画面を離れたりしても、途中で切れた文が完成した下書きとして残らないように
+  // 配信中の表示。端末にも draftIncomplete と一緒に保存し、離脱後も途中の言葉を回復できる。
   const [streamText, setStreamText] = useState('')
 
   const abortRef = useRef<AbortController | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
-  const startedRef = useRef(false) // StrictMode(dev)の二重実行で生成/質問が2回走らないようにする
   // 非同期応答の取り違え防止: 生成・書き直しのたびに番号を進め、古い番号の応答は捨てる
   const genRef = useRef(0)
   const rewriteRef = useRef(0)
+  const reflectionRef = useRef(0)
+  const saveRef = useRef(0)
+  const savingRef = useRef(false)
   const savedRef = useRef(false)
-  // 画面にいるか（内省の問いを待っている間に離れたら、そのあと清書を始めない）。
-  // genRef では代用できない: StrictMode(dev) の二重実行でクリーンアップが genRef を進めるため
+  // 画面にいるか（離脱後の内省・生成・保存の完了で新しい入力を変更しない）。
   const mountedRef = useRef(false)
 
   // 本人のメモ（比較の基準）と、清書のうち本人の言葉の割合
@@ -109,53 +124,82 @@ export default function DraftPage() {
   const kept = useMemo(() => analyzeKept(original, editedDraft, aiSource), [original, editedDraft, aiSource])
 
   useEffect(() => {
-    const st = useCheckinStore.getState()
-    const today = todayJST()
+    const abort = abortRef
+    const gen = genRef
+    const rewrite = rewriteRef
+    const reflection = reflectionRef
+    const save = saveRef
+    const saving = savingRef
+    mountedRef.current = true
+    let active = true
+    const initialize = () => {
+      const st = useCheckinStore.getState()
+      const today = todayJST()
 
-    // 前日以前に書き始めた下書き: 言葉があれば消さずに、書き始めた日の記録として続ける（7日以内）。
-    // 言葉が無い・古すぎるものだけ消して、チェックインへ戻す
-    const plan = planDateRollover(st, today)
-    if (plan.kind === 'reset') {
-      st.reset()
-      router.replace('/checkin')
-      return
-    }
-    if (plan.kind === 'carry') {
-      st.setTargetDate(plan.targetDate)
-      st.setCheckinDate(today)
-    }
-    const input = st.getInput()
-    if (!input.mood && !input.energy) {
-      router.replace('/checkin')
-      return
-    }
-    if (startedRef.current) return
-    startedRef.current = true
-
-    // この日にすでに言葉のある日記があれば、保存は上書きではなく追記になることを先に伝える
-    hasEntryWithWords(currentEntryDate())
-      .then((exists) => setWillAppend(exists))
-      .catch(() => setWillAppend(false))
-
-    if (st.editedDraft || st.draftResult) {
-      const key = inputKey(currentComposeInput())
-      // 入力に戻ってメモを変えていたら、古い清書のまま保存しないようにする
-      if (st.draftInputKey && st.draftInputKey !== key) {
-        const untouched = st.draftMode === 'tidy' && st.editedDraft === st.draftResult?.draft
-        if (untouched || window.confirm('メモの内容が変わりました。新しい内容で清書し直しますか？\n（いまのドラフトは置き換わります）')) {
-          st.clearDraft()
-          st.setReflection('', '')
-          startReflectionThenGenerate()
-        } else {
-          st.setDraftInputKey(key)
-        }
+      // 日付またぎは最新の持ち越し仕様を保つ（言葉があれば7日以内の対象日に続ける）。
+      const plan = planDateRollover(st, today)
+      if (plan.kind === 'reset') {
+        st.reset()
+        router.replace('/checkin')
         return
       }
-      if (!st.editedDraft && st.draftResult) st.setEditedDraft(st.draftResult.draft)
-      return
+      if (plan.kind === 'carry') {
+        st.setTargetDate(plan.targetDate)
+        st.setCheckinDate(today)
+      }
+      const input = st.getInput()
+      if (!input.mood && !input.energy) {
+        router.replace('/checkin')
+        return
+      }
+      st.setIsGenerating(false)
+
+      const date = currentEntryDate()
+      const version = st.resetVersion
+      const sameEntry = () => active && useCheckinStore.getState().resetVersion === version && currentEntryDate() === date
+      hasEntryWithWords(date)
+        .then((exists) => { if (sameEntry()) setWillAppend(exists) })
+        .catch(() => { if (sameEntry()) setWillAppend(false) })
+
+      if (st.editedDraft || st.draftResult || st.draftIncomplete) {
+        const key = inputKey(currentComposeInput())
+        if (st.draftInputKey && st.draftInputKey !== key) {
+          const untouched = st.draftMode === 'tidy' && st.editedDraft === st.draftResult?.draft
+          if (untouched || window.confirm('メモの内容が変わりました。新しい内容で清書し直しますか？\n（いまのドラフトは置き換わります）')) {
+            st.clearDraft()
+            st.setReflection('', '')
+            startReflectionThenGenerate()
+            return
+          }
+          st.setDraftInputKey(key)
+        }
+        if (st.draftIncomplete) {
+          const full = currentComposeInput()
+          const offline = generateOfflineDraft(full, currentEntryDate())
+          const text = st.editedDraft || composeRaw(full) || offline.draft
+          st.setDraftResult({ ...offline, draft: text, fromAI: false })
+          st.setEditedDraft(text)
+          setNotice('partial')
+        } else if (!st.editedDraft && st.draftResult) st.setEditedDraft(st.draftResult.draft)
+        setReflectPhase('done')
+        return
+      }
+      startReflectionThenGenerate()
     }
-    // 生成の「前」に、AIが内省の問いを1つだけ投げる（不要・失敗なら即生成へ）
-    startReflectionThenGenerate()
+    initialize()
+    // StrictModeでも旧リクエストを無効にし、次のsetupで同じ入力から再開する。
+    return () => {
+      active = false
+      mountedRef.current = false
+      abort.current?.abort()
+      gen.current++
+      rewrite.current++
+      reflection.current++
+      save.current++
+      saving.current = false
+      const st = useCheckinStore.getState()
+      if (st.isGenerating) st.setIsGenerating(false)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -175,25 +219,6 @@ export default function DraftPage() {
     return () => document.removeEventListener('visibilitychange', onVisible)
   }, [])
 
-  // 画面を離れたら進行中の生成を止め、遅れて届く応答はすべて無効にする
-  useEffect(() => {
-    const abort = abortRef
-    const gen = genRef
-    const rewrite = rewriteRef
-    const mounted = mountedRef
-    mounted.current = true
-    return () => {
-      mounted.current = false
-      abort.current?.abort()
-      gen.current++
-      rewrite.current++
-      // 清書の途中で画面を離れたら「生成中」を戻す（戻ってきたときに、動いていない待ち画面のまま固まらないように）。
-      // 途中までの清書は下書きに入れていないので、戻ると前の下書き（なければ新しい清書）になる
-      const st = useCheckinStore.getState()
-      if (st.isGenerating) st.setIsGenerating(false)
-    }
-  }, [])
-
   useEffect(() => {
     const el = textareaRef.current
     if (!el) return
@@ -211,20 +236,27 @@ export default function DraftPage() {
     setDraftResult({ ...offline, draft: text, fromAI: false })
     setEditedDraft(text)
     setDraftMode(raw ? 'raw' : 'tidy')
+    setDraftIncomplete(false)
     setNotice('offline')
   }
 
   const generateDraft = async () => {
+    if (!mountedRef.current || savingRef.current) return
     abortRef.current?.abort()
     const controller = new AbortController()
     abortRef.current = controller
     const id = ++genRef.current
-    const isCurrent = () => id === genRef.current
-
     const st = useCheckinStore.getState()
     const full = currentComposeInput()
-    const entryTarget = st.targetDate
+    const previousAiText = st.aiText
+    const version = st.resetVersion
+    const key = inputKey(full)
+    const entryTarget = currentEntryDate()
+    const isCurrent = () => mountedRef.current && id === genRef.current &&
+      useCheckinStore.getState().resetVersion === version && inputKey(currentComposeInput()) === key &&
+      currentEntryDate() === entryTarget
     setIsGenerating(true)
+    setDraftIncomplete(true)
     setNotice(null)
     setStreamText('')
     setEditedDraft('')
@@ -236,53 +268,39 @@ export default function DraftPage() {
     const keepPartial = (partial: string, reason: unknown) => {
       console.warn('清書が途中で止まりました:', reason)
       const meta = generateOfflineDraft(full, entryTarget)
-      setDraftResult({ ...meta, draft: partial, fromAI: true })
+      setDraftResult({ ...meta, draft: partial, fromAI: false })
       setEditedDraft(partial)
       addAiText(partial)
       setNotice('partial')
     }
     try {
-      // 日記本文は text/plain でストリーミングされる。内省Q&Aがあれば文脈として渡す。
-      // entryDate は過去日付の書き忘れ救済用（null なら今日扱い）
+      // 本文とは別の完了通知を受け取るまでは、完成した清書と扱わない。
       const res = await fetch('/api/generate-draft', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', Accept: 'application/x-ndjson' },
         body: JSON.stringify({ ...full, entryDate: entryTarget ?? undefined }),
         signal: controller.signal,
       })
       if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`)
 
       const isFallback = res.headers.get('X-Draft-Fallback') === '1'
-      const reader = res.body.getReader()
-      const decoder = new TextDecoder()
-      for (;;) {
-        const { done, value } = await reader.read()
-        if (!isCurrent()) {
-          reader.cancel().catch(() => {})
-          return
-        }
-        if (done) break
-        text += decoder.decode(value, { stream: true })
-        setStreamText(splitCutMark(text).text)
+      if (isFallback) {
+        if (isCurrent()) fallbackToOwnWords(full, entryTarget)
+        return
       }
-      text += decoder.decode()
-      // 出力の上限に達した・途中で失敗したときは、サーバーが末尾に印を付けてくる（ストリームは正常に終わる）
-      const received = splitCutMark(text)
-      text = received.text.trim()
+      await readDraftStream(res.body, (delta) => {
+        if (!isCurrent()) throw new DOMException('Obsolete draft', 'AbortError')
+        text += delta
+        setStreamText(text)
+        setEditedDraft(text)
+        setAiText([previousAiText, text].filter(Boolean).join('\n'))
+      })
+      if (!isCurrent()) return
+      text = text.trim()
       if (!text) throw new Error('empty draft')
 
-      if (isFallback) {
-        // サーバーに AI が設定されていない → 本人のメモをそのまま使う
-        fallbackToOwnWords(full, entryTarget)
-        return
-      }
-      if (received.cut) {
-        // 途中で切れた清書を完成品として出さない
-        keepPartial(text, 'cut off')
-        return
-      }
-
       setEditedDraft(text)
+      setDraftIncomplete(false)
       addAiText(text)
       // メタ情報（タグ・サマリー・感情）は本文確定後にバックグラウンドで取得。失敗時はローカル生成のメタ
       const offlineMeta = generateOfflineDraft(full, entryTarget)
@@ -321,17 +339,25 @@ export default function DraftPage() {
         fallbackToOwnWords(full, entryTarget)
       }
     } finally {
-      if (isCurrent()) setIsGenerating(false)
+      if (mountedRef.current && id === genRef.current && useCheckinStore.getState().resetVersion === version) {
+        setIsGenerating(false)
+      }
     }
   }
 
   // 生成前の内省質問ゲート。問いは入力中に先読みしてあるので、たいていすぐ届く。
   // 不要・失敗・遅延（7秒）なら黙って生成へ進む（requestReflection は例外を投げず、絶対にブロックしない）
   const startReflectionThenGenerate = async () => {
+    const id = ++reflectionRef.current
+    const st = useCheckinStore.getState()
+    const version = st.resetVersion
+    const key = inputKey(currentComposeInput())
+    const isCurrent = () => mountedRef.current && id === reflectionRef.current &&
+      useCheckinStore.getState().resetVersion === version && inputKey(currentComposeInput()) === key
     // 先読み済みなら描画の前に届き、'fetching' は次の段階とまとめて描画されるので待ち画面は残らない
     setReflectPhase('fetching')
     const res = await requestReflection(useCheckinStore.getState().getInput())
-    if (!mountedRef.current) return
+    if (!isCurrent()) return
     if (!res.skip && res.question && Array.isArray(res.options) && res.options.length >= 2) {
       setReflectQuestion({ question: res.question, options: res.options })
       setReflectPhase('asking')
@@ -356,8 +382,8 @@ export default function DraftPage() {
   const handleCancel = () => {
     abortRef.current?.abort()
     genRef.current++
-    // 途中まで書かれたドラフトを、次に開いたとき完成品のように再利用しない
-    clearDraft()
+    // 途中の本文と不完全フラグを残し、戻ってきたら編集・再生成できるようにする。
+    setIsGenerating(false)
     router.push('/checkin')
   }
 
@@ -368,10 +394,10 @@ export default function DraftPage() {
     return draftResult?.draft ?? ''
   }
 
-  const pushHistory = () => setHistory((h) => [...h, { text: editedDraft, mode: draftMode }].slice(-10))
+  const pushHistory = () => setHistory((h) => [...h, { text: editedDraft, mode: draftMode, incomplete: draftIncomplete }].slice(-10))
 
   const switchMode = (next: DraftMode) => {
-    if (next === draftMode || isGenerating || rewritingKey || isSaving) return
+    if (next === draftMode || isGenerating || rewritingKey || savingRef.current) return
     const edited = editedDraft.trim() && editedDraft !== baseText(draftMode)
     if (edited && !window.confirm('手で直した内容は置き換わります（「元に戻す」で戻せます）。よろしいですか？')) return
     pushHistory()
@@ -386,20 +412,24 @@ export default function DraftPage() {
       return
     }
     setNotice(null)
+    setDraftIncomplete(false)
     setDraftMode(next)
     setEditedDraft(next === 'raw' ? composeRaw(currentComposeInput()) : composeBullets(currentComposeInput()))
   }
 
   const handleUndo = () => {
     const last = history[history.length - 1]
-    if (!last || isGenerating || rewritingKey) return
+    if (!last || isGenerating || rewritingKey || savingRef.current) return
     setHistory((h) => h.slice(0, -1))
     setDraftMode(last.mode)
     setEditedDraft(last.text)
+    setDraftIncomplete(last.incomplete)
+    setNotice(last.incomplete ? 'partial' : null)
   }
 
   // ユーザーが手で編集した内容を無確認で破棄しない
   const handleRegenerate = () => {
+    if (savingRef.current || isGenerating || rewritingKey) return
     const hasEdits = draftResult && editedDraft.trim() && editedDraft !== draftResult.draft
     if (hasEdits && !window.confirm('編集した内容は置き換わります（「元に戻す」で戻せます）。清書し直しますか？')) {
       return
@@ -409,7 +439,7 @@ export default function DraftPage() {
   }
 
   const handleRewrite = async (instruction: RewriteInstruction) => {
-    if (!editedDraft.trim() || rewritingKey || isGenerating) return
+    if (!editedDraft.trim() || rewritingKey || isGenerating || savingRef.current) return
     const rid = ++rewriteRef.current
     const before = editedDraft
     setRewritingKey(instruction)
@@ -418,7 +448,7 @@ export default function DraftPage() {
       // 自動で再試行しない（長すぎて切れるなど、何度やっても同じ失敗を AI に繰り返させないため）
       const result = await apiPost<{ draft: string }>('/api/rewrite-draft', { draft: before, instruction }, { retry: false })
       if (rid !== rewriteRef.current || savedRef.current) return
-      setHistory((h) => [...h, { text: before, mode: draftMode }].slice(-10))
+      setHistory((h) => [...h, { text: before, mode: draftMode, incomplete: draftIncomplete }].slice(-10))
       setEditedDraft(result.draft)
       // AI の言葉として覚えるのは、書き直しで新しく足された言葉だけ（書き直す前の本文には本人が書き足した言葉もある）
       addAiText(
@@ -435,11 +465,18 @@ export default function DraftPage() {
   }
 
   const handleSave = async () => {
-    if (!editedDraft.trim() || isSaving || rewritingKey || isGenerating) return
+    const st = useCheckinStore.getState()
+    if (!mountedRef.current || !st.editedDraft.trim() || savingRef.current || rewritingKey || st.isGenerating) return
+    savingRef.current = true
+    const id = ++saveRef.current
+    const snapshot = currentSaveSnapshot()
+    const ownsSave = () => mountedRef.current && id === saveRef.current
+    const canClearDraft = () => ownsSave() && currentSaveSnapshot() === snapshot
+    const textToSave = st.editedDraft
+    const resultToSave = st.draftResult
     setIsSaving(true)
     setSaveError(null)
 
-    const st = useCheckinStore.getState()
     const input = st.getInput()
     const entryDate = currentEntryDate()
     // 内省Q&Aは DB 列を増やさず freeform に畳んで残す（将来のAI分析の材料にする）
@@ -455,33 +492,35 @@ export default function DraftPage() {
         challenges: input.challenges,
         gratitude: input.gratitude,
         freeform: freeformToSave,
-        aiDraft: draftResult?.draft ?? editedDraft,
-        editedDraft,
-        tags: draftResult?.tags ?? [],
-        summary: draftResult?.summary ?? '',
-        dominantEmotion: draftResult?.dominantEmotion ?? '',
+        aiDraft: resultToSave?.draft ?? textToSave,
+        editedDraft: textToSave,
+        tags: resultToSave?.tags ?? [],
+        summary: resultToSave?.summary ?? '',
+        dominantEmotion: resultToSave?.dominantEmotion ?? '',
       })
-      // ここから先に届く生成・メタ・書き直しの応答はすべて無効
-      savedRef.current = true
-      genRef.current++
-      rewriteRef.current++
 
       // Notion には保存した本文全体を送る（追記した日は前の日記も含めた本文）
       const notion = { entryId: result.id, entryDate, draft: result.draft, mood: input.mood, energy: input.energy }
-      const syncNotion = (tags: string[]) =>
-        apiPost('/api/notion-sync', { ...notion, tags }, { retry: false }).catch((err) => console.warn('Notion同期失敗（無視）:', err))
+      const syncSavedEntry = (tags: string[]) =>
+        syncNotion({ ...notion, tags }).catch((err) => console.warn('Notion同期失敗（無視）:', err))
       if (result.merged) {
         // 追記した日は、要約・タグを本文全体から作り直してから同期する（作り直せなければ保存時のタグ）
-        refreshEntryMeta(result.id, result.draft).then((meta) => syncNotion(meta?.tags ?? result.tags))
+        refreshEntryMeta(result.id, result.draft).then((meta) => syncSavedEntry(meta?.tags ?? result.tags))
       } else {
-        syncNotion(draftResult?.tags ?? [])
+        syncSavedEntry(result.tags)
       }
+
+      // 保存が届いても、離脱後・リセット後・別入力への切替後の下書きは消さない。
+      if (!canClearDraft()) return
+      savedRef.current = true
+      genRef.current++
+      rewriteRef.current++
 
       // 日記に入ったひとことメモだけを片付ける（入りきらなかった・選ばなかったメモは、その日のうちは残す。
       // 以前はすべて消していたため、上限で入らなかったメモがそのまま失われていた）
       const memos = useMemoStore.getState()
       if (memos.date === entryDate) {
-        memos.removeUsedIn([input.events, input.challenges, input.gratitude, input.freeform, editedDraft].join('\n'))
+        memos.removeUsedIn([input.events, input.challenges, input.gratitude, input.freeform, textToSave].join('\n'))
       }
 
       reset()
@@ -493,6 +532,7 @@ export default function DraftPage() {
       setSaved({ date: entryDate, merged: result.appended, mood: input.mood })
     } catch (err) {
       console.error('保存エラー:', err)
+      if (!canClearDraft()) return
       const classified = classifyError(err)
       if (classified === 'cancelled') return
       if (classified.includes('セッション')) {
@@ -502,10 +542,13 @@ export default function DraftPage() {
       setSaveError(classified)
       // 保存は届いていたのに応答だけ失われた場合、次の保存は追記になる。案内を出し直す
       hasEntryWithWords(entryDate)
-        .then((exists) => setWillAppend(exists))
+        .then((exists) => { if (canClearDraft()) setWillAppend(exists) })
         .catch(() => {})
     } finally {
-      setIsSaving(false)
+      if (id === saveRef.current) {
+        savingRef.current = false
+        if (mountedRef.current) setIsSaving(false)
+      }
     }
   }
 
@@ -544,9 +587,11 @@ export default function DraftPage() {
 
   return (
     <div className="dv-page animate-fade-in">
-      <DraftHeader targetDate={targetDate} onBack={() => router.push('/checkin')} />
+      <DraftHeader targetDate={targetDate} disabled={busy} onBack={() => {
+        if (!savingRef.current && !isGenerating && !rewritingKey) router.push('/checkin')
+      }} />
 
-      {notice && <DraftNotice kind={notice} />}
+      {(notice || draftIncomplete) && <DraftNotice kind={draftIncomplete ? 'partial' : notice!} />}
 
       {/* 整え方 */}
       <DraftModePicker mode={draftMode} disabled={busy} onSelect={switchMode} />
@@ -557,9 +602,9 @@ export default function DraftPage() {
         <textarea
           ref={textareaRef}
           value={editedDraft}
-          readOnly={!!rewritingKey}
+          readOnly={busy}
           aria-label="日記の本文（編集できます）"
-          onChange={(e) => setEditedDraft(e.target.value)}
+          onChange={(e) => { if (!savingRef.current && !rewritingKey) setEditedDraft(e.target.value) }}
           className="dv-textarea"
         />
 
