@@ -6,6 +6,8 @@ import { apiPost } from '@/lib/api-client'
 import { STORAGE_KEYS } from '@/lib/constants'
 import PersonalityCard from './PersonalityCard'
 import { formatAge, MOOD_COLOR } from './shared'
+import InkRings from '@/components/ui/InkRings'
+import { AlertIcon, ChevronRightIcon, MirrorMark, TrendDownIcon, TrendFlatIcon, TrendUpIcon } from '@/components/ui/icons'
 
 interface EmotionTrigger {
   trigger: string
@@ -38,8 +40,9 @@ interface CachedAnalysis {
 const CACHE_KEY = STORAGE_KEYS.INSIGHTS_CACHE
 const CACHE_TTL = 24 * 60 * 60 * 1000
 
-const TREND_ICON = { improving: '📈', stable: '➡️', declining: '📉' }
+const TREND_ICON = { improving: TrendUpIcon, stable: TrendFlatIcon, declining: TrendDownIcon }
 const TREND_LABEL = { improving: '改善傾向', stable: '安定', declining: '要注意' }
+const TREND_COLOR = { improving: 'var(--positive)', stable: 'var(--muted)', declining: 'var(--notice)' }
 
 /** キャッシュや API の分析結果が、画面で使う形をしているか（欠けていると表示が落ちる） */
 function isValidAnalysis(r: unknown): r is AnalysisResult {
@@ -106,14 +109,16 @@ export default function AnalysisSection() {
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-bold text-[var(--foreground)]">AI パーソナル分析</h2>
+        <h2 className="font-mincho text-lg font-semibold tracking-wide text-[var(--foreground)]">AI パーソナル分析</h2>
         <div className="flex flex-col items-end gap-0.5">
           <button
+            type="button"
             onClick={loadAnalysis}
             disabled={isLoading}
-            className="text-[var(--primary)] text-sm font-medium disabled:opacity-50"
+            className="btn-quiet"
+            style={{ minHeight: 32, color: 'var(--primary)', fontWeight: 700 }}
           >
-            {isLoading ? '分析中...' : analysis ? '更新' : '分析する'}
+            {isLoading ? '分析しています…' : analysis ? '更新する' : '分析する'}
           </button>
           {cachedAt && !isLoading && (
             <span className="text-xs text-[var(--muted-2)]">{formatAge(cachedAt)}</span>
@@ -122,39 +127,38 @@ export default function AnalysisSection() {
       </div>
 
       {isLoading && (
-        <div className="flex flex-col items-center justify-center py-16 gap-4">
-          <div className="spinner" style={{ width: 40, height: 40, borderWidth: 3 }} />
-          <p className="text-[var(--muted)] text-sm">過去の日記を分析しています...</p>
+        <div className="flex flex-col items-center justify-center py-14 gap-5" role="status">
+          <InkRings size="md" />
+          <p className="font-mincho text-[var(--muted)] text-sm tracking-wide">過去の日記を、読み返しています</p>
         </div>
       )}
 
       {!isLoading && !hasEnoughData && (
         <div className="card text-center py-10">
-          <p className="text-4xl mb-3">📊</p>
-          <p className="font-bold text-[var(--foreground)]">データが足りません</p>
-          <p className="text-sm text-[var(--muted)] mt-1">最低5件の日記が必要です</p>
+          <MirrorMark size={40} className="empty-mark" />
+          <p className="font-mincho font-semibold text-[var(--foreground)]">もう少し、記録がたまってから</p>
+          <p className="text-sm text-[var(--muted)] mt-1">分析には 5 日分以上の日記が必要です</p>
         </div>
       )}
 
       {!isLoading && error && (
         <div className="card text-center py-8">
-          <p className="text-red-500 text-sm">{error}</p>
-          <button onClick={loadAnalysis} className="mt-3 text-[var(--primary)] text-sm font-medium">
-            再試行
+          <p className="text-[var(--danger)] text-sm" role="alert">
+            {error}
+          </p>
+          <button type="button" onClick={loadAnalysis} className="btn btn-secondary btn-sm mt-3">
+            もう一度試す
           </button>
         </div>
       )}
 
       {!analysis && !isLoading && hasEnoughData && !error && (
         <div className="card text-center py-10">
-          <p className="text-4xl mb-3">🤖</p>
-          <p className="font-bold text-[var(--foreground)]">AIが日記を分析します</p>
-          <p className="text-sm text-[var(--muted)] mt-1 mb-4">あなたの傾向・強み・価値観を発見</p>
-          <button
-            onClick={loadAnalysis}
-            className="px-6 py-2.5 rounded-full bg-[var(--accent)] text-[#f7f4ea] font-bold text-sm"
-          >
-            分析を開始
+          <MirrorMark size={40} className="empty-mark" />
+          <p className="font-mincho font-semibold text-[var(--foreground)]">日記から、自分の傾向を読み取ります</p>
+          <p className="text-sm text-[var(--muted)] mt-1 mb-5">強み・大切にしているもの・気分が動くきっかけ</p>
+          <button type="button" onClick={loadAnalysis} className="btn btn-primary btn-sm">
+            分析する
           </button>
         </div>
       )}
@@ -162,9 +166,10 @@ export default function AnalysisSection() {
       {!isLoading && analysis && (
         <>
           {analysis.isFallback && (
-            <p className="mb-4 p-3 rounded-2xl text-xs" style={{ background: 'rgba(197,137,95,0.12)', border: '1px solid rgba(197,137,95,0.35)', color: '#a4683f' }}>
-              ⚠️ AI分析を実行できなかったため、簡易分析を表示しています。「更新」で再試行できます。
-            </p>
+            <div className="notice mb-4" data-tone="warn" role="status">
+              <AlertIcon size={18} />
+              <p>AI 分析を実行できなかったため、簡易分析を表示しています。「更新する」で再試行できます。</p>
+            </div>
           )}
 
           <div className="grid grid-cols-3 gap-3 mb-4">
@@ -176,8 +181,11 @@ export default function AnalysisSection() {
               <p className="text-2xl font-bold text-[var(--accent)]">{analysis.averageMood.toFixed(1)}</p>
               <p className="text-xs text-[var(--muted)] mt-1">平均気分</p>
             </div>
-            <div className="card text-center">
-              <p className="text-2xl">{TREND_ICON[analysis.moodTrend]}</p>
+            <div className="card flex flex-col items-center justify-center text-center">
+              {(() => {
+                const Trend = TREND_ICON[analysis.moodTrend] ?? TrendFlatIcon
+                return <Trend size={28} style={{ color: TREND_COLOR[analysis.moodTrend] ?? 'var(--muted)' }} />
+              })()}
               <p className="text-xs text-[var(--muted)] mt-1">{TREND_LABEL[analysis.moodTrend]}</p>
             </div>
           </div>
@@ -187,7 +195,7 @@ export default function AnalysisSection() {
           {/* 価値観（内省ガイドの回答から抽出） */}
           {analysis.coreValues && analysis.coreValues.length > 0 && (
             <div className="card mt-4">
-              <h3 className="font-bold text-[var(--foreground)] mb-1">🧭 あなたが大切にしているもの</h3>
+              <h3 className="font-mincho font-semibold text-[var(--foreground)] mb-1">あなたが大切にしているもの</h3>
               <p className="text-xs text-[var(--muted-2)] mb-3">日記とふりかえりの回答から AI が読み取った価値観</p>
               <div className="flex flex-wrap gap-2">
                 {analysis.coreValues.map((v) => (
@@ -204,15 +212,21 @@ export default function AnalysisSection() {
 
           {analysis.emotionTriggers && analysis.emotionTriggers.length > 0 && (
             <div className="card mt-4">
-              <h3 className="font-bold text-[var(--foreground)] mb-3">
-                🔍 感情トリガー分析
-              </h3>
+              <h3 className="font-mincho font-semibold text-[var(--foreground)] mb-1">気分が動くきっかけ</h3>
               <p className="text-xs text-[var(--muted-2)] mb-3">気分に影響しやすいパターン（根拠になった日記つき）</p>
               <ul className="space-y-3">
                 {analysis.emotionTriggers.map((t, i) => (
                   <li key={i} className="flex items-start gap-3">
-                    <span className="text-lg flex-shrink-0">
-                      {t.effect === 'positive' ? '🔆' : '🔻'}
+                    {/* 上向き＝気分が晴れるきっかけ／下向き＝沈むきっかけ */}
+                    <span
+                      className="flex-shrink-0 mt-0.5 w-7 h-7 rounded-full inline-flex items-center justify-center"
+                      style={{
+                        color: t.effect === 'positive' ? 'var(--positive)' : 'var(--notice)',
+                        background: `color-mix(in srgb, ${t.effect === 'positive' ? 'var(--mood-5)' : 'var(--mood-1)'} 14%, transparent)`,
+                      }}
+                    >
+                      {t.effect === 'positive' ? <TrendUpIcon size={16} /> : <TrendDownIcon size={16} />}
+                      <span className="sr-only">{t.effect === 'positive' ? '気分が晴れるきっかけ' : '気分が沈むきっかけ'}</span>
                     </span>
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-medium text-[var(--foreground)]">{t.trigger}</p>
@@ -231,7 +245,7 @@ export default function AnalysisSection() {
                                 {Number(ev.date.slice(5, 7))}/{Number(ev.date.slice(8, 10))}
                               </span>
                               <span className="evidence-quote">{ev.quote ? `「${ev.quote}」` : 'この日の日記'}</span>
-                              <span className="text-[var(--muted-2)]">›</span>
+                              <ChevronRightIcon size={14} className="flex-none text-[var(--faint)]" />
                             </Link>
                           ))}
                         </div>
@@ -245,9 +259,7 @@ export default function AnalysisSection() {
 
           {analysis.recommendations.length > 0 && (
             <div className="card mt-4">
-              <h3 className="font-bold text-[var(--foreground)] mb-3">
-                💡 おすすめアクション
-              </h3>
+              <h3 className="font-mincho font-semibold text-[var(--foreground)] mb-3">次にできること</h3>
               <ul className="space-y-2">
                 {analysis.recommendations.map((rec, i) => (
                   <li key={i} className="flex items-start gap-2 text-sm text-[var(--muted)]">

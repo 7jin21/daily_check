@@ -96,6 +96,9 @@ function StageArt({
   stars: { x: number; y: number; r: number }[]
   idSuffix: string
 }) {
+  const long = monthDay.length > 5
+  const cut = monthDay.indexOf('月') + 1
+  const columnChars = long ? Math.max(cut, monthDay.length - cut) : monthDay.length
   return (
     <>
       <svg className="im-stars" width="100%" height="100%" aria-hidden="true" style={{ position: 'absolute', inset: 0 }}>
@@ -105,11 +108,12 @@ function StageArt({
       </svg>
       <Moon age={age} idSuffix={idSuffix} />
       <div className="im-date">
-        {/* 6文字以上（例: 十二月二十四日）は空に収まらないので、月と日を2列に組む */}
-        <p className="im-date-main" data-long={monthDay.length > 5}>
+        {/* 6文字以上（例: 十二月二十四日）は空に収まらないので、月と日を2列に組む。
+            --n（いちばん長い列の文字数）で文字の大きさを決め、空の高さに必ず収める（低い空でワードマークに重ならない） */}
+        <p className="im-date-main" data-long={long} style={{ '--n': columnChars } as CSSProperties}>
           {Array.from(monthDay).map((ch, i) => (
             <span key={i}>
-              {monthDay.length > 5 && i === monthDay.indexOf('月') + 1 && <br />}
+              {long && i === cut && <br />}
               <span className="im-ch" style={{ animationDelay: `${0.18 + i * 0.07}s` }}>
                 {ch}
               </span>

@@ -2,11 +2,12 @@
 
 import { useEffect, useState } from 'react'
 import { getStoredTheme, setTheme, type Theme } from '@/lib/theme'
+import { AutoThemeIcon, MoonIcon, SunIcon } from '@/components/ui/icons'
 
-const OPTIONS: { value: Theme; label: string; icon: string }[] = [
-  { value: 'system', label: '自動', icon: '🌓' },
-  { value: 'light', label: 'ライト', icon: '☀️' },
-  { value: 'dark', label: 'ダーク', icon: '🌙' },
+const OPTIONS: { value: Theme; label: string; Icon: typeof SunIcon }[] = [
+  { value: 'system', label: '自動', Icon: AutoThemeIcon },
+  { value: 'light', label: 'ライト', Icon: SunIcon },
+  { value: 'dark', label: 'ダーク', Icon: MoonIcon },
 ]
 
 export default function ThemeToggle() {
@@ -25,12 +26,12 @@ export default function ThemeToggle() {
             setTheme(opt.value)
             setThemeState(opt.value)
           }}
-          className={`flex-1 py-2.5 rounded-full text-sm font-medium transition-colors flex items-center justify-center gap-1.5 ${
-            theme === opt.value ? 'bg-[var(--accent)] text-[#f7f4ea]' : 'text-[var(--muted)]'
+          className={`flex-1 py-2.5 rounded-full text-sm font-bold font-ui transition-colors flex items-center justify-center gap-1.5 ${
+            theme === opt.value ? 'bg-[var(--btn-bg)] text-[var(--btn-fg)]' : 'text-[var(--muted)]'
           }`}
           aria-pressed={theme === opt.value}
         >
-          <span aria-hidden="true">{opt.icon}</span>
+          <opt.Icon size={16} />
           {opt.label}
         </button>
       ))}

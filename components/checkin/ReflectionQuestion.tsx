@@ -2,6 +2,10 @@
 
 import { useState } from 'react'
 import { composeReflectionAnswer } from '@/lib/freeform'
+import { hapticTap } from '@/lib/haptics'
+import PhraseLite from '@/components/ui/PhraseLite'
+import { CheckIcon, PenIcon } from '@/components/ui/icons'
+import './checkin.css'
 
 interface ReflectionQuestionProps {
   question: string
@@ -31,60 +35,67 @@ export default function ReflectionQuestion({
   }
 
   return (
-    <div className="min-h-dvh flex flex-col px-4 pt-6 animate-fade-in">
-      <div className="eyebrow mb-2">One more step</div>
-      <h1 className="text-xl font-bold text-[var(--foreground)] leading-relaxed mb-1">
-        {question}
+    <div className="ck-page animate-fade-in" style={{ paddingTop: 24 }}>
+      <p className="label-ui mb-3">清書の前に、ひとつだけ</p>
+      <h1 className="font-mincho text-[1.375rem] font-semibold leading-relaxed tracking-wide text-[var(--foreground)]">
+        <PhraseLite text={question} />
       </h1>
-      <p className="text-sm text-[var(--muted-2)] mb-5">近いものがあれば選んでください（任意）</p>
+      <p className="mt-2 mb-5 text-[0.8125rem] text-[var(--muted)] font-ui">近いものがあれば選んでください（選ばなくても大丈夫です）</p>
 
-      <div className="flex flex-col gap-2.5 mb-5">
+      <div className="flex flex-col gap-2.5 mb-5" role="radiogroup" aria-label={question}>
         {options.map((opt) => {
           const active = selected === opt
           return (
             <button
               key={opt}
               type="button"
-              onClick={() => setSelected(active ? null : opt)}
-              className={`w-full text-left px-4 py-3.5 rounded-2xl border transition-all active:scale-[0.98] ${
-                active
-                  ? 'border-[var(--primary)] bg-[var(--primary)]/10 text-[var(--foreground)]'
-                  : 'border-[var(--border)] text-[var(--foreground)]'
-              }`}
+              role="radio"
+              aria-checked={active}
+              onClick={() => {
+                hapticTap()
+                setSelected(active ? null : opt)
+              }}
+              className="ck-reflect-option"
             >
-              {opt}
+              <span className="ck-radio" aria-hidden="true">
+                {active && <CheckIcon size={12} strokeWidth={2.2} />}
+              </span>
+              <PhraseLite text={opt} />
             </button>
           )
         })}
       </div>
 
       <div className="mb-2">
-        <label className="block text-xs text-[var(--muted-2)] mb-1.5">ひとこと足す（任意）</label>
+        <label htmlFor="ck-reflect-note" className="ck-field-label block">
+          ひとこと足す（任意）
+        </label>
         <textarea
+          id="ck-reflect-note"
           value={note}
           onChange={(e) => setNote(e.target.value.slice(0, 200))}
           rows={2}
           placeholder="例：内容は納得しているけど、前提を確認されなかったのが嫌だった"
-          className="w-full p-3 rounded-2xl border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] text-base resize-none focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
+          className="ck-textarea"
+          style={{ paddingBottom: 16 }}
         />
       </div>
 
       <div className="flex-1" />
 
-      <div className="pb-6 space-y-3">
-        <button
-          onClick={handleSubmit}
-          disabled={!canSubmit}
-          className="w-full py-4 rounded-full bg-[var(--accent)] text-[#f7f4ea] font-bold text-base disabled:opacity-30 active:scale-[0.99] transition-transform glow-sky"
-        >
-          この内容で日記を書く ✨
+      <div className="ck-actions space-y-2">
+        <button type="button" onClick={handleSubmit} disabled={!canSubmit} className="btn btn-primary btn-block">
+          {canSubmit ? (
+            <>
+              <PenIcon size={18} />
+              この答えも入れて清書する
+            </>
+          ) : (
+            '選ぶか、ひとこと書いてください'
+          )}
         </button>
-        <button
-          onClick={onSkip}
-          type="button"
-          className="w-full py-3 rounded-full border border-[var(--border)] text-[var(--muted)] text-sm active:scale-[0.99] transition-transform"
-        >
-          スキップして書く
+        <button type="button" onClick={onSkip} className="btn btn-secondary btn-block">
+          答えずに清書する
         </button>
       </div>
     </div>

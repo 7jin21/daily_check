@@ -75,6 +75,13 @@
   -webkit-line-clamp: 2;
 }
 
+/* 背の低い画面（iPhone SE など）で記録済みの日: 空を少し低くして、水面の上のことばと水平線が重ならないようにする */
+@media (max-height: 700px) {
+  .im-mirror[data-compact='true'] {
+    --sky-h: calc(var(--hero-h) * 0.47);
+  }
+}
+
 /* ───────── ヒーロー全体 ───────── */
 .im-mirror {
   /* 高さの基準。空・水・舞台・映り込みはすべてここから計算して、鏡像がぴったり合うようにする */
@@ -162,13 +169,13 @@
   font-family: 'Cormorant Garamond', serif;
   font-style: italic;
   font-weight: 500;
-  font-size: 21px;
+  font-size: 21px; /* ロゴなので文字の大きさの設定では変えない */
   letter-spacing: 0.02em;
   color: var(--ink);
 }
 .im-almanac {
   font-family: 'Zen Kaku Gothic New', system-ui, sans-serif;
-  font-size: 11px;
+  font-size: 0.6875rem;
   font-weight: 500;
   letter-spacing: 0.14em;
   color: var(--ink-soft);
@@ -179,7 +186,7 @@
   font-variant-numeric: lining-nums;
   font-family: 'Cormorant Garamond', serif;
   font-weight: 500;
-  font-size: 14px;
+  font-size: 0.875rem;
   letter-spacing: 0.04em;
   color: var(--ink);
 }
@@ -220,7 +227,8 @@
   writing-mode: vertical-rl;
   font-family: 'Shippori Mincho', serif;
   font-weight: 500;
-  font-size: min(42px, calc(var(--stage-h) * 0.185));
+  /* 縦の長さ = 文字数 × (1 + 字間 0.16)。上下の余白（下 26px・上 18px）を除いた空の高さに収まる大きさにする */
+  font-size: min(42px, calc((var(--stage-h) - 44px) / (var(--n, 5) * 1.16)));
   line-height: 1;
   letter-spacing: 0.16em;
   color: var(--ink);
@@ -229,7 +237,7 @@
   writing-mode: vertical-rl;
   font-family: 'Shippori Mincho', serif;
   font-weight: 500;
-  font-size: 15px;
+  font-size: 15px; /* 空の絵の一部なので、空の高さに合わせて固定 */
   letter-spacing: 0.32em;
   color: var(--ink-soft);
   padding-bottom: 2px;
@@ -238,7 +246,7 @@
   display: inline-block;
 }
 .im-date-main[data-long='true'] {
-  font-size: min(38px, calc(var(--stage-h) * 0.17));
+  font-size: min(38px, calc((var(--stage-h) - 44px) / (var(--n, 4) * 1.16)));
   line-height: 1.3;
 }
 
@@ -303,6 +311,14 @@
   opacity: 0;
   animation: im-ripple 1.6s cubic-bezier(0.2, 0.6, 0.3, 1) forwards;
 }
+/* 保存した直後の波紋（その日の気分の色。SaveEcho.tsx が置く） */
+.im-ripple-echo {
+  width: 300px;
+  height: 300px;
+  margin: -150px 0 0 -150px;
+  border-width: 1.6px;
+  animation-duration: 2.8s;
+}
 @keyframes im-ripple {
   0% { transform: scale(0.05, 0.016); opacity: 0.9; }
   100% { transform: scale(1.6, 0.5); opacity: 0; }
@@ -318,7 +334,7 @@
 }
 .im-cta-eyebrow {
   font-family: 'Zen Kaku Gothic New', system-ui, sans-serif;
-  font-size: 11px;
+  font-size: 0.6875rem;
   font-weight: 500;
   letter-spacing: 0.24em;
   color: var(--ink-soft);
@@ -326,16 +342,18 @@
 .im-cta-title {
   font-family: 'Shippori Mincho', serif;
   font-weight: 500;
-  font-size: 23px;
+  font-size: 1.4375rem;
   line-height: 1.6;
   letter-spacing: 0.06em;
   color: var(--ink);
   margin-top: 10px;
+  font-feature-settings: 'palt' 1;
+  text-wrap: balance;
 }
 .im-cta-quote {
   font-family: 'Shippori Mincho', serif;
   font-weight: 500;
-  font-size: 19px;
+  font-size: 1.1875rem;
   line-height: 1.75;
   letter-spacing: 0.04em;
   color: var(--ink);
@@ -344,6 +362,7 @@
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
+  text-wrap: balance;
 }
 .im-cta-row {
   display: flex;
@@ -362,7 +381,7 @@
   background: var(--cta-bg);
   color: var(--cta-fg);
   font-family: 'Zen Kaku Gothic New', system-ui, sans-serif;
-  font-size: 15px;
+  font-size: 0.9375rem;
   font-weight: 700;
   letter-spacing: 0.08em;
   box-shadow: 0 14px 34px rgba(0, 0, 0, 0.28);
@@ -386,7 +405,7 @@
 }
 .im-textlink {
   font-family: 'Zen Kaku Gothic New', system-ui, sans-serif;
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 500;
   letter-spacing: 0.1em;
   color: var(--ink-soft);
@@ -397,49 +416,40 @@
   text-underline-offset: 5px;
 }
 
-/* 連続記録の節目の知らせ（ナビの上に浮かぶガラスの帯。空の日付や月を隠さない） */
-.im-toast {
-  position: fixed;
-  z-index: 60;
-  left: 50%;
-  bottom: calc(env(safe-area-inset-bottom) + var(--bottom-nav-height) + 24px);
-  translate: -50% 0;
+/* 連続記録の節目の知らせ（シートの冒頭に置く金の帯。ほかの内容を隠さない） */
+.im-milestone {
   display: flex;
   align-items: center;
-  gap: 10px;
-  max-width: calc(100% - 40px);
-  padding: 11px 20px 11px 16px;
-  border-radius: 999px;
-  background: rgba(12, 16, 26, 0.55);
-  border: 1px solid rgba(239, 231, 212, 0.22);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-  color: #efe7d4;
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.25);
-  animation: im-toast 5.2s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  gap: 16px;
+  padding: 16px 20px;
+  margin-bottom: 40px;
+  border-radius: 20px;
+  background: color-mix(in srgb, var(--gold) 9%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--gold) 32%, transparent);
+  animation: im-rise 0.9s cubic-bezier(0.2, 0.7, 0.2, 1) 0.2s both;
 }
-.im-toast-mark {
-  color: #d8b878;
-  font-size: 12px;
-}
-.im-toast-count {
+.im-milestone-count {
   font-family: 'Cormorant Garamond', serif;
   font-variant-numeric: lining-nums;
-  font-size: 22px;
+  font-size: 44px;
+  font-weight: 500;
   line-height: 1;
+  color: var(--gold-ink);
 }
-.im-toast-text {
+.im-milestone-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.im-milestone-text {
   font-family: 'Shippori Mincho', serif;
-  font-size: 13px;
-  letter-spacing: 0.06em;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-@keyframes im-toast {
-  0% { opacity: 0; transform: translateY(10px); }
-  10%, 86% { opacity: 1; transform: none; }
-  100% { opacity: 0; transform: translateY(6px); }
+  font-size: 0.9375rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  line-height: 1.6;
+  color: var(--foreground);
+  text-wrap: balance;
 }
 
 /* ───────── 和紙のシート ───────── */
@@ -467,22 +477,22 @@
 .im-sec-idx {
   font-family: 'Cormorant Garamond', serif;
   font-style: italic;
-  font-size: 15px;
+  font-size: 0.9375rem;
   font-weight: 500;
-  color: var(--muted-2);
+  color: var(--faint);
   width: 20px;
 }
 .im-sec-title {
   font-family: 'Shippori Mincho', serif;
   font-weight: 600;
-  font-size: 18px;
+  font-size: 1.125rem;
   letter-spacing: 0.08em;
   color: var(--foreground);
 }
 .im-sec-meta {
   margin-left: auto;
   font-family: 'Zen Kaku Gothic New', system-ui, sans-serif;
-  font-size: 11px;
+  font-size: 0.6875rem;
   font-weight: 500;
   letter-spacing: 0.08em;
   color: var(--muted);
@@ -495,7 +505,7 @@ a.im-sec-meta {
 /* 小さな UI 文字 */
 .im-label {
   font-family: 'Zen Kaku Gothic New', system-ui, sans-serif;
-  font-size: 11px;
+  font-size: 0.6875rem;
   font-weight: 500;
   letter-spacing: 0.12em;
   color: var(--muted);
@@ -511,7 +521,7 @@ a.im-sec-meta {
   border-radius: 16px;
   border: 1px dashed var(--border);
   font-family: 'Zen Kaku Gothic New', system-ui, sans-serif;
-  font-size: 13px;
+  font-size: 0.8125rem;
   color: var(--muted);
   margin-bottom: 34px;
 }
@@ -535,7 +545,7 @@ a.im-sec-meta {
 }
 .im-day-wd {
   font-family: 'Zen Kaku Gothic New', system-ui, sans-serif;
-  font-size: 11px;
+  font-size: 0.6875rem;
   font-weight: 500;
   color: var(--muted);
 }
@@ -564,8 +574,7 @@ a.im-sec-meta {
   width: 3px;
   height: 3px;
   border-radius: 9px;
-  background: var(--muted-2);
-  opacity: 0.6;
+  background: var(--faint);
 }
 .im-day-dot[data-state='future'] {
   border: 1px dashed var(--hairline);
@@ -579,7 +588,7 @@ a.im-sec-meta {
 .im-day-num {
   font-variant-numeric: lining-nums;
   font-family: 'Cormorant Garamond', serif;
-  font-size: 15px;
+  font-size: 0.9375rem;
   font-weight: 500;
   color: var(--muted);
   line-height: 1;
@@ -612,9 +621,41 @@ a.im-sec-meta {
   margin-top: 10px;
   font-variant-numeric: lining-nums;
 }
+/* 連続が途切れたときのマスはリンクになる（昨日の記録へ） */
+a.im-stat {
+  display: block;
+  min-height: 0;
+  color: inherit;
+}
+/* 戻せる日数は、まだ「ない」数字なので輪郭だけで見せる */
+.im-stat-value[data-ghost='true'] {
+  color: transparent;
+  -webkit-text-stroke: 1px var(--muted-2);
+}
+.im-stat-value[data-ghost='true'] .im-stat-unit {
+  -webkit-text-stroke: 0;
+  color: var(--muted);
+}
+.im-stat-note {
+  display: block;
+  text-wrap: balance;
+  margin: 8px auto 0;
+  min-height: 0;
+  padding: 0 4px;
+  font-family: 'Zen Kaku Gothic New', system-ui, sans-serif;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  line-height: 1.5;
+  color: var(--primary);
+}
+.im-stat-note[data-quiet='true'] {
+  font-weight: 500;
+  color: var(--muted);
+}
 .im-stat-unit {
   font-family: 'Shippori Mincho', serif;
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 500;
   margin-left: 3px;
   color: var(--muted);
@@ -630,14 +671,14 @@ a.im-sec-meta {
 }
 .im-trace-month {
   font-family: 'Zen Kaku Gothic New', system-ui, sans-serif;
-  font-size: 10px;
+  font-size: 0.625rem;
   color: var(--muted);
   white-space: nowrap;
   height: 14px;
 }
 .im-trace-wd {
   font-family: 'Zen Kaku Gothic New', system-ui, sans-serif;
-  font-size: 9px;
+  font-size: 0.5625rem;
   color: var(--muted-2);
 }
 .im-trace-cell {
@@ -671,13 +712,13 @@ a.im-sec-meta {
 }
 .im-trace-count {
   font-family: 'Zen Kaku Gothic New', system-ui, sans-serif;
-  font-size: 12px;
+  font-size: 0.75rem;
   color: var(--muted);
 }
 .im-trace-count b {
   font-variant-numeric: lining-nums;
   font-family: 'Cormorant Garamond', serif;
-  font-size: 22px;
+  font-size: 1.375rem;
   font-weight: 500;
   color: var(--foreground);
   margin: 0 3px;
@@ -717,8 +758,8 @@ a.im-sec-meta {
   opacity: 0.35;
 }
 .im-curve-energy[data-sel='true'] {
-  opacity: 0.9;
-  fill: var(--foreground);
+  opacity: 1;
+  fill: var(--water);
 }
 .im-curve-readout {
   display: flex;
@@ -738,7 +779,7 @@ a.im-sec-meta {
 }
 .im-curve-readout-date small {
   font-family: 'Zen Kaku Gothic New', system-ui, sans-serif;
-  font-size: 11px;
+  font-size: 0.6875rem;
   font-weight: 500;
   color: var(--muted);
   margin-left: 5px;
@@ -748,7 +789,7 @@ a.im-sec-meta {
   flex-direction: column;
   gap: 3px;
   font-family: 'Zen Kaku Gothic New', system-ui, sans-serif;
-  font-size: 12px;
+  font-size: 0.75rem;
   color: var(--muted);
 }
 .im-curve-readout-vals span {
@@ -756,10 +797,8 @@ a.im-sec-meta {
   align-items: center;
   gap: 6px;
 }
-.im-curve-readout-vals i {
-  width: 8px;
-  height: 8px;
-  border-radius: 8px;
+.im-curve-readout-vals svg {
+  flex: none;
 }
 .im-curve-open {
   margin-left: auto;
@@ -767,7 +806,7 @@ a.im-sec-meta {
   border-radius: 999px;
   border: 1px solid var(--border);
   font-family: 'Zen Kaku Gothic New', system-ui, sans-serif;
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 700;
   color: var(--primary);
   min-height: 36px;
@@ -795,8 +834,8 @@ a.im-sec-meta {
   stroke-linejoin: round;
 }
 .im-curve-energy {
-  fill: var(--muted-2);
-  opacity: 0.42;
+  fill: var(--water);
+  opacity: 0.45;
 }
 .im-curve-dot {
   stroke: var(--background);
@@ -820,7 +859,7 @@ a.im-sec-meta {
 .im-curve-hint {
   margin-left: auto;
   color: var(--muted-2);
-  font-size: 10px;
+  font-size: 0.625rem;
   letter-spacing: 0.04em;
 }
 .im-curve-legend i[data-kind='energy'] {
@@ -828,8 +867,8 @@ a.im-sec-meta {
   height: 12px;
   border: 0;
   border-radius: 6px;
-  background: var(--muted-2);
-  opacity: 0.55;
+  background: var(--water);
+  opacity: 0.6;
 }
 
 /* ───────── あの日の自分 ───────── */
@@ -850,23 +889,24 @@ a.im-sec-meta {
 .im-flash-text {
   font-family: 'Shippori Mincho', serif;
   font-weight: 500;
-  font-size: 16px;
+  font-size: 1rem;
   line-height: 1.75;
   color: var(--foreground);
   margin-top: 4px;
+  text-wrap: balance;
 }
 .im-chevron {
   align-self: center;
-  color: var(--muted-2);
+  color: var(--faint);
   font-family: 'Cormorant Garamond', serif;
-  font-size: 22px;
+  font-size: 1.375rem;
 }
 
 .im-flash-now {
   display: inline-block;
   margin-top: 6px;
   font-family: 'Zen Kaku Gothic New', system-ui, sans-serif;
-  font-size: 11px;
+  font-size: 0.6875rem;
   font-weight: 700;
   letter-spacing: 0.08em;
   color: var(--primary);
@@ -888,7 +928,7 @@ a.im-sec-meta {
   background: var(--surface);
   color: var(--foreground);
   font-family: 'Shippori Mincho', serif;
-  font-size: 16px;
+  font-size: max(16px, 1rem); /* 16px 未満だと iPhone が入力時に拡大する */
 }
 .im-memo-input::placeholder {
   color: var(--muted-2);
@@ -904,7 +944,7 @@ a.im-sec-meta {
   background: var(--foreground);
   color: var(--background);
   font-family: 'Zen Kaku Gothic New', system-ui, sans-serif;
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 700;
   letter-spacing: 0.06em;
   transition: opacity 0.2s;
@@ -924,25 +964,25 @@ a.im-sec-meta {
 .im-memo-time {
   font-family: 'Cormorant Garamond', serif;
   font-variant-numeric: lining-nums;
-  font-size: 15px;
+  font-size: 0.9375rem;
   font-weight: 500;
   color: var(--muted);
 }
 .im-memo-text {
   font-family: 'Shippori Mincho', serif;
-  font-size: 15px;
+  font-size: 0.9375rem;
   line-height: 1.7;
   padding: 10px 0;
   color: var(--foreground);
 }
 .im-memo-del {
-  color: var(--muted-2);
-  font-size: 18px;
+  color: var(--muted);
+  font-size: 1.125rem;
 }
 .im-memo-empty {
   margin-top: 12px;
   font-family: 'Zen Kaku Gothic New', system-ui, sans-serif;
-  font-size: 12px;
+  font-size: 0.75rem;
   line-height: 1.8;
   color: var(--muted);
 }
@@ -958,11 +998,13 @@ a.im-sec-meta {
 .im-focus-text {
   margin-top: 8px;
   font-family: 'Shippori Mincho', serif;
-  font-size: 18px;
+  font-size: 1.125rem;
   font-weight: 600;
   line-height: 1.6;
   letter-spacing: 0.04em;
   color: var(--foreground);
+  font-feature-settings: 'palt' 1;
+  text-wrap: balance;
 }
 .im-focus-row {
   display: flex;
@@ -989,12 +1031,13 @@ a.im-sec-meta {
   box-shadow: 0 0 0 2px var(--background), 0 0 0 3px var(--foreground);
 }
 .im-focus-btn {
+  gap: 6px;
   min-height: 40px;
   padding: 0 18px;
   border-radius: 999px;
   border: 1px solid var(--foreground);
   font-family: 'Zen Kaku Gothic New', system-ui, sans-serif;
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 700;
   color: var(--foreground);
   transition: background 0.2s, color 0.2s;
@@ -1043,7 +1086,7 @@ a.im-sec-meta {
 .im-row-text {
   font-family: 'Shippori Mincho', serif;
   font-weight: 500;
-  font-size: 15px;
+  font-size: 0.9375rem;
   line-height: 1.75;
   color: var(--foreground);
   display: -webkit-box;
@@ -1054,7 +1097,7 @@ a.im-sec-meta {
 .im-row-tags {
   margin-top: 6px;
   font-family: 'Zen Kaku Gothic New', system-ui, sans-serif;
-  font-size: 11px;
+  font-size: 0.6875rem;
   color: var(--muted);
   letter-spacing: 0.04em;
   white-space: nowrap;
@@ -1070,13 +1113,13 @@ a.im-sec-meta {
 .im-colophon-mark {
   font-family: 'Cormorant Garamond', serif;
   font-style: italic;
-  font-size: 17px;
+  font-size: 1.0625rem;
   color: var(--foreground);
 }
 .im-colophon-line {
   margin-top: 8px;
   font-family: 'Shippori Mincho', serif;
-  font-size: 12px;
+  font-size: 0.75rem;
   letter-spacing: 0.3em;
   color: var(--muted);
 }
@@ -1125,6 +1168,32 @@ a.im-sec-meta {
   animation: im-pop 0.6s cubic-bezier(0.2, 0.7, 0.2, 1) both;
   animation-delay: calc(var(--i, 0) * 28ms);
 }
+/* 保存した日の丸に、色が落ちる（SaveEcho.tsx が data-landing を付ける） */
+.im-reveal[data-visible='true'] .im-day-dot[data-landing='true'] {
+  animation: im-land 1.1s cubic-bezier(0.2, 0.7, 0.2, 1) 0.3s both;
+}
+.im-day-dot[data-landing='true']::before {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: 50%;
+  border: 1.5px solid var(--mood);
+  opacity: 0;
+  pointer-events: none;
+}
+.im-reveal[data-visible='true'] .im-day-dot[data-landing='true']::before {
+  animation: im-land-ring 1.8s cubic-bezier(0.2, 0.6, 0.3, 1) 0.75s both;
+}
+@keyframes im-land {
+  0% { opacity: 0; transform: translateY(-18px) scale(0.25); }
+  45% { opacity: 1; transform: translateY(0) scale(0.6); }
+  70% { transform: scale(1.12); }
+  100% { opacity: 1; transform: scale(1); }
+}
+@keyframes im-land-ring {
+  0% { opacity: 0.85; transform: scale(1); }
+  100% { opacity: 0; transform: scale(2.6); }
+}
 @keyframes im-pop {
   from { opacity: 0; transform: scale(0.4); }
   to { opacity: 1; transform: scale(1); }
@@ -1150,10 +1219,11 @@ a.im-sec-meta {
 
 @media (prefers-reduced-motion: reduce) {
   .im-anim *,
-  .im-toast,
+  .im-milestone,
   .im-stars circle,
   .im-glint,
   .im-reveal[data-visible='true'] .im-day-dot,
+  .im-reveal[data-visible='true'] .im-day-dot::before,
   .im-reveal[data-visible='true'] .im-trace-cell i {
     animation: none !important;
   }

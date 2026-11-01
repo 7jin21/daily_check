@@ -16,6 +16,7 @@ import {
   unsubscribeThisDevice,
 } from '@/lib/push-client'
 import ThemeToggle from '@/components/ui/ThemeToggle'
+import { DownloadIcon, InfoIcon } from '@/components/ui/icons'
 
 interface ServerSettings {
   hasNotionToken: boolean
@@ -75,7 +76,7 @@ export default function SettingsPage() {
         setHasNotionToken(true)
         setNotionTokenInput('')
       }
-      setSaveMessage('設定を保存しました ✓')
+      setSaveMessage('設定を保存しました')
     } catch (err) {
       console.error('Settings save error:', err)
       setSaveMessage('保存に失敗しました')
@@ -118,7 +119,7 @@ export default function SettingsPage() {
 
     // ON にする
     if (!isPushConfigured()) {
-      setPushMessage('⚠️ サーバー側の通知設定（VAPID キー）が未完了のため、現在リマインダーは利用できません。README のプッシュ通知セクションを参照してください。')
+      setPushMessage('サーバー側の通知設定（VAPID キー）が未完了のため、現在リマインダーは利用できません。README のプッシュ通知セクションを参照してください。')
       return
     }
     if (!isPushSupported()) {
@@ -132,11 +133,11 @@ export default function SettingsPage() {
 
     if (result.ok) {
       updateSettings({ notificationsEnabled: true })
-      setPushMessage('✓ この端末にリマインダーが届くようになりました（毎日21時ごろ・未記録の日のみ）')
+      setPushMessage('この端末にリマインダーが届くようになりました（毎日21時ごろ・未記録の日のみ）')
     } else if (result.reason === 'denied') {
       setPushMessage('通知が許可されませんでした。ブラウザ / OS の通知設定を確認してください。')
     } else if (result.reason === 'not_configured') {
-      setPushMessage('⚠️ サーバー側の通知設定が未完了です。README のプッシュ通知セクションを参照してください。')
+      setPushMessage('サーバー側の通知設定が未完了です。README のプッシュ通知セクションを参照してください。')
     } else {
       setPushMessage('通知の設定に失敗しました。時間をおいて再試行してください。')
     }
@@ -165,10 +166,11 @@ export default function SettingsPage() {
 
       {/* アカウント情報 */}
       <div className="card">
-        <h2 className="font-bold text-[var(--foreground)] mb-4">アカウント</h2>
+        <h2 className="font-mincho font-semibold tracking-wide text-[var(--foreground)] mb-4">アカウント</h2>
         <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-full bg-[#333a28] border border-[var(--gold)] flex items-center justify-center text-[#efe9d3] text-xl">
-            👤
+          {/* 自分の印（金の輪の「私」） */}
+          <div className="w-12 h-12 rounded-full bg-[var(--deep)] border border-[var(--gold)] flex items-center justify-center text-[var(--on-deep)] font-mincho text-lg" aria-hidden="true">
+            私
           </div>
           <div>
             <p className="font-medium text-[var(--foreground)]">{userEmail ?? 'ログイン済み'}</p>
@@ -179,7 +181,7 @@ export default function SettingsPage() {
 
       {/* 外観（テーマ） */}
       <div className="card">
-        <h2 className="font-bold text-[var(--foreground)] mb-1">外観</h2>
+        <h2 className="font-mincho font-semibold tracking-wide text-[var(--foreground)] mb-1">外観</h2>
         <p className="text-xs text-[var(--muted)] mb-4">
           この端末での表示テーマを選べます
         </p>
@@ -189,7 +191,7 @@ export default function SettingsPage() {
       {/* 通知設定 */}
       <div className="card">
         <div className="flex items-center justify-between mb-1">
-          <h2 className="font-bold text-[var(--foreground)]">通知</h2>
+          <h2 className="font-mincho font-semibold tracking-wide text-[var(--foreground)]">通知</h2>
           <span className="text-[10px] text-[var(--muted-2)] tracking-wide">この端末の設定</span>
         </div>
         <p className="text-xs text-[var(--muted)] mb-4">
@@ -209,9 +211,10 @@ export default function SettingsPage() {
             }`}
             role="switch"
             aria-checked={settings.notificationsEnabled}
+            aria-label="毎日のリマインダー"
           >
             <span
-              className={`block w-5 h-5 rounded-full bg-white shadow transition-transform mx-1 ${
+              className={`block w-5 h-5 rounded-full bg-[var(--surface)] shadow transition-transform mx-1 ${
                 settings.notificationsEnabled ? 'translate-x-5' : 'translate-x-0'
               }`}
             />
@@ -219,9 +222,10 @@ export default function SettingsPage() {
         </div>
 
         {pushMessage && (
-          <p className="mb-4 p-3 rounded-2xl bg-[var(--surface-secondary)] text-xs text-[var(--muted)] leading-relaxed">
-            {pushMessage}
-          </p>
+          <div className="notice mb-4" role="status">
+            <InfoIcon size={18} />
+            <p>{pushMessage}</p>
+          </div>
         )}
 
         {settings.notificationsEnabled && (
@@ -242,16 +246,16 @@ export default function SettingsPage() {
         )}
 
         <p className="mt-3 text-xs text-[var(--muted-2)] leading-relaxed">
-          📱 iPhone では「ホーム画面に追加」したアプリから設定してください（iOS 16.4以降）
+          iPhone では「ホーム画面に追加」したアプリから設定してください（iOS 16.4以降）
         </p>
       </div>
 
       {/* Notion連携 */}
       <div className="card">
         <div className="flex items-center justify-between mb-1">
-          <h2 className="font-bold text-[var(--foreground)]">Notion連携</h2>
+          <h2 className="font-mincho font-semibold tracking-wide text-[var(--foreground)]">Notion連携</h2>
           {hasNotionToken && (
-            <span className="text-xs px-2 py-0.5 rounded-full bg-[#6f8a5f]/15 text-[#5a7350] dark:text-[#9caa7e] font-medium">
+            <span className="text-xs px-2 py-0.5 rounded-full font-medium font-ui text-[var(--positive)]" style={{ background: 'color-mix(in srgb, var(--mood-5) 15%, transparent)' }}>
               連携中
             </span>
           )}
@@ -287,20 +291,19 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        <div className="mt-3 p-3 rounded-2xl bg-[var(--surface-secondary)] text-[var(--muted)] text-xs">
-          📝 Notion API トークンは{' '}
-          <a href="https://www.notion.so/my-integrations" target="_blank" rel="noopener noreferrer" className="underline">
-            notion.so/my-integrations
-          </a>{' '}
-          から取得できます
+        <div className="notice mt-3">
+          <InfoIcon size={18} />
+          <p>
+            Notion API トークンは{' '}
+            <a href="https://www.notion.so/my-integrations" target="_blank" rel="noopener noreferrer" className="underline" style={{ minHeight: 0, minWidth: 0, display: 'inline' }}>
+              notion.so/my-integrations
+            </a>{' '}
+            から取得できます
+          </p>
         </div>
 
         {hasNotionToken && (
-          <button
-            onClick={handleDisconnectNotion}
-            disabled={isSaving}
-            className="mt-3 text-xs text-red-500 underline disabled:opacity-40"
-          >
+          <button type="button" onClick={handleDisconnectNotion} disabled={isSaving} className="btn-quiet mt-2" data-tone="danger">
             連携を解除する
           </button>
         )}
@@ -308,24 +311,18 @@ export default function SettingsPage() {
 
       {/* データ管理 */}
       <div className="card">
-        <h2 className="font-bold text-[var(--foreground)] mb-1">データ</h2>
+        <h2 className="font-mincho font-semibold tracking-wide text-[var(--foreground)] mb-1">データ</h2>
         <p className="text-xs text-[var(--muted)] mb-4">
           日記データはあなたのものです。いつでも持ち出せます
         </p>
         <div className="flex gap-3">
-          <a
-            href="/api/export?format=json"
-            download
-            className="flex-1 py-3 text-center rounded-2xl border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] text-sm font-medium active:scale-95 transition-transform"
-          >
-            📦 JSON で保存
+          <a href="/api/export?format=json" download className="btn btn-secondary flex-1">
+            <DownloadIcon size={18} />
+            JSON で保存
           </a>
-          <a
-            href="/api/export?format=csv"
-            download
-            className="flex-1 py-3 text-center rounded-2xl border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] text-sm font-medium active:scale-95 transition-transform"
-          >
-            📊 CSV で保存
+          <a href="/api/export?format=csv" download className="btn btn-secondary flex-1">
+            <DownloadIcon size={18} />
+            CSV で保存
           </a>
         </div>
         <p className="mt-3 text-xs text-[var(--muted-2)]">
@@ -334,22 +331,22 @@ export default function SettingsPage() {
       </div>
 
       {/* 保存ボタン */}
-      <button
-        onClick={handleSave}
-        disabled={isSaving}
-        className="w-full py-4 rounded-full bg-[var(--accent)] text-[#f7f4ea] font-bold text-base disabled:opacity-40 active:scale-[0.99] transition-transform"
-      >
-        {isSaving ? '保存中...' : '設定を保存'}
+      <button type="button" onClick={handleSave} disabled={isSaving} className="btn btn-primary btn-block">
+        {isSaving ? '保存しています…' : '設定を保存する'}
       </button>
 
       {saveMessage && (
-        <p className="text-center text-sm text-[var(--primary)]">{saveMessage}</p>
+        <p className="text-center text-sm font-ui text-[var(--primary)]" role="status">
+          {saveMessage}
+        </p>
       )}
 
       {/* サインアウト */}
       <button
+        type="button"
         onClick={handleSignOut}
-        className="w-full py-4 rounded-full border border-[#b5654a]/40 text-[#9c4a2f] dark:text-[#d39177] font-medium text-base active:scale-[0.99] transition-transform"
+        className="btn btn-secondary btn-block"
+        style={{ color: 'var(--danger)', borderColor: 'var(--danger-border)' }}
       >
         サインアウト
       </button>

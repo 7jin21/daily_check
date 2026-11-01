@@ -7,7 +7,9 @@ import ShareEntryButton from '@/components/entry/ShareEntryButton'
 import LaterNote from '@/components/entry/LaterNote'
 import { parseFreeform } from '@/lib/freeform'
 import { APP_TIME_ZONE, formatJSTDate, todayJST } from '@/lib/jst'
-import { energyLabel, moodEmoji, moodLabel } from '@/lib/constants'
+import { ENERGY, energyLabel, moodLabel } from '@/lib/constants'
+import { EnergyGlyph, MoodGlyph } from '@/components/ui/StateGlyphs'
+import { CheckIcon, ChevronLeftIcon } from '@/components/ui/icons'
 
 interface Props {
   params: Promise<{ date: string }>
@@ -50,15 +52,11 @@ export default async function EntryDetailPage({ params, searchParams }: Props) {
     <div className="px-4 pt-6 pb-8">
       {/* ヘッダー */}
       <div className="flex items-center gap-3 mb-6">
-        <Link
-          href="/entries"
-          className="w-11 h-11 rounded-full bg-[var(--surface-secondary)] border border-[var(--border)] flex items-center justify-center text-xl text-[var(--foreground)]"
-          aria-label="一覧に戻る"
-        >
-          ‹
+        <Link href="/entries" className="icon-btn" aria-label="一覧に戻る">
+          <ChevronLeftIcon />
         </Link>
         <div>
-          <h1 className="text-xl font-bold text-[var(--foreground)]">
+          <h1 className="font-mincho text-xl font-semibold tracking-wide text-[var(--foreground)]">
             {formatJSTDate(date, {
               year: 'numeric',
               month: 'long',
@@ -70,19 +68,23 @@ export default async function EntryDetailPage({ params, searchParams }: Props) {
       </div>
 
       {/* 気分・エネルギー */}
+      {/* 気分（月の満ち欠け）とエネルギー（水位）。チェックインで選んだときと同じ形 */}
       <div className="flex gap-3 mb-6">
-        <div className="flex-1 card text-center">
-          <p className="text-3xl mb-1">{moodEmoji(entry.mood as number | null) ?? '😐'}</p>
-          <p className="eyebrow">気分</p>
-          <p className="text-sm font-medium text-[var(--foreground)] mt-1">
-            {moodLabel(entry.mood as number | null) ?? '-'}
+        <div className="flex-1 card flex flex-col items-center gap-1.5" style={{ padding: '18px 12px' }}>
+          <MoodGlyph mood={entry.mood as number | null} size={46} />
+          <p className="eyebrow mt-1">気分</p>
+          <p className="font-mincho text-base font-semibold text-[var(--foreground)]">
+            {moodLabel(entry.mood as number | null) ?? '—'}
           </p>
         </div>
-        <div className="flex-1 card text-center">
-          <p className="text-3xl mb-1">⚡</p>
-          <p className="eyebrow">エネルギー</p>
-          <p className="text-sm font-medium text-[var(--foreground)] mt-1">
-            {energyLabel(entry.energy as number | null) ?? '-'}
+        <div className="flex-1 card flex flex-col items-center gap-1.5" style={{ padding: '18px 12px' }}>
+          <EnergyGlyph energy={entry.energy as number | null} size={46} />
+          <p className="eyebrow mt-1">エネルギー</p>
+          <p className="font-mincho text-base font-semibold text-[var(--foreground)]">
+            {energyLabel(entry.energy as number | null) ?? '—'}
+          </p>
+          <p className="text-[0.6875rem] font-ui text-[var(--muted)]">
+            {ENERGY.find((e) => e.value === entry.energy)?.description ?? ''}
           </p>
         </div>
       </div>
@@ -95,7 +97,7 @@ export default async function EntryDetailPage({ params, searchParams }: Props) {
             <Link
               key={tag}
               href={`/entries?tag=${encodeURIComponent(tag)}`}
-              className="px-3 py-1 rounded-full bg-[var(--surface-secondary)] border border-[var(--border)] text-[var(--primary)] text-xs font-medium"
+              className="tag-pill"
               style={{ minHeight: 32 }}
             >
               #{tag}
@@ -122,25 +124,25 @@ export default async function EntryDetailPage({ params, searchParams }: Props) {
         {entry.events && (
           <div className="card">
             <h3 className="eyebrow mb-2">今日の出来事</h3>
-            <p className="text-base text-[var(--foreground)] whitespace-pre-wrap leading-relaxed">{entry.events}</p>
+            <p className="font-mincho text-base text-[var(--foreground)] whitespace-pre-wrap leading-loose prose-ja">{entry.events}</p>
           </div>
         )}
         {entry.challenges && (
           <div className="card">
             <h3 className="eyebrow mb-2">課題・困ったこと</h3>
-            <p className="text-base text-[var(--foreground)] whitespace-pre-wrap leading-relaxed">{entry.challenges}</p>
+            <p className="font-mincho text-base text-[var(--foreground)] whitespace-pre-wrap leading-loose prose-ja">{entry.challenges}</p>
           </div>
         )}
         {entry.gratitude && (
           <div className="card">
             <h3 className="eyebrow mb-2">感謝できること</h3>
-            <p className="text-base text-[var(--foreground)] whitespace-pre-wrap leading-relaxed">{entry.gratitude}</p>
+            <p className="font-mincho text-base text-[var(--foreground)] whitespace-pre-wrap leading-loose prose-ja">{entry.gratitude}</p>
           </div>
         )}
         {ff.memo && (
           <div className="card">
             <h3 className="eyebrow mb-2">メモ</h3>
-            <p className="text-base text-[var(--foreground)] whitespace-pre-wrap leading-relaxed">{ff.memo}</p>
+            <p className="font-mincho text-base text-[var(--foreground)] whitespace-pre-wrap leading-loose prose-ja">{ff.memo}</p>
           </div>
         )}
         {ff.reflections.map((r, i) => (
@@ -155,7 +157,7 @@ export default async function EntryDetailPage({ params, searchParams }: Props) {
         {ff.laterNotes.map((n, i) => (
           <div key={`n${i}`} className="card" style={{ borderStyle: 'dashed' }}>
             <h3 className="eyebrow mb-2">あとから・{n.date.split('-').join('.')}</h3>
-            <p className="text-base text-[var(--foreground)] whitespace-pre-wrap leading-relaxed">{n.text}</p>
+            <p className="font-mincho text-base text-[var(--foreground)] whitespace-pre-wrap leading-loose prose-ja">{n.text}</p>
           </div>
         ))}
       </div>
@@ -176,8 +178,9 @@ export default async function EntryDetailPage({ params, searchParams }: Props) {
 
       {/* Notion同期状態 */}
       {entry.notion_synced_at && (
-        <p className="mt-6 text-xs text-center text-[var(--muted-2)]">
-          ✓ Notionに同期済み ({new Date(entry.notion_synced_at as string).toLocaleDateString('ja-JP', { timeZone: APP_TIME_ZONE })})
+        <p className="mt-6 flex items-center justify-center gap-1.5 text-xs font-ui text-[var(--muted-2)]">
+          <CheckIcon size={14} />
+          Notionに同期済み ({new Date(entry.notion_synced_at as string).toLocaleDateString('ja-JP', { timeZone: APP_TIME_ZONE })})
         </p>
       )}
 

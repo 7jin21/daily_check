@@ -1,7 +1,7 @@
 // インサイト画面の複数のセクションで使う、表示用の小さな部品
 
-/** 気分（1〜5）ごとの色。添字がそのまま気分の値（0 は使わない） */
-export const MOOD_COLOR = ['', '#b5654a', '#c5895f', '#cdbf9a', '#9caa7e', '#6f8a5f']
+/** 気分（1〜5）ごとの色（CSS 変数）。添字がそのまま気分の値（0 は使わない） */
+export const MOOD_COLOR = ['', 'var(--mood-1)', 'var(--mood-2)', 'var(--mood-3)', 'var(--mood-4)', 'var(--mood-5)']
 
 /** キャッシュした結果がどれくらい前に作られたか（「3時間前」など） */
 export function formatAge(ts: number) {

@@ -3,6 +3,9 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import MonthCalendar from '@/components/entries/MonthCalendar'
 import { formatJSTDate, todayJST } from '@/lib/jst'
+import { energyLabel, moodLabel } from '@/lib/constants'
+import { EnergyGlyph, MoodGlyph } from '@/components/ui/StateGlyphs'
+import { ArrowLeftIcon, ArrowRightIcon, ChevronRightIcon, MirrorMark, PlusIcon, SearchIcon } from '@/components/ui/icons'
 
 interface Entry {
   id: string
@@ -26,14 +29,6 @@ function shiftMonth(monthStr: string, delta: number): string {
 
 const PAGE_SIZE = 60
 
-const MOOD_COLOR: Record<number, string> = {
-  1: '#b5654a', 2: '#c5895f', 3: '#cdbf9a', 4: '#9caa7e', 5: '#6f8a5f',
-}
-
-const ENERGY_BAR: Record<number, string> = {
-  1: '▪▫▫▫▫', 2: '▪▪▫▫▫', 3: '▪▪▪▫▫', 4: '▪▪▪▪▫', 5: '▪▪▪▪▪',
-}
-
 // PostgREST の or() はカンマ・括弧が構文になるため取り除き、
 // ilike のワイルドカードもエスケープする
 function sanitizeQuery(raw: string): string {
@@ -41,23 +36,32 @@ function sanitizeQuery(raw: string): string {
 }
 
 function ViewToggle({ view }: { view: 'list' | 'calendar' }) {
+  const item = (active: boolean) =>
+    `px-5 py-2 rounded-full text-sm font-bold font-ui transition-colors ${
+      active ? 'bg-[var(--btn-bg)] text-[var(--btn-fg)]' : 'text-[var(--muted)]'
+    }`
   return (
-    <div className="flex gap-1 p-1 mb-6 rounded-full bg-[var(--surface-secondary)] border border-[var(--border)] w-fit">
-      <Link
-        href="/entries"
-        className={`px-5 py-2 rounded-full text-sm font-medium transition-colors ${
-          view === 'list' ? 'bg-[var(--accent)] text-[#f7f4ea]' : 'text-[var(--muted)]'
-        }`}
-      >
+    <nav className="flex gap-1 p-1 mb-6 rounded-full bg-[var(--surface-secondary)] border border-[var(--border)] w-fit" aria-label="表示の切り替え">
+      <Link href="/entries" className={item(view === 'list')} aria-current={view === 'list' ? 'page' : undefined}>
         リスト
       </Link>
-      <Link
-        href="/entries?view=calendar"
-        className={`px-5 py-2 rounded-full text-sm font-medium transition-colors ${
-          view === 'calendar' ? 'bg-[var(--accent)] text-[#f7f4ea]' : 'text-[var(--muted)]'
-        }`}
-      >
+      <Link href="/entries?view=calendar" className={item(view === 'calendar')} aria-current={view === 'calendar' ? 'page' : undefined}>
         カレンダー
+      </Link>
+    </nav>
+  )
+}
+
+/** 見出しの帯（一覧・カレンダー共通） */
+function EntriesHeader() {
+  return (
+    <div className="section-head mb-5" style={{ borderBottomColor: 'var(--divider-strong)' }}>
+      <div className="flex items-baseline gap-4">
+        <div className="eyebrow">All entries</div>
+        <h1 className="text-2xl font-bold text-[var(--foreground)]">日記一覧</h1>
+      </div>
+      <Link href="/checkin" className="icon-btn" style={{ background: 'var(--btn-bg)', color: 'var(--btn-fg)', borderColor: 'transparent' }} aria-label="今日の記録をする">
+        <PlusIcon size={20} />
       </Link>
     </div>
   )
@@ -93,19 +97,7 @@ export default async function EntriesPage({ searchParams }: Props) {
 
     return (
       <div className="px-5 pt-8 pb-8">
-        <div className="section-head mb-5" style={{ borderBottomColor: 'var(--divider-strong)' }}>
-          <div className="flex items-baseline gap-4">
-            <div className="eyebrow">All entries</div>
-            <h1 className="text-2xl font-bold text-[var(--foreground)]">日記一覧</h1>
-          </div>
-          <Link
-            href="/checkin"
-            className="w-10 h-10 rounded-full bg-[var(--accent)] text-[#f7f4ea] flex items-center justify-center text-xl font-bold"
-            aria-label="新しい記録を追加"
-          >
-            +
-          </Link>
-        </div>
+        <EntriesHeader />
 
         <ViewToggle view={view} />
 
@@ -172,37 +164,23 @@ export default async function EntriesPage({ searchParams }: Props) {
 
   return (
     <div className="px-5 pt-8 pb-8">
-      <div className="section-head mb-5" style={{ borderBottomColor: 'var(--divider-strong)' }}>
-        <div className="flex items-baseline gap-4">
-          <div className="eyebrow">All entries</div>
-          <h1 className="text-2xl font-bold text-[var(--foreground)]">日記一覧</h1>
-        </div>
-        <Link
-          href="/checkin"
-          className="w-10 h-10 rounded-full bg-[var(--accent)] text-[#f7f4ea] flex items-center justify-center text-xl font-bold"
-          aria-label="新しい記録を追加"
-        >
-          +
-        </Link>
-      </div>
+      <EntriesHeader />
 
       <ViewToggle view="list" />
 
       {/* キーワード検索（GET フォーム） */}
-      <form method="GET" action="/entries" className="mb-6 flex gap-2">
+      <form method="GET" action="/entries" className="mb-6 flex gap-2" role="search">
         {tag && <input type="hidden" name="tag" value={tag} />}
         <input
           type="search"
           name="q"
           defaultValue={rawQuery}
           placeholder="キーワードで検索（本文・出来事・メモ）"
-          className="flex-1 px-4 py-2.5 rounded-2xl border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
+          aria-label="キーワード"
+          className="flex-1 min-w-0 px-4 py-2.5 rounded-2xl border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] placeholder:text-[var(--muted-2)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
         />
-        <button
-          type="submit"
-          className="px-4 py-2.5 rounded-2xl border border-[var(--border)] bg-[var(--surface-secondary)] text-[var(--foreground)] text-sm font-medium active:scale-95 transition-transform"
-        >
-          検索
+        <button type="submit" className="icon-btn" aria-label="検索">
+          <SearchIcon size={20} />
         </button>
       </form>
 
@@ -232,7 +210,7 @@ export default async function EntriesPage({ searchParams }: Props) {
 
       {safeEntries.length === 0 ? (
         <div className="text-center py-20 text-[var(--muted)]">
-          <p className="text-6xl mb-4">📖</p>
+          <MirrorMark size={48} className="empty-mark" />
           {rawQuery || tag ? (
             <>
               <p className="font-medium text-lg text-[var(--foreground)]">見つかりませんでした</p>
@@ -242,11 +220,9 @@ export default async function EntriesPage({ searchParams }: Props) {
             <>
               <p className="font-medium text-lg text-[var(--foreground)]">まだ記録がありません</p>
               <p className="text-sm mt-2">チェックインして最初の日記を書こう</p>
-              <Link
-                href="/checkin"
-                className="inline-block mt-6 px-7 py-3 rounded-full bg-[var(--accent)] text-[#f7f4ea] font-bold"
-              >
-                今日の記録をする →
+              <Link href="/checkin" className="btn btn-primary mt-6">
+                今日の記録をする
+                <ArrowRightIcon size={18} className="btn-arrow" />
               </Link>
             </>
           )}
@@ -265,17 +241,15 @@ export default async function EntriesPage({ searchParams }: Props) {
                     href={`/entries/${entry.entry_date}`}
                     className="flex items-start gap-4 py-5 border-b border-[var(--border)] active:opacity-70 transition-opacity"
                   >
-                    <div
-                      className="flex-none w-2.5 h-2.5 rounded-full mt-2"
-                      style={{ backgroundColor: MOOD_COLOR[entry.mood] ?? '#cdbf9a' }}
-                    />
+                    {/* 気分（月）とエネルギー（水位）。一覧でも、チェックインで選んだときと同じ形 */}
+                    <span className="flex-none flex flex-col items-center gap-1 pt-0.5">
+                      <MoodGlyph mood={entry.mood} size={22} label={`気分 ${moodLabel(entry.mood) ?? '—'}`} />
+                      <EnergyGlyph energy={entry.energy} size={16} label={`エネルギー ${energyLabel(entry.energy) ?? '—'}`} />
+                    </span>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
                         <span className="font-bold text-[var(--foreground)]">
                           {formatJSTDate(entry.entry_date, { month: 'numeric', day: 'numeric', weekday: 'short' })}
-                        </span>
-                        <span className="text-xs text-[var(--muted-2)] font-mono tracking-tighter">
-                          {ENERGY_BAR[entry.energy] ?? ''}
                         </span>
                       </div>
                       <p className="text-sm text-[var(--muted)] truncate">
@@ -291,7 +265,7 @@ export default async function EntriesPage({ searchParams }: Props) {
                         </div>
                       )}
                     </div>
-                    <span className="text-[var(--muted-2)] text-lg">›</span>
+                    <ChevronRightIcon size={18} className="flex-none self-center text-[var(--faint)]" />
                   </Link>
                 ))}
               </div>
@@ -304,14 +278,16 @@ export default async function EntriesPage({ searchParams }: Props) {
       {(page > 1 || hasMore) && (
         <div className="flex items-center justify-between mt-8">
           {page > 1 ? (
-            <Link href={pageLink(page - 1)} className="text-sm text-[var(--primary)] font-medium">
-              ← 新しい記録
+            <Link href={pageLink(page - 1)} className="gap-1.5 text-sm text-[var(--primary)] font-bold font-ui">
+              <ArrowLeftIcon size={16} />
+              新しい記録
             </Link>
           ) : <span />}
           <span className="text-xs text-[var(--muted-2)]">ページ {page}</span>
           {hasMore ? (
-            <Link href={pageLink(page + 1)} className="text-sm text-[var(--primary)] font-medium">
-              古い記録 →
+            <Link href={pageLink(page + 1)} className="gap-1.5 text-sm text-[var(--primary)] font-bold font-ui">
+              古い記録
+              <ArrowRightIcon size={16} />
             </Link>
           ) : <span />}
         </div>

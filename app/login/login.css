@@ -1,0 +1,143 @@
+/* ログイン（lg- 接頭辞）。最初に見る画面なので、ホームと同じ「水鏡」の夜を小さく置く */
+.lg-page {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background: var(--background);
+  /* .page-content の safe-area 分を打ち消して、ステータスバーの裏まで空を伸ばす */
+  margin-top: calc(env(safe-area-inset-top) * -1);
+}
+.lg-sky {
+  --ink: #efe7d4;
+  --moon: #f4ead0;
+  position: relative;
+  height: clamp(260px, 42svh, 380px);
+  overflow: hidden;
+  background: linear-gradient(180deg, #0a0f1d 0%, #141c33 50%, #29324d 64%, #1b233a 64.2%, #070a12 100%);
+}
+.lg-stars circle {
+  fill: var(--ink);
+}
+.lg-moon {
+  position: absolute;
+  left: 50%;
+  top: 34%;
+  width: 92px;
+  height: 92px;
+  translate: -50% -50%;
+  overflow: visible;
+  animation: lg-moon-in 1.4s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+.lg-reflection {
+  position: absolute;
+  left: 50%;
+  top: calc(64% + (64% - 34%));
+  width: 92px;
+  height: 92px;
+  translate: -50% -50%;
+  scale: 1 -1;
+  opacity: 0.32;
+  filter: blur(1.4px);
+  -webkit-mask-image: linear-gradient(0deg, #000 0%, transparent 70%);
+  mask-image: linear-gradient(0deg, #000 0%, transparent 70%);
+}
+.lg-horizon {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 64%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(239, 231, 212, 0.32) 20%, rgba(239, 231, 212, 0.66) 50%, rgba(239, 231, 212, 0.32) 80%, transparent);
+}
+.lg-body {
+  position: relative;
+  flex: 1;
+  margin-top: -28px;
+  border-radius: 28px 28px 0 0;
+  background: var(--background);
+  padding: 36px 24px calc(28px + env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+.lg-wordmark {
+  font-family: 'Cormorant Garamond', serif;
+  font-style: italic;
+  font-weight: 500;
+  font-size: 40px;
+  letter-spacing: 0.01em;
+  color: var(--foreground);
+}
+.lg-tagline {
+  margin-top: 8px;
+  font-family: 'Shippori Mincho', serif;
+  font-size: 0.9375rem;
+  letter-spacing: 0.16em;
+  color: var(--muted);
+}
+.lg-points {
+  list-style: none;
+  width: 100%;
+  max-width: 360px;
+  margin: 28px 0 30px;
+  border-top: 1px solid var(--hairline);
+}
+.lg-points li {
+  display: grid;
+  grid-template-columns: 7.2em 1fr;
+  gap: 12px;
+  align-items: baseline;
+  padding: 12px 4px;
+  border-bottom: 1px solid var(--hairline);
+  text-align: left;
+  font-family: 'Zen Kaku Gothic New', system-ui, sans-serif;
+  font-size: 0.8125rem;
+  color: var(--muted);
+}
+.lg-points b {
+  white-space: nowrap;
+  font-family: 'Shippori Mincho', serif;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--foreground);
+}
+.lg-actions {
+  width: 100%;
+  max-width: 360px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+/* Apple の決まりに合わせた黒（ダークでは白）のボタン */
+.lg-apple {
+  background: #000;
+  color: #fff;
+}
+.dark .lg-apple {
+  background: #fff;
+  color: #000;
+}
+.lg-google {
+  background: var(--surface);
+  color: var(--foreground);
+  border: 1px solid var(--border);
+}
+.lg-terms {
+  margin-top: 22px;
+  max-width: 20rem;
+  font-family: 'Zen Kaku Gothic New', system-ui, sans-serif;
+  font-size: 0.6875rem;
+  line-height: 1.7;
+  color: var(--muted-2);
+}
+@keyframes lg-moon-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lg-moon {
+    animation: none;
+  }
+}

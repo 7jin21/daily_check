@@ -15,7 +15,7 @@ export default function BottomNav() {
   const pathname = usePathname()
 
   // ログインページ・チェックイン・ドラフトページではナビを非表示
-  const hideNav = ['/login', '/auth', '/checkin', '/draft'].some((path) => pathname.startsWith(path))
+  const hideNav = ['/login', '/auth', '/checkin', '/draft', '/dev/views'].some((path) => pathname.startsWith(path))
 
   if (hideNav) return null
 

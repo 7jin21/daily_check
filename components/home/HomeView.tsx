@@ -8,6 +8,8 @@ import { Section, WeekRipples, StatsLine, MoodTrace, Flashbacks, RecentList, wee
 import MoodCurve from './MoodCurve'
 import QuickMemo from './QuickMemo'
 import FocusLine from './FocusLine'
+import SaveEcho from './SaveEcho'
+import Phrase from '@/components/ui/Phrase'
 import './home.css'
 
 // ホーム画面の描画（データは app/page.tsx か開発用プレビューから受け取る）
@@ -33,16 +35,19 @@ export default function HomeView({ model, now }: { model: HomeModel; now: Date }
   // 「気分だけ」の記録（本文・要約がまだない）
   const moodOnlyToday = !!todayEntry && !todayEntry.summary && !todayEntry.dominant_emotion
 
+  const summary = todayEntry?.summary || todayEntry?.dominant_emotion || null
+
   return (
     <div className="im-home">
-      <StreakCelebration streak={stats.streak} />
+      <SaveEcho today={today} />
 
       {/* 記録済みの日は空を低くして、読み返し・数字をすぐ見られるようにする */}
       <MirrorHero today={today} period={period} now={now} compact={!!todayEntry}>
         <MirrorCTA
           today={today}
           greeting={GREETING[period]}
-          todaySummary={todayEntry?.summary || todayEntry?.dominant_emotion || null}
+          // 今日の一文は、文節の切れ目でだけ折り返す（サーバーで分けてから渡す）
+          todayQuote={summary ? <Phrase text={`「${summary}」`} /> : null}
           hasTodayEntry={!!todayEntry}
           moodOnly={moodOnlyToday}
           missedYesterday={missedYesterday ? yesterday : null}
@@ -50,6 +55,9 @@ export default function HomeView({ model, now }: { model: HomeModel; now: Date }
       </MirrorHero>
 
       <div className="im-sheet">
+        {/* 連続記録の節目（その日のあいだだけ、シートの冒頭に出す） */}
+        <StreakCelebration streak={stats.streak} today={today} />
+
         <FocusLine today={today} />
 
         {/* 日中のひとこと（今日の言葉がまだ日記になっていない間だけ） */}
@@ -63,7 +71,7 @@ export default function HomeView({ model, now }: { model: HomeModel; now: Date }
           <WeekRipples today={today} entries={entries} />
         </Section>
 
-        <StatsLine stats={stats} />
+        <StatsLine stats={stats} yesterday={yesterday} />
 
         {entries.length > 0 && (
           <Section idx={idx()} title="記録の軌跡" meta="直近90日">
@@ -132,8 +140,8 @@ export function OnboardingView({ model, now }: { model: HomeModel; now: Date }) 
               <li key={s.title} className="im-row" style={{ gridTemplateColumns: '46px 1fr' }}>
                 <span className="im-row-day" style={{ textAlign: 'center' }}>{i + 1}</span>
                 <span>
-                  <span className="im-sec-title" style={{ fontSize: 16, display: 'block' }}>{s.title}</span>
-                  <span className="im-row-tags" style={{ display: 'block', whiteSpace: 'normal', fontSize: 13, lineHeight: 1.8 }}>
+                  <span className="im-sec-title" style={{ fontSize: '1rem', display: 'block' }}>{s.title}</span>
+                  <span className="im-row-tags" style={{ display: 'block', whiteSpace: 'normal', fontSize: '0.8125rem', lineHeight: 1.8 }}>
                     {s.body}
                   </span>
                 </span>

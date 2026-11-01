@@ -2,9 +2,10 @@
 
 import { useRef, useState, type KeyboardEvent, type PointerEvent } from 'react'
 import Link from 'next/link'
-import { ENERGY, MOODS } from '@/lib/constants'
+import { ENERGY, MOODS, moodColor } from '@/lib/constants'
 import { dayOfWeek, type HomeEntry } from '@/lib/home-model'
 import { WEEKDAY_KANJI } from '@/lib/almanac'
+import { EnergyGlyph, MoodGlyph } from '@/components/ui/StateGlyphs'
 
 // 気分の波（直近14回）。上段 = 気分の波線（その高さの気分の色で塗る）／下段 = エネルギーの細い棒。
 // 点をタップ（または横になぞる）すると、その日の気分・エネルギーが上に出て、日記を開ける。
@@ -17,7 +18,6 @@ const MOOD_BOTTOM = 118
 const ENERGY_TOP = 138
 const ENERGY_BOTTOM = 166
 
-const moodColor = (mood: number) => MOODS.find((m) => m.value === mood)?.color ?? '#cdbf9a'
 const shortDate = (d: string) => `${Number(d.slice(5, 7))}.${Number(d.slice(8, 10))}`
 
 /** Catmull-Rom を 3 次ベジェに変換した滑らかな線。制御点は描画範囲内に収めて行き過ぎを防ぐ */
@@ -96,10 +96,13 @@ export default function MoodCurve({ entries }: { entries: HomeEntry[] }) {
         </span>
         <span className="im-curve-readout-vals">
           <span>
-            <i style={{ background: moodColor(cur.mood) }} />
+            <MoodGlyph mood={cur.mood} size={15} />
             気分 {curMood?.label ?? '—'}
           </span>
-          <span>エネルギー {curEnergy?.label ?? '—'}</span>
+          <span>
+            <EnergyGlyph energy={cur.energy} size={15} />
+            エネルギー {curEnergy?.label ?? '—'}
+          </span>
         </span>
         <Link href={`/entries/${cur.entry_date}`} className="im-curve-open">
           開く ›
@@ -127,9 +130,10 @@ export default function MoodCurve({ entries }: { entries: HomeEntry[] }) {
         <defs>
           {/* 塗りの色＝その高さの気分の色（上ほど晴れ、下ほど沈む） */}
           <linearGradient id="im-curve-fill" gradientUnits="userSpaceOnUse" x1="0" y1={MOOD_TOP} x2="0" y2={MOOD_BOTTOM}>
-            <stop offset="0%" stopColor={moodColor(5)} stopOpacity="0.42" />
-            <stop offset="50%" stopColor={moodColor(3)} stopOpacity="0.22" />
-            <stop offset="100%" stopColor={moodColor(1)} stopOpacity="0.06" />
+            {/* 色は CSS 変数なので、属性ではなく style で渡す（属性の var() は効かないブラウザがある） */}
+            <stop offset="0%" style={{ stopColor: moodColor(5), stopOpacity: 0.42 }} />
+            <stop offset="50%" style={{ stopColor: moodColor(3), stopOpacity: 0.22 }} />
+            <stop offset="100%" style={{ stopColor: moodColor(1), stopOpacity: 0.06 }} />
           </linearGradient>
         </defs>
         {[5, 3, 1].map((v) => (
@@ -151,7 +155,7 @@ export default function MoodCurve({ entries }: { entries: HomeEntry[] }) {
             cx={pts[i].x}
             cy={pts[i].y}
             r={i === sel ? 5.5 : 3.2}
-            fill={moodColor(e.mood)}
+            style={{ fill: moodColor(e.mood) }}
           />
         ))}
         {/* エネルギー */}

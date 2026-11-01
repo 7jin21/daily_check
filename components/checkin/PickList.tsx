@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { hapticTap } from '@/lib/haptics'
+import { CheckIcon } from '@/components/ui/icons'
 
 // 「今日のひとこと」や「今日の予定」から、日記に入れたいものだけを選んで挿入するリスト。
 // 全部入れるのではなく、残したいものを本人が選ぶ（振り返りの入口にする）。
@@ -32,15 +33,18 @@ export default function PickList({ title, items, maxChars, skippedNote, onInsert
   // 入れたあと（1件でも入ったら一覧を閉じる。入らなかった分があれば、黙らずに伝える）
   if (result && result.inserted > 0) {
     return (
-      <p className="text-xs text-[var(--muted)] px-1" role="status">
-        {result.skipped === 0 ? (
-          <>✓ {title}を「今日あったこと」に入れました。いらない行は消して大丈夫です。</>
-        ) : (
-          <>
-            ✓ {result.inserted}件を「今日あったこと」に入れました。{result.skipped}件は文字数の上限（{maxChars}字）に入りきらないため、入れていません。
-            {skippedNote}
-          </>
-        )}
+      <p className="flex gap-2 text-xs leading-relaxed text-[var(--muted)] px-1" role="status">
+        <CheckIcon size={16} className="flex-none text-[var(--primary)] mt-px" />
+        <span>
+          {result.skipped === 0 ? (
+            <>{title}を「今日あったこと」に入れました。いらない行は消して大丈夫です。</>
+          ) : (
+            <>
+              {result.inserted}件を「今日あったこと」に入れました。{result.skipped}件は文字数の上限（{maxChars}字）に入りきらないため、入れていません。
+              {skippedNote}
+            </>
+          )}
+        </span>
       </p>
     )
   }
@@ -71,7 +75,7 @@ export default function PickList({ title, items, maxChars, skippedNote, onInsert
             <li key={it.id}>
               <button type="button" className="pick-item" data-on={on} aria-pressed={on} onClick={() => toggle(it.id)}>
                 <span className="pick-check" aria-hidden="true">
-                  {on ? '✓' : ''}
+                  {on && <CheckIcon size={14} strokeWidth={2} />}
                 </span>
                 {it.meta && <span className="pick-meta">{it.meta}</span>}
                 <span className="pick-label">{it.label}</span>
@@ -94,7 +98,7 @@ export default function PickList({ title, items, maxChars, skippedNote, onInsert
         選んだ{selected.size}件を「今日あったこと」に入れる
       </button>
       {result && result.inserted === 0 && (
-        <p className="mt-2 text-xs px-1" style={{ color: '#9c4a2f' }} role="alert">
+        <p className="mt-2 text-xs px-1 text-[var(--danger)]" role="alert">
           「今日あったこと」が文字数の上限（{maxChars}字）に近いため、入れられませんでした。文章を短くするか、入れるものを減らしてください。
         </p>
       )}

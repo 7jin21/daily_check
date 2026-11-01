@@ -26,6 +26,9 @@ import RewriteButtons, { type RewriteInstruction } from '@/components/draft/Rewr
 import SaveActions from '@/components/draft/SaveActions'
 import { classifyError, rewriteErrorMessage } from '@/components/draft/classify-error'
 import { splitCutMark } from '@/lib/draft-prompt'
+import { markSaveEcho } from '@/lib/save-echo'
+import { UndoIcon } from '@/components/ui/icons'
+import '@/components/draft/draft.css'
 
 /** ストアの最新値から、清書の材料（メモ＋内省の答え）を組み立てる */
 function currentComposeInput(): ComposeInput {
@@ -68,7 +71,7 @@ export default function DraftPage() {
 
   const [isSaving, setIsSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
-  const [saved, setSaved] = useState<{ date: string; merged: boolean } | null>(null)
+  const [saved, setSaved] = useState<{ date: string; merged: boolean; mood: number | null } | null>(null)
   const [willAppend, setWillAppend] = useState(false) // この日の日記がすでにあり、保存すると追記になる
   const [notice, setNotice] = useState<DraftNoticeKind | null>(null)
   const [rewritingKey, setRewritingKey] = useState<RewriteInstruction | null>(null)
@@ -484,8 +487,10 @@ export default function DraftPage() {
       reset()
       // 先読みした内省の問いは、この日記のためのもの（次のチェックインで使い回さない）
       clearReflectionCache()
+      // ホームに戻ったら、その日の丸に色が落ちる（保存画面の「水面に一滴」の続き）
+      markSaveEcho(entryDate, input.mood)
       // 「追記しました」と出すのは、実際に言葉が足されたときだけ（保存のやり直しで何も足されなかったときは出さない）
-      setSaved({ date: entryDate, merged: result.appended })
+      setSaved({ date: entryDate, merged: result.appended, mood: input.mood })
     } catch (err) {
       console.error('保存エラー:', err)
       const classified = classifyError(err)
@@ -519,12 +524,13 @@ export default function DraftPage() {
   // 問いを待っている（最大7秒。失敗すれば自動で生成へ進む）
   if (reflectPhase === 'fetching') return <ReadingView />
 
-  if (isGenerating) return <GeneratingView text={streamText} onCancel={handleCancel} />
+  if (isGenerating) return <GeneratingView text={streamText} original={original} onCancel={handleCancel} />
 
   if (saved) {
     return (
       <SavedView
         entryDate={saved.date}
+        mood={saved.mood}
         merged={saved.merged}
         isToday={saved.date === todayJST()}
         showReminderNudge={!notificationsEnabled}
@@ -537,7 +543,7 @@ export default function DraftPage() {
   const busy = isGenerating || !!rewritingKey || isSaving
 
   return (
-    <div className="min-h-dvh flex flex-col px-4 pt-6">
+    <div className="dv-page animate-fade-in">
       <DraftHeader targetDate={targetDate} onBack={() => router.push('/checkin')} />
 
       {notice && <DraftNotice kind={notice} />}
@@ -554,18 +560,19 @@ export default function DraftPage() {
           readOnly={!!rewritingKey}
           aria-label="日記の本文（編集できます）"
           onChange={(e) => setEditedDraft(e.target.value)}
-          className="w-full min-h-40 p-4 rounded-2xl border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] text-base resize-none overflow-hidden focus:outline-none focus:ring-2 focus:ring-[var(--primary)] leading-relaxed"
+          className="dv-textarea"
         />
 
         {/* 自分の言葉が残っているかを確かめる */}
-        <div className="mt-2 flex items-center gap-2 flex-wrap">
+        <div className="mt-3 flex items-center gap-2 flex-wrap">
           {/* 本文が空のときは割合に意味がないので出さない */}
           {original && editedDraft.trim() && (
             <OwnWordsMeter percent={Math.round(kept.own * 100)} open={compareOpen} onToggle={() => setCompareOpen((v) => !v)} />
           )}
           {history.length > 0 && (
             <button type="button" onClick={handleUndo} disabled={busy} className="draft-undo">
-              ↶ 元に戻す
+              <UndoIcon size={15} />
+              元に戻す
             </button>
           )}
         </div>

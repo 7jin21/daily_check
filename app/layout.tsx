@@ -19,6 +19,15 @@ export const metadata: Metadata = {
   },
 }
 
+/**
+ * iPhone の「文字サイズ」（設定 → 画面表示と明るさ → テキストサイズ / アクセシビリティ → さらに大きな文字）に合わせて、
+ * 画面の文字の基準（1rem）を変える。Safari は既定の 16px をこの設定で変えないため、
+ * システム本文の大きさ（-apple-system-body。標準で 17px）を測って比率を出す。
+ * 画面が崩れないよう 0.875〜1.3 倍に収める。iPhone / iPad だけ（Mac の Safari は本文が 13px で小さくなりすぎるため対象外）。
+ * アプリに戻ってきたとき（設定を変えて戻ったとき）にも測り直す。
+ */
+const DYNAMIC_TYPE_SCRIPT = `(function(){try{var d=document.documentElement,u=navigator.userAgent;if(!(/iP(hone|ad|od)/.test(u)||(/Macintosh/.test(u)&&navigator.maxTouchPoints>1)))return;if(!(window.CSS&&CSS.supports('font','-apple-system-body')))return;var a=function(){var p=document.createElement('div');p.style.cssText='font:-apple-system-body;position:absolute;visibility:hidden;pointer-events:none';d.appendChild(p);var s=parseFloat(getComputedStyle(p).fontSize);d.removeChild(p);if(!s)return;var r=Math.min(1.3,Math.max(0.875,s/17));d.style.fontSize=Math.abs(r-1)<0.01?'':(16*r).toFixed(2)+'px'};a();document.addEventListener('visibilitychange',function(){if(document.visibilityState==='visible')a()})}catch(e){}})()`
+
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
@@ -35,6 +44,8 @@ export default function RootLayout({
       <head>
         {/* ダークモード初期化スクリプト（フラッシュ防止） */}
         <script dangerouslySetInnerHTML={{ __html: `(function(){try{var d=document.documentElement,t=localStorage.getItem('inner-mirror-theme');if(t==='dark'||(t!=='light'&&window.matchMedia('(prefers-color-scheme:dark)').matches)){d.classList.add('dark')}else{d.classList.remove('dark')}}catch(e){}})()` }} />
+        {/* 文字の大きさを iPhone の設定（Dynamic Type）に合わせる。描画の前に決めて、ちらつかせない */}
+        <script dangerouslySetInnerHTML={{ __html: DYNAMIC_TYPE_SCRIPT }} />
         {/* PWA / iPhone 対応 meta tags */}
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />

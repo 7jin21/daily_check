@@ -10,6 +10,7 @@ import { hapticTap } from '@/lib/haptics'
 import { jstTimeHM, todayJST } from '@/lib/jst'
 import { prefetchReflection } from '@/lib/reflection-prefetch'
 import { appendLinesWithin } from '@/lib/memo-insert'
+import { ChevronDownIcon } from '@/components/ui/icons'
 
 // チェックイン2画面目: テキスト4欄を1画面に集約。
 // 「出来事」は常時表示、残り3欄は折りたたみ（値があれば自動で開く）。
@@ -31,9 +32,9 @@ const PREFETCH_DELAY_MS = 2000
 type OptionalField = 'challenges' | 'gratitude' | 'freeform'
 
 const OPTIONAL_SECTIONS: { id: OptionalField; label: string; placeholder: string }[] = [
-  { id: 'challenges', label: '困ったこと・課題', placeholder: '問題・悩み・不安など...' },
-  { id: 'gratitude', label: '感謝できること', placeholder: '小さなことでも大丈夫...' },
-  { id: 'freeform', label: '自由メモ', placeholder: '思ったこと、気づいたこと、なんでも...' },
+  { id: 'challenges', label: '困ったこと・課題', placeholder: '問題・悩み・不安など…' },
+  { id: 'gratitude', label: '感謝できること', placeholder: '小さなことでも大丈夫…' },
+  { id: 'freeform', label: '自由メモ', placeholder: '思ったこと、気づいたこと、なんでも…' },
 ]
 
 export default function NotesStep() {
@@ -124,7 +125,9 @@ export default function NotesStep() {
     <div className="space-y-5 pb-2">
       {/* 出来事（メイン欄） */}
       <section>
-        <p className="text-sm font-medium text-[var(--muted)] mb-2">今日あったこと</p>
+        <p className="ck-field-label" id="ck-events-label">
+          今日あったこと
+        </p>
         {(memos.length > 0 || calendarItems.length > 0) && (
           <div className="space-y-2.5 mb-3">
             {/* 項目が後から届いたときに選択状態を作り直すため、件数を key にする */}
@@ -148,8 +151,9 @@ export default function NotesStep() {
         <TextStep
           value={events}
           onChange={setEvents}
-          placeholder="出来事・行動・会った人など..."
+          placeholder="出来事・行動・会った人など…"
           rows={4}
+          labelledBy="ck-events-label"
         />
       </section>
 
@@ -158,23 +162,26 @@ export default function NotesStep() {
         {OPTIONAL_SECTIONS.map(({ id, label, placeholder }) => {
           const isOpen = openSections[id]
           const value = values[id]
+          const headId = `ck-fold-${id}`
           return (
-            <section key={id} className="border border-[var(--border)] rounded-2xl bg-[var(--surface)]">
+            <section key={id} className="ck-fold">
               <button
                 type="button"
+                id={headId}
                 onClick={() => toggleSection(id)}
-                className="w-full flex items-center justify-between px-4 py-3.5 text-left active:opacity-70"
+                className="ck-fold-head"
                 aria-expanded={isOpen}
               >
-                <span className="text-sm font-medium text-[var(--foreground)]">
+                <span className="min-w-0 truncate">
                   {label}
                   {!isOpen && value.trim() && (
-                    <span className="ml-2 text-xs text-[var(--muted-2)] font-normal">
-                      {value.trim().slice(0, 18)}{value.trim().length > 18 ? '…' : ''}
-                    </span>
+                    <small>
+                      {value.trim().slice(0, 18)}
+                      {value.trim().length > 18 ? '…' : ''}
+                    </small>
                   )}
                 </span>
-                <span className="text-[var(--muted-2)] text-lg leading-none">{isOpen ? '−' : '+'}</span>
+                <ChevronDownIcon size={18} />
               </button>
               {isOpen && (
                 <div className="px-3 pb-3 animate-fade-in">
@@ -184,6 +191,7 @@ export default function NotesStep() {
                     placeholder={placeholder}
                     rows={3}
                     showHint={false}
+                    labelledBy={headId}
                   />
                 </div>
               )}

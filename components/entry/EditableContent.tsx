@@ -6,6 +6,7 @@ import { getSupabaseClient } from '@/lib/supabase'
 import { apiPost } from '@/lib/api-client'
 import { refreshEntryMeta } from '@/lib/entry-save'
 import { todaysMemos, useMemoStore } from '@/stores/memos'
+import { PlusIcon } from '@/components/ui/icons'
 
 interface Props {
   entryId: string
@@ -113,12 +114,9 @@ export default function EditableContent({
     return (
       <div className="card mb-6 text-center" style={{ padding: '28px 20px' }}>
         <h2 className="eyebrow mb-2">Diary</h2>
-        <p className="text-base text-[var(--foreground)]">この日は、気分だけ残しています。</p>
-        <p className="text-xs text-[var(--muted)] mt-1">思い出したことがあれば、あとから言葉を書き足せます。</p>
-        <button
-          onClick={() => setIsEditing(true)}
-          className="mt-4 px-6 py-2.5 rounded-full bg-[var(--accent)] text-[#f7f4ea] text-sm font-bold active:scale-95 transition-transform"
-        >
+        <p className="font-mincho text-base text-[var(--foreground)]">この日は、気分だけ残しています。</p>
+        <p className="text-xs font-ui text-[var(--muted)] mt-1.5">思い出したことがあれば、あとから言葉を書き足せます。</p>
+        <button type="button" onClick={() => setIsEditing(true)} className="btn btn-primary btn-sm mt-4">
           言葉を書き足す
         </button>
       </div>
@@ -130,12 +128,8 @@ export default function EditableContent({
       <div className="flex items-center justify-between mb-3">
         <h2 className="eyebrow">Diary</h2>
         {!isEditing && (
-          <button
-            onClick={() => setIsEditing(true)}
-            className="text-xs text-[var(--primary)] font-medium"
-            style={{ minHeight: 0, minWidth: 0, padding: 0 }}
-          >
-            編集
+          <button type="button" onClick={() => setIsEditing(true)} className="btn-quiet" style={{ minHeight: 32, color: 'var(--primary)' }}>
+            編集する
           </button>
         )}
       </div>
@@ -143,13 +137,9 @@ export default function EditableContent({
       {isEditing ? (
         <div className="animate-fade-in">
           {memos.length > 0 && (
-            <button
-              type="button"
-              onClick={insertMemos}
-              className="mb-2 px-3 py-1.5 rounded-full text-xs font-bold border border-[var(--border)] text-[var(--primary)] bg-[var(--surface)]"
-              style={{ minHeight: 36 }}
-            >
-              ＋ 今日のひとこと（{memos.length}件）を入れる
+            <button type="button" onClick={insertMemos} className="chip mb-2" style={{ color: 'var(--primary)', fontWeight: 700 }}>
+              <PlusIcon size={14} />
+              今日のひとこと（{memos.length}件）を入れる
             </button>
           )}
           <textarea
@@ -157,31 +147,24 @@ export default function EditableContent({
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             placeholder={saved ? undefined : '今日のこと、思い出したことを、あなたの言葉で'}
-            className="w-full min-h-36 p-3 rounded-2xl border border-[var(--border)] bg-[var(--surface-secondary)] text-[var(--foreground)] text-base resize-none overflow-hidden focus:outline-none focus:ring-2 focus:ring-[var(--primary)] leading-relaxed"
+            className="w-full min-h-36 p-3 rounded-2xl border border-[var(--border)] bg-[var(--surface-secondary)] text-[var(--foreground)] font-mincho resize-none overflow-hidden focus:outline-none focus:ring-2 focus:ring-[var(--primary)] leading-loose"
           />
           {error && (
-            <p className="mt-1.5 text-xs" style={{ color: '#9c4a2f' }}>
+            <p className="mt-1.5 text-xs text-[var(--danger)]" role="alert">
               {error}
             </p>
           )}
           <div className="flex gap-2 mt-3">
-            <button
-              onClick={handleSave}
-              disabled={saving || !draft.trim()}
-              className="flex-1 py-2.5 rounded-full bg-[var(--accent)] text-[#f7f4ea] text-sm font-bold disabled:opacity-50 active:scale-95 transition-transform"
-            >
-              {saving ? '保存中…' : '保存する'}
+            <button type="button" onClick={handleSave} disabled={saving || !draft.trim()} className="btn btn-primary btn-sm flex-1">
+              {saving ? '保存しています…' : '保存する'}
             </button>
-            <button
-              onClick={handleCancel}
-              className="px-4 py-2.5 rounded-full border border-[var(--border)] text-[var(--muted)] text-sm active:scale-95 transition-transform"
-            >
-              キャンセル
+            <button type="button" onClick={handleCancel} className="btn btn-secondary btn-sm">
+              やめる
             </button>
           </div>
         </div>
       ) : (
-        <p className="text-base text-[var(--foreground)] whitespace-pre-wrap leading-relaxed">{saved}</p>
+        <p className="font-mincho text-base text-[var(--foreground)] whitespace-pre-wrap leading-loose prose-ja">{saved}</p>
       )}
     </div>
   )

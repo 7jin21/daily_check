@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { STORAGE_KEYS } from '@/lib/constants'
 import { hasPendingCheckin, type PendingCheckin } from '@/lib/checkin-rollover'
@@ -12,7 +12,8 @@ import { hasPendingCheckin, type PendingCheckin } from '@/lib/checkin-rollover'
 interface Props {
   today: string
   greeting: string
-  todaySummary: string | null
+  /** 今日の一文（「」つき。文節で折り返すよう、サーバーで組んだもの）。無ければ null */
+  todayQuote: ReactNode
   hasTodayEntry: boolean
   moodOnly?: boolean // 今日の記録が気分だけ（言葉はまだ）
   missedYesterday: string | null // 昨日の日付（書き忘れのときだけ）
@@ -26,7 +27,7 @@ function Arrow() {
   )
 }
 
-export default function MirrorCTA({ today, greeting, todaySummary, hasTodayEntry, moodOnly = false, missedYesterday }: Props) {
+export default function MirrorCTA({ today, greeting, todayQuote, hasTodayEntry, moodOnly = false, missedYesterday }: Props) {
   const [hasDraft, setHasDraft] = useState(false)
 
   useEffect(() => {
@@ -73,7 +74,7 @@ export default function MirrorCTA({ today, greeting, todaySummary, hasTodayEntry
     return (
       <>
         <p className="im-cta-eyebrow">今日の記録</p>
-        <p className="im-cta-quote">{todaySummary ? `「${todaySummary}」` : '今日の記録は、ちゃんと残っています。'}</p>
+        <p className="im-cta-quote">{todayQuote ?? '今日の記録は、ちゃんと残っています。'}</p>
         <div className="im-cta-row">
           <Link href={`/entries/${today}`} className="im-pill">
             日記を読む

@@ -1,10 +1,10 @@
 export type RewriteInstruction = 'emotional' | 'shorter' | 'positive' | 'formal'
 
 const REWRITE_BUTTONS: { key: RewriteInstruction; label: string }[] = [
-  { key: 'emotional', label: '感情豊かに ✨' },
-  { key: 'shorter', label: '短くして 📝' },
-  { key: 'positive', label: 'ポジティブに 🌟' },
-  { key: 'formal', label: '丁寧な文体に 📖' },
+  { key: 'emotional', label: '感情豊かに' },
+  { key: 'shorter', label: '短くして' },
+  { key: 'positive', label: 'ポジティブに' },
+  { key: 'formal', label: '丁寧な文体に' },
 ]
 
 interface Props {
@@ -17,22 +17,26 @@ interface Props {
 // AI書き直し（任意。AI らしく膨らませたい日に。言葉が変わることを先に伝える）
 export default function RewriteButtons({ activeKey, disabled, error, onRewrite }: Props) {
   return (
-    <div className="mt-5">
-      <p className="text-xs text-[var(--muted-2)] mb-2">AIに書き直してもらう（言葉が変わります）</p>
-      <div className="flex flex-wrap gap-2">
+    <div className="mt-6">
+      <p className="label-ui mb-2" id="dv-rewrite-label">
+        AI に書き直してもらう（言葉が変わります）
+      </p>
+      <div className="flex flex-wrap gap-2" role="group" aria-labelledby="dv-rewrite-label">
         {REWRITE_BUTTONS.map(({ key, label }) => (
-          <button
-            key={key}
-            onClick={() => onRewrite(key)}
-            disabled={disabled}
-            className="px-3 py-1.5 rounded-full text-xs font-medium border border-[var(--border)] text-[var(--muted)] bg-[var(--surface)] disabled:opacity-40 active:scale-95 transition-transform"
-          >
-            {activeKey === key ? '書き直し中...' : label}
+          <button key={key} type="button" onClick={() => onRewrite(key)} disabled={disabled} className="chip" aria-busy={activeKey === key}>
+            {activeKey === key ? (
+              <>
+                <span className="spinner" style={{ width: 12, height: 12, borderWidth: 1.5 }} aria-hidden="true" />
+                書き直しています
+              </>
+            ) : (
+              label
+            )}
           </button>
         ))}
       </div>
       {error && (
-        <p className="mt-2 text-xs" style={{ color: '#9c4a2f' }}>
+        <p className="mt-2 text-xs text-[var(--danger)]" role="alert">
           {error}
         </p>
       )}

@@ -3,7 +3,9 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { getSupabaseClient } from '@/lib/supabase'
-import { moodEmoji } from '@/lib/constants'
+import { moodLabel } from '@/lib/constants'
+import { MoodGlyph } from '@/components/ui/StateGlyphs'
+import { ChevronRightIcon } from '@/components/ui/icons'
 import { dayOfWeek, formatJSTDate, subtractDays, todayJST } from '@/lib/jst'
 import { hasWords, type StoredEntryText } from '@/lib/entry-merge'
 import { MOOD_COLOR } from './shared'
@@ -150,7 +152,7 @@ export default function LocalStatsSection() {
     <>
       {/* 記録ペース */}
       <div className="card">
-        <h2 className="font-bold text-[var(--foreground)] mb-3">過去30日の記録ペース</h2>
+        <h2 className="font-mincho font-semibold tracking-wide text-[var(--foreground)] mb-3">過去30日の記録ペース</h2>
         <div className="flex items-end justify-between mb-2">
           <span className="text-3xl font-bold text-[var(--foreground)]">
             {localStats.recorded}
@@ -184,14 +186,14 @@ export default function LocalStatsSection() {
 
       {/* 気分の分布 */}
       <div className="card">
-        <h2 className="font-bold text-[var(--foreground)] mb-4">気分の分布</h2>
+        <h2 className="font-mincho font-semibold tracking-wide text-[var(--foreground)] mb-4">気分の分布</h2>
         <div className="space-y-2">
           {[5, 4, 3, 2, 1].map((level) => {
             const count = localStats.moodDist[level] ?? 0
             const pct = (count / maxMoodCount) * 100
             return (
               <div key={level} className="flex items-center gap-3">
-                <span className="text-xl w-8 flex-shrink-0 text-center">{moodEmoji(level)}</span>
+                <MoodGlyph mood={level} size={24} className="flex-shrink-0" label={moodLabel(level)} />
                 <div className="flex-1 h-5 bg-[var(--surface-secondary)] rounded-full overflow-hidden">
                   <div
                     className="h-full rounded-full transition-all duration-500"
@@ -208,12 +210,12 @@ export default function LocalStatsSection() {
       {/* 曜日×気分 */}
       {localStats.weekdayMoods.length >= 3 && (
         <div className="card">
-          <h2 className="font-bold text-[var(--foreground)] mb-1">曜日と気分</h2>
+          <h2 className="font-mincho font-semibold tracking-wide text-[var(--foreground)] mb-1">曜日と気分</h2>
           <p className="text-xs text-[var(--muted-2)] mb-4">過去30日の曜日別平均</p>
           <div className="flex items-end justify-between gap-1.5" style={{ height: 88 }}>
             {localStats.weekdayMoods.map((w) => (
               <div key={w.label} className="flex-1 flex flex-col items-center justify-end gap-1">
-                <span className="text-[10px] text-[var(--muted)] tabular-nums">{w.avg}</span>
+                <span className="text-[0.625rem] text-[var(--muted)] tabular-nums">{w.avg}</span>
                 <div
                   className="w-full rounded-t-sm transition-all"
                   style={{
@@ -222,7 +224,7 @@ export default function LocalStatsSection() {
                     borderRadius: 4,
                   }}
                 />
-                <span className="text-[10px] text-[var(--muted-2)]">{w.label}</span>
+                <span className="text-[0.625rem] text-[var(--muted-2)]">{w.label}</span>
               </div>
             ))}
           </div>
@@ -232,7 +234,7 @@ export default function LocalStatsSection() {
       {/* タグ×気分 */}
       {localStats.tagMoods.length > 0 && (
         <div className="card">
-          <h2 className="font-bold text-[var(--foreground)] mb-1">タグと気分の関係</h2>
+          <h2 className="font-mincho font-semibold tracking-wide text-[var(--foreground)] mb-1">タグと気分の関係</h2>
           <p className="text-xs text-[var(--muted-2)] mb-3">
             そのタグが付いた日の平均気分（全体平均 {localStats.avgMood} との差）。タップでその日記を一覧できます
           </p>
@@ -246,11 +248,11 @@ export default function LocalStatsSection() {
                   <span className="text-sm font-semibold text-[var(--foreground)] tabular-nums">{t.avg}</span>
                   <span
                     className="text-xs font-medium tabular-nums w-12 text-right"
-                    style={{ color: t.diff >= 0 ? '#5a7350' : '#9c4a2f' }}
+                    style={{ color: t.diff >= 0 ? 'var(--positive)' : 'var(--danger)' }}
                   >
                     {t.diff >= 0 ? `+${t.diff}` : t.diff}
                   </span>
-                  <span className="text-[var(--muted-2)]">›</span>
+                  <ChevronRightIcon size={14} className="flex-none text-[var(--faint)]" />
                 </Link>
               </li>
             ))}
@@ -261,7 +263,7 @@ export default function LocalStatsSection() {
       {/* 直近7日の気分 */}
       {localStats.recentMoods.length > 0 && (
         <div className="card">
-          <h2 className="font-bold text-[var(--foreground)] mb-4">直近の気分推移</h2>
+          <h2 className="font-mincho font-semibold tracking-wide text-[var(--foreground)] mb-4">直近の気分推移</h2>
           <div className="flex items-end justify-between gap-1" style={{ height: 72 }}>
             {localStats.recentMoods.map((e) => (
               <div key={e.date} className="flex-1 flex flex-col items-center justify-end gap-1">
@@ -273,7 +275,7 @@ export default function LocalStatsSection() {
                     borderRadius: 4,
                   }}
                 />
-                <span className="text-[9px] text-[var(--muted-2)]">
+                <span className="text-[0.5625rem] text-[var(--muted-2)]">
                   {formatJSTDate(e.date, { month: 'numeric', day: 'numeric' })}
                 </span>
               </div>
@@ -285,7 +287,7 @@ export default function LocalStatsSection() {
       {/* よく感じた感情 */}
       {localStats.topEmotions.length > 0 && (
         <div className="card">
-          <h2 className="font-bold text-[var(--foreground)] mb-3">よく感じた感情</h2>
+          <h2 className="font-mincho font-semibold tracking-wide text-[var(--foreground)] mb-3">よく感じた感情</h2>
           <div className="flex flex-wrap gap-2">
             {localStats.topEmotions.map(({ emotion, count }) => (
               <span

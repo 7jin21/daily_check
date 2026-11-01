@@ -5,6 +5,7 @@ import { doneInLastWeek, isFocusActive, loadFocus, saveFocus, toggleDone, type F
 import { subtractDays } from '@/lib/home-model'
 import { hapticTap } from '@/lib/haptics'
 import Reveal from './Reveal'
+import { CheckIcon } from '@/components/ui/icons'
 
 // 週次レポートで採用した「今週のフォーカス」と、今日やったかのワンタップ記録
 export default function FocusLine({ today }: { today: string }) {
@@ -40,7 +41,14 @@ export default function FocusLine({ today }: { today: string }) {
             ))}
           </span>
           <button type="button" className="im-focus-btn" data-done={doneToday} aria-pressed={doneToday} onClick={toggle}>
-            {doneToday ? '✓ 今日できた' : '今日やった'}
+            {doneToday ? (
+              <>
+                <CheckIcon size={15} />
+                今日できた
+              </>
+            ) : (
+              '今日やった'
+            )}
           </button>
         </div>
       </div>

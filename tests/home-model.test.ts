@@ -87,6 +87,48 @@ describe('buildHomeModel', () => {
     })
   })
 
+  describe('昨日を書けば戻る連続（restorable）', () => {
+    it('昨日だけ空いていて今日もまだなら、昨日＋一昨日までの連続', () => {
+      // 10/8・10/7・10/6 と続いて、10/9（昨日）が空き
+      const m = buildHomeModel(entries('2026-10-08', '2026-10-07', '2026-10-06'), 3, NOON)
+      expect(m.stats.streak).toBe(0)
+      expect(m.stats.restorable).toBe(4)
+    })
+
+    it('今日を書いていて昨日だけ空いているなら、今日の分も足す', () => {
+      const m = buildHomeModel(entries('2026-10-10', '2026-10-08', '2026-10-07'), 3, NOON)
+      expect(m.stats.streak).toBe(1)
+      expect(m.stats.restorable).toBe(4)
+    })
+
+    it('昨日を書いていれば null', () => {
+      expect(buildHomeModel(entries('2026-10-09', '2026-10-08'), 2, NOON).stats.restorable).toBeNull()
+    })
+
+    it('一昨日も空いていれば（昨日を書いても1日だけ）null', () => {
+      expect(buildHomeModel(entries('2026-10-07', '2026-10-06'), 2, NOON).stats.restorable).toBeNull()
+      expect(buildHomeModel([], 0, NOON).stats.restorable).toBeNull()
+    })
+  })
+
+  describe('いちばん長く続いた日数（longest）', () => {
+    it('途中で途切れても、いちばん長い連続を返す', () => {
+      const list = entries('2026-10-10', '2026-10-05', '2026-10-04', '2026-10-03', '2026-09-30', '2026-09-29')
+      expect(buildHomeModel(list, list.length, NOON).stats.longest).toBe(3)
+    })
+
+    it('月をまたぐ連続も数え、記録が無ければ 0', () => {
+      const list = entries('2026-10-02', '2026-10-01', '2026-09-30', '2026-09-29')
+      expect(buildHomeModel(list, list.length, NOON).stats.longest).toBe(4)
+      expect(buildHomeModel([], 0, NOON).stats.longest).toBe(0)
+    })
+
+    it('未来の日付が混ざっていても、今日・昨日からの連続はずれない', () => {
+      const m = buildHomeModel(entries('2026-10-12', '2026-10-10', '2026-10-09'), 3, NOON)
+      expect(m.stats.streak).toBe(2)
+    })
+  })
+
   describe('昨日の書き忘れ', () => {
     it('昨日が空で、それより前に記録があれば true', () => {
       expect(buildHomeModel(entries('2026-10-10', '2026-10-08'), 2, NOON).missedYesterday).toBe(true)

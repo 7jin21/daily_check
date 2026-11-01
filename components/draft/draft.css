@@ -1,0 +1,362 @@
+/*
+ * 下書き（dv- 接頭辞）: 待ち時間・清書の生成中・下書きの編集・保存のあと。
+ * 清書中は「墨と金」: あなたの言葉は墨のまま、AI が足した言葉にだけ金の下線が、書かれていくそばから引かれる。
+ * 「AI は代筆者ではなく清書係」という約束を、待ち時間のあいだに目で確かめられるようにする。
+ */
+
+/* ───────── 待ち時間（墨の輪） ───────── */
+.dv-wait {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 28px;
+  padding: 0 24px;
+  text-align: center;
+}
+.dv-wait-title {
+  font-family: 'Shippori Mincho', serif;
+  font-size: 1.1875rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--foreground);
+}
+.dv-wait-sub {
+  margin-top: 8px;
+  font-family: 'Zen Kaku Gothic New', system-ui, sans-serif;
+  font-size: 0.8125rem;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
+/* ───────── 清書の生成中 ───────── */
+.dv-gen {
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  padding: 20px 16px 0;
+}
+.dv-gen-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 4px 4px 14px;
+}
+.dv-gen-head h1 {
+  font-family: 'Shippori Mincho', serif;
+  font-size: 1.0625rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--foreground);
+}
+/* 便箋（罫線は本文の行の高さにそろえる） */
+.dv-paper {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 22px 20px 28px;
+  border-radius: 24px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  box-shadow: 0 10px 30px rgba(72, 70, 52, 0.07);
+  overscroll-behavior: contain;
+}
+.dv-ink {
+  --line: 2.05em;
+  font-family: 'Shippori Mincho', serif;
+  font-size: 1.0625rem;
+  font-weight: 500;
+  line-height: var(--line);
+  letter-spacing: 0.03em;
+  color: var(--foreground);
+  white-space: pre-wrap;
+  background-image: repeating-linear-gradient(
+    180deg,
+    transparent 0,
+    transparent calc(var(--line) - 1px),
+    var(--hairline) calc(var(--line) - 1px),
+    var(--hairline) var(--line)
+  );
+}
+/* 一文字ずつ。新しく届いた文字は墨がにじむように現れる */
+.dv-ink span {
+  background-image: linear-gradient(
+    color-mix(in srgb, var(--gold) 40%, transparent),
+    color-mix(in srgb, var(--gold) 40%, transparent)
+  );
+  background-repeat: no-repeat;
+  background-position: 0 86%;
+  background-size: 100% 0;
+  animation: dv-ink-in 0.55s ease-out both;
+  transition: color 0.6s ease, text-shadow 0.6s ease, background-size 0.6s ease;
+}
+/* 書かれたばかり（まだ乾いていない）。本人の言葉か AI の言葉かは、次の文字が届いてから決まる */
+.dv-ink span.w {
+  color: color-mix(in srgb, var(--foreground) 45%, transparent);
+  text-shadow: 0 0 7px color-mix(in srgb, var(--foreground) 40%, transparent);
+}
+/* AI が足した言葉: 金の下線が引かれる */
+.dv-ink span.a {
+  background-size: 100% 0.38em;
+}
+/* 文をつなぐだけの助詞: 点線で控えめに */
+.dv-ink span.j {
+  text-decoration-line: underline;
+  text-decoration-style: dotted;
+  text-decoration-color: color-mix(in srgb, var(--gold) 75%, transparent);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 5px;
+}
+@keyframes dv-ink-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* 凡例（墨＝あなたの言葉／金の下線＝AI が足した言葉） */
+.dv-legend {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px 18px;
+  margin: 12px 0 2px;
+  font-family: 'Zen Kaku Gothic New', system-ui, sans-serif;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+.dv-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.dv-legend-ink {
+  font-family: 'Shippori Mincho', serif;
+  font-weight: 700;
+  color: var(--foreground);
+}
+.dv-legend-gold {
+  font-family: 'Shippori Mincho', serif;
+  color: var(--foreground);
+  background: linear-gradient(transparent 62%, color-mix(in srgb, var(--gold) 40%, transparent) 62%);
+}
+.dv-actions {
+  padding: 12px 0 calc(16px + env(safe-area-inset-bottom));
+}
+
+/* ───────── 下書きの編集 ───────── */
+.dv-page {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  padding: 12px 16px 0;
+}
+.dv-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+.dv-head h1 {
+  font-family: 'Shippori Mincho', serif;
+  font-size: 1.25rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--foreground);
+}
+.dv-textarea {
+  width: 100%;
+  min-height: 10rem;
+  padding: 18px 18px 22px;
+  border-radius: 24px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--foreground);
+  font-family: 'Shippori Mincho', serif;
+  line-height: 2;
+  letter-spacing: 0.03em;
+  resize: none;
+  overflow: hidden;
+  box-shadow: 0 10px 30px rgba(72, 70, 52, 0.06);
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.dv-textarea:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 14%, transparent);
+}
+.dv-meter-chevron {
+  color: var(--muted);
+  transition: transform 0.25s;
+}
+.draft-kept[aria-expanded='true'] .dv-meter-chevron {
+  transform: rotate(180deg);
+}
+
+/* ───────── 保存のあと（水面に一滴） ───────── */
+.dv-saved {
+  --drop: var(--mood-3);
+  position: relative;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  isolation: isolate;
+}
+/* 水面（画面の下 46%）。上は紙の空 */
+.dv-saved-water {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 46%;
+  bottom: 0;
+  z-index: -1;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--water) 22%, var(--background)) 0%,
+    color-mix(in srgb, var(--water) 8%, var(--background)) 100%
+  );
+}
+/* ホームの水面と同じ、ごく淡いさざ波の横縞 */
+.dv-saved-water::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--water) 9%, transparent) 0px,
+    color-mix(in srgb, var(--water) 9%, transparent) 1px,
+    transparent 1px,
+    transparent 9px
+  );
+  -webkit-mask-image: linear-gradient(180deg, #000 0%, transparent 50%);
+  mask-image: linear-gradient(180deg, #000 0%, transparent 50%);
+  pointer-events: none;
+}
+.dark .dv-saved-water::after {
+  opacity: 0.35;
+}
+.dv-saved-water::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--water) 70%, transparent), transparent);
+}
+/* 落ちる一滴（その日の気分の色） */
+.dv-drop {
+  position: absolute;
+  left: 50%;
+  top: 46%;
+  width: 14px;
+  height: 14px;
+  margin: -7px 0 0 -7px;
+  border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
+  background: var(--drop);
+  animation: dv-drop-fall var(--fall, 0.75s) cubic-bezier(0.55, 0, 0.9, 0.4) 0.15s both;
+}
+@keyframes dv-drop-fall {
+  0% { transform: translateY(-34vh) scale(0.7, 1); opacity: 0; }
+  12% { opacity: 1; }
+  85% { transform: translateY(-1vh) scale(0.85, 1.25); opacity: 1; }
+  100% { transform: translateY(0) scale(1.6, 0.2); opacity: 0; }
+}
+/* 落ちたところから広がる波紋（水面を斜めから見ているので横長） */
+.dv-ring {
+  position: absolute;
+  left: 50%;
+  top: 46%;
+  width: 260px;
+  height: 260px;
+  margin: -130px 0 0 -130px;
+  border-radius: 50%;
+  border: 1.5px solid var(--drop);
+  opacity: 0;
+  transform: scale(0.04, 0.014);
+  animation: dv-ring 2.6s cubic-bezier(0.2, 0.6, 0.3, 1) both;
+  animation-delay: calc(var(--impact, 0.9s) + var(--i, 0) * 0.32s);
+}
+@keyframes dv-ring {
+  0% { transform: scale(0.04, 0.014); opacity: 0.9; }
+  100% { transform: scale(1.5, 0.42); opacity: 0; }
+}
+/* 色が水に溶けていく */
+.dv-bloom {
+  position: absolute;
+  left: 50%;
+  top: 46%;
+  width: 320px;
+  height: 120px;
+  margin: -60px 0 0 -160px;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--drop) 34%, transparent), transparent);
+  opacity: 0;
+  animation: dv-bloom 2.4s ease-out var(--impact, 0.9s) both;
+}
+@keyframes dv-bloom {
+  from { opacity: 0; transform: scale(0.3); }
+  to { opacity: 1; transform: scale(1); }
+}
+.dv-saved-text {
+  padding: 22vh 28px 0;
+  text-align: center;
+  animation: slide-up 0.9s cubic-bezier(0.2, 0.7, 0.2, 1) calc(var(--impact, 0.9s) + 0.25s) both;
+}
+.dv-saved-eyebrow {
+  font-family: 'Zen Kaku Gothic New', system-ui, sans-serif;
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.2em;
+  color: var(--muted);
+}
+.dv-saved-title {
+  margin-top: 14px;
+  font-family: 'Shippori Mincho', serif;
+  font-size: 1.625rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  line-height: 1.5;
+  color: var(--foreground);
+  outline: none;
+}
+.dv-saved-sub {
+  text-wrap: balance;
+  margin: 12px auto 0;
+  max-width: 22em;
+  font-family: 'Shippori Mincho', serif;
+  font-size: 0.9375rem;
+  line-height: 1.9;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+.dv-saved-actions {
+  margin-top: auto;
+  padding: 0 16px calc(24px + env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  animation: fade-in 0.8s ease-out calc(var(--impact, 0.9s) + 0.6s) both;
+}
+.dv-saved-actions .btn-quiet {
+  align-self: center;
+  gap: 6px;
+  text-decoration: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dv-ink span {
+    animation: none;
+    transition: none;
+  }
+  .dv-drop,
+  .dv-ring {
+    display: none;
+  }
+  .dv-bloom,
+  .dv-saved-text,
+  .dv-saved-actions {
+    animation: none;
+    opacity: 1;
+  }
+}
