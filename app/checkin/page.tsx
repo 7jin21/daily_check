@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useCheckinStore } from '@/stores/checkin'
 import { STEPS, getDailyDescription } from '@/lib/constants'
@@ -9,14 +9,8 @@ import NotesStep from '@/components/checkin/NotesStep'
 import { hapticTap } from '@/lib/haptics'
 import { saveMoodOnly } from '@/lib/entry-save'
 import { prefetchReflection } from '@/lib/reflection-prefetch'
-import { daysBetween, formatJSTDate, todayJST } from '@/lib/jst'
-
-// 過去日付の記録（書き忘れ救済）は7日前まで許可する
-function isValidPastDate(date: string, today: string): boolean {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return false
-  if (date >= today) return false
-  return daysBetween(date, today) <= 7
-}
+import { formatJSTDate, todayJST } from '@/lib/jst'
+import { hasUnsavedWords, isValidPastDate, planDateRollover } from '@/lib/checkin-rollover'
 
 export default function CheckinPage() {
   const router = useRouter()
@@ -33,18 +27,21 @@ export default function CheckinPage() {
   // 初回描画までは固定の説明文を出し、マウントしてから日替わりの文に切り替える
   const [mounted, setMounted] = useState(false)
   useEffect(() => setMounted(true), [])
+  // ?date= で別の日に切り替えるとき、書きかけを消すか一度だけ確かめる
+  const dateSwitchAskedRef = useRef(false)
 
-  // 前日以前のデータが残っていたら自動クリア
-  // PWA は何日もバックグラウンドに残るため、マウント時だけでなく
-  // visibilitychange（スリープ復帰・アプリ切り替え）でも日付またぎを検知する
+  // 日付またぎの検知。PWA は何日もバックグラウンドに残るため、マウント時だけでなく
+  // visibilitychange（スリープ復帰・アプリ切り替え）でも確かめる。
+  // 言葉のある書きかけは消さず、書き始めた日の記録として続ける（7日以内。「◯月◯日の記録をあとから書いています」と出る）。
+  // 言葉が無い（気分だけ選んだ）書きかけと、7日より前に書き始めたものは消して今日の入力にする
   useEffect(() => {
     const checkDateRollover = () => {
       if (document.visibilityState === 'hidden') return
       const today = todayJST()
       const state = useCheckinStore.getState()
-      if (state.checkinDate && state.checkinDate !== today) {
-        state.reset()
-      }
+      const plan = planDateRollover(state, today)
+      if (plan.kind === 'reset') state.reset()
+      if (plan.kind === 'carry') state.setTargetDate(plan.targetDate)
       state.setCheckinDate(today)
       // ステップ構成の変更（旧6ステップ→2ステップ）で保存値が範囲外の場合に備える
       if (state.currentStep >= STEPS.length) state.setCurrentStep(0)
@@ -55,13 +52,24 @@ export default function CheckinPage() {
     const params = new URLSearchParams(window.location.search)
     const dateParam = params.get('date')
     const today = todayJST()
-    if (dateParam && isValidPastDate(dateParam, today)) {
+    if (dateParam && isValidPastDate(dateParam, today) && !dateSwitchAskedRef.current) {
+      dateSwitchAskedRef.current = true // StrictMode(dev) の二重実行で2回聞かない
       const state = useCheckinStore.getState()
       if (state.targetDate !== dateParam) {
-        // 別の日の入力が残っていたら混ざらないように消してから対象日を設定
-        state.reset()
-        state.setCheckinDate(today)
-        state.setTargetDate(dateParam)
+        // 別の日の入力が残っていたら、混ざらないように消してから対象日を設定する。
+        // ただし言葉のある書きかけは、黙って消さずに先に確かめる（やめたら書きかけの続きを出す）
+        const from = state.targetDate ?? state.checkinDate ?? today
+        const label = (d: string) => (d === today ? '今日' : formatJSTDate(d, { month: 'long', day: 'numeric' }))
+        const keep =
+          hasUnsavedWords(state) &&
+          !window.confirm(`${label(from)}の書きかけがあります。消して、${label(dateParam)}の記録を書きますか？\n（キャンセルすると、書きかけの続きを表示します）`)
+        if (keep) {
+          window.history.replaceState(null, '', '/checkin')
+        } else {
+          state.reset()
+          state.setCheckinDate(today)
+          state.setTargetDate(dateParam)
+        }
       }
     }
 
@@ -123,6 +131,8 @@ export default function CheckinPage() {
   // 対象日を今日に戻す（過去日付モードの解除。入力の混在を防ぐため全部リセット）
   const handleClearTargetDate = () => {
     const state = useCheckinStore.getState()
+    // 書いた言葉を消すときは確かめる（日付をまたいで続けている書きかけを、うっかり消さない）
+    if (hasUnsavedWords(state) && !window.confirm('書いた内容は消えます。今日の記録に戻しますか？')) return
     state.reset()
     state.setCheckinDate(todayJST())
     router.replace('/checkin')

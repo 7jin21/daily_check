@@ -4,14 +4,27 @@
 import { getSupabaseClient } from '@/lib/supabase'
 import { apiPost } from '@/lib/api-client'
 import { hasWords, mergeEntryText, metaExcerpt, type MergedEntryText, type StoredEntryText } from '@/lib/entry-merge'
+import { isNetworkFailure, NetworkError } from '@/lib/network-error'
 
+/**
+ * ログイン中のユーザーの id。未ログインなら Error('Unauthorized')、通信の失敗なら NetworkError を投げる。
+ * getUser は通信に失敗しても user: null を返すので、エラーの中身を見て未ログインと区別する
+ * （区別しないと、電波が弱いだけでログイン画面へ飛ばしてしまう）
+ */
 async function currentUserId(): Promise<string> {
   const supabase = getSupabaseClient()
   const {
     data: { user },
+    error,
   } = await supabase.auth.getUser()
-  if (!user) throw new Error('Unauthorized')
-  return user.id
+  if (user) return user.id
+  if (isNetworkFailure(error)) throw new NetworkError(error?.message)
+  throw new Error('Unauthorized')
+}
+
+/** Supabase が返したエラーを例外にする（通信の失敗は NetworkError にして、画面が言い分けられるようにする） */
+function toError(error: { message: string }): Error {
+  return isNetworkFailure(error) ? new NetworkError(error.message) : new Error(error.message)
 }
 
 /**
@@ -23,7 +36,7 @@ export async function saveMoodOnly(entryDate: string, mood: number, energy: numb
   const { error } = await getSupabaseClient()
     .from('diary_entries')
     .upsert({ user_id: userId, entry_date: entryDate, mood, energy }, { onConflict: 'user_id,entry_date' })
-  if (error) throw new Error(error.message)
+  if (error) throw toError(error)
 }
 
 /** その日にすでに言葉のある日記があるか（あれば保存は「追記」になる） */
@@ -35,7 +48,7 @@ export async function hasEntryWithWords(entryDate: string): Promise<boolean> {
     .eq('user_id', userId)
     .eq('entry_date', entryDate)
     .maybeSingle()
-  if (error) throw new Error(error.message)
+  if (error) throw toError(error)
   return hasWords(data as Partial<StoredEntryText> | null)
 }
 
@@ -79,7 +92,7 @@ export async function saveFullEntry(e: FullEntry): Promise<SaveResult> {
     .eq('user_id', userId)
     .eq('entry_date', e.entryDate)
     .maybeSingle()
-  if (readError) throw new Error(readError.message)
+  if (readError) throw toError(readError)
 
   const merged = hasWords(existing as Partial<StoredEntryText> | null)
   const text: MergedEntryText = merged
@@ -113,7 +126,7 @@ export async function saveFullEntry(e: FullEntry): Promise<SaveResult> {
     )
     .select('id')
     .single()
-  if (error) throw new Error(error.message)
+  if (error) throw toError(error)
   const appended =
     merged &&
     (['events', 'challenges', 'gratitude', 'freeform', 'ai_draft', 'edited_draft'] as const).some(
@@ -157,7 +170,7 @@ export async function refreshEntryMeta(entryId: string, draft: string): Promise<
     if (Object.keys(update).length === 0) return null
 
     const { error } = await getSupabaseClient().from('diary_entries').update(update).eq('id', entryId)
-    if (error) throw new Error(error.message)
+    if (error) throw toError(error)
     return refreshed
   } catch (err) {
     console.warn('要約・タグの作り直しに失敗（本文は保存済み）:', err)

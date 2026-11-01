@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createReadonlyServerClient } from '@/lib/supabase-server'
 import { getGroqClient, GROQ_MODELS } from '@/lib/groq'
 import { subtractDays, todayJST } from '@/lib/jst'
-import { formatEntriesForPrompt } from '@/lib/prompt-context'
+import { formatEntriesForPrompt, PROMPT_ENTRY_LEGEND } from '@/lib/prompt-context'
 
 export interface WeeklyReport {
   narrative: string
@@ -25,6 +25,8 @@ interface WeeklyEntry {
   gratitude: string | null
   freeform: string | null
   dominant_emotion: string | null
+  edited_draft: string | null
+  ai_draft: string | null
 }
 
 export async function POST(req: NextRequest) {
@@ -52,7 +54,8 @@ export async function POST(req: NextRequest) {
 
   const { data: entries, error } = await supabase
     .from('diary_entries')
-    .select('entry_date, mood, energy, events, challenges, gratitude, freeform, dominant_emotion')
+    // 本文の列は、メモ欄が空で本文にだけ言葉を書いた日のために読む（lib/prompt-context.ts の ownBodyText）
+    .select('entry_date, mood, energy, events, challenges, gratitude, freeform, dominant_emotion, edited_draft, ai_draft')
     .eq('user_id', user.id)
     .gte('entry_date', from)
     .order('entry_date', { ascending: true })
@@ -68,7 +71,14 @@ export async function POST(req: NextRequest) {
       (entries.reduce((s, e) => s + (e.mood ?? 3), 0) / entries.length) * 10
     ) / 10
 
-  const summary = formatEntriesForPrompt(entries as WeeklyEntry[], { events: 120, challenges: 80, gratitude: 80, freeform: 120 })
+  const summary = formatEntriesForPrompt(entries as WeeklyEntry[], {
+    events: 120,
+    challenges: 80,
+    gratitude: 80,
+    freeform: 120,
+    reflection: 120,
+    body: 200,
+  })
 
   try {
     const groq = getGroqClient()
@@ -91,7 +101,8 @@ export async function POST(req: NextRequest) {
           role: 'system',
           content: `あなたはユーザーの自己理解をサポートするライフコーチです。
 週間日記データをもとに、温かく共感的なトーンで振り返りレポートを日本語で生成してください。
-「メモ・ふりかえり」内の【ふりかえり】部分は本人の内省の記録なので、感情の理由・価値観として重視してください。
+${PROMPT_ENTRY_LEGEND}
+【ふりかえり】は本人の内省の記録なので、感情の理由・価値観として重視してください。
 必ず JSON 形式で返してください。`,
         },
         {

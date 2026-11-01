@@ -13,6 +13,7 @@ import {
   isPushConfigured,
   subscribeToPush,
   unsubscribeFromPush,
+  unsubscribeThisDevice,
 } from '@/lib/push-client'
 import ThemeToggle from '@/components/ui/ThemeToggle'
 
@@ -143,6 +144,9 @@ export default function SettingsPage() {
 
   const handleSignOut = async () => {
     const supabase = getSupabaseClient()
+    // 先にこの端末の通知の購読を解除する（サインアウト後は削除 API が 401 になる）。
+    // 残すと前の人のリマインダーが届き続け、次にこの端末を使う人は通知を登録できない
+    await unsubscribeThisDevice()
     await supabase.auth.signOut()
     // 共有端末対策: 前ユーザーの下書き・AI分析キャッシュ等を残さない
     useCheckinStore.getState().reset()

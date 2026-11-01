@@ -16,13 +16,48 @@ export interface DraftPromptInput extends CheckinInput {
  * 清書の生成パラメータ（/api/generate-draft と評価スクリプト scripts/eval-draft.ts で共有する）。
  * - temperature: 言い換えを減らすため低め
  * - reasoning_effort: gpt-oss の推論トークンが max_tokens を食わないよう抑える
- * - max_tokens: 日本語はトークン消費が多いため余裕を持たせる
+ * 出力の上限（max_tokens）は入力の長さで決める（draftMaxTokens）
  */
 export const DRAFT_GENERATION = {
-  max_tokens: 1536,
   temperature: 0.3,
   reasoning_effort: 'low',
 } as const
+
+// 出力の上限の目安。日本語の日記文は gpt-oss で 1 トークン ≒ 1.2 文字なので、1 文字 1 トークンで見積もれば余裕がある。
+// gpt-oss は推論のトークンも max_tokens に数えるため、その分を足す
+const DRAFT_MIN_TOKENS = 1536
+const MAX_TOKENS_CAP = 4096
+const REASONING_ALLOWANCE = 1024
+
+/**
+ * 清書の出力上限（トークン）。指示している長さ（入力の約 1.3 倍）が収まるよう、入力が長いほど広げる。
+ * 以前は 1536 で固定だったため、長いメモ（おおむね 1,500 文字超）の清書が途中で切れていた
+ */
+export function draftMaxTokens(input: DraftPromptInput): number {
+  const target = Math.ceil(countInputChars(input) * 1.3)
+  return Math.min(MAX_TOKENS_CAP, Math.max(DRAFT_MIN_TOKENS, target + REASONING_ALLOWANCE))
+}
+
+/**
+ * 書き直し（/api/rewrite-draft）の出力上限（トークン）。「感情豊かに」などで長くなる分と JSON の包みを見込む。
+ * 以前は 1024 で固定だったため、1,000 文字を超える本文の書き直しは途中で切れて失敗していた
+ */
+export function rewriteMaxTokens(draftLength: number): number {
+  return Math.min(MAX_TOKENS_CAP, Math.max(1024, Math.ceil(draftLength * 2) + 512))
+}
+
+/**
+ * 清書のストリームの末尾に付ける「ここで途切れた」の印（本文には現れない制御文字）。
+ * 出力の上限に達した・途中で失敗したときにサーバーが付け、画面は「清書が途中で止まりました」と出す。
+ * （正常に終わったように見せると、途中で切れた本文が完成品として保存されてしまう）
+ */
+export const DRAFT_CUT_MARK = '\u0003'
+
+/** 受け取った清書から印を取り除き、途中で切れたかどうかを返す */
+export function splitCutMark(text: string): { text: string; cut: boolean } {
+  if (!text.includes(DRAFT_CUT_MARK)) return { text, cut: false }
+  return { text: text.split(DRAFT_CUT_MARK).join(''), cut: true }
+}
 
 export const DRAFT_SYSTEM_PROMPT = `あなたは、本人が書いたメモを日記帳に清書する係です。
 文章を「書く」のではなく、本人の言葉を「整える」ことだけが仕事です。

@@ -2,11 +2,19 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createReadonlyServerClient } from '@/lib/supabase-server'
 import { generateOfflineDraft } from '@/lib/offline-draft'
 import { getGroqClient, GROQ_MODELS } from '@/lib/groq'
-import { DRAFT_GENERATION, DRAFT_SYSTEM_PROMPT, buildDraftUserPrompt, type DraftPromptInput } from '@/lib/draft-prompt'
+import {
+  DRAFT_CUT_MARK,
+  DRAFT_GENERATION,
+  DRAFT_SYSTEM_PROMPT,
+  buildDraftUserPrompt,
+  draftMaxTokens,
+  type DraftPromptInput,
+} from '@/lib/draft-prompt'
 
 // 日記本文を text/plain でストリーミング返却する。
 // タグ・サマリー等のメタ情報は本文確定後に /api/draft-meta で取得する（クライアント側）。
 // オフラインフォールバック時は X-Draft-Fallback: 1 ヘッダーを付けて全文を一括返却。
+// 清書が途中で止まった（出力の上限・途中の失敗）ときは、本文の末尾に DRAFT_CUT_MARK を付ける。
 
 const MAX_TEXT_LENGTH = 1000
 const TEXT_FIELDS = ['events', 'challenges', 'gratitude', 'freeform'] as const
@@ -72,8 +80,9 @@ export async function POST(req: NextRequest) {
     const groq = getGroqClient()
     const stream = await groq.chat.completions.create({
       model: GROQ_MODELS.quality,
-      // 生成パラメータは評価スクリプトと共有（lib/draft-prompt.ts の DRAFT_GENERATION）
+      // 生成パラメータは評価スクリプトと共有（lib/draft-prompt.ts の DRAFT_GENERATION・draftMaxTokens）
       ...DRAFT_GENERATION,
+      max_tokens: draftMaxTokens(input),
       stream: true,
       messages: [
         { role: 'system', content: DRAFT_SYSTEM_PROMPT },
@@ -84,16 +93,24 @@ export async function POST(req: NextRequest) {
     const encoder = new TextEncoder()
     const readable = new ReadableStream({
       async start(controller) {
+        // 途中で止まったことは、届いた本文のあとに印（DRAFT_CUT_MARK）を付けてクライアントに伝える。
+        // 出力の上限（max_tokens）で止まったときも、ストリーム自体は正常に終わるので、finish_reason を見る
+        // （正常終了に見せかけると、切れた本文が完成品として残る）
+        let cut = false
         try {
           for await (const chunk of stream) {
-            const delta = chunk.choices[0]?.delta?.content ?? ''
+            const choice = chunk.choices[0]
+            const delta = choice?.delta?.content ?? ''
             if (delta) controller.enqueue(encoder.encode(delta))
+            if (choice?.finish_reason === 'length') cut = true
           }
         } catch (err) {
-          // 途中で止まったことをクライアントに伝える（正常終了に見せかけると、切れた本文が完成品として残る）
           console.error('GROQ stream error:', err)
-          controller.error(err)
-          return
+          cut = true
+        }
+        if (cut) {
+          console.warn('清書が途中で止まりました（出力の上限または途中の失敗）')
+          controller.enqueue(encoder.encode(DRAFT_CUT_MARK))
         }
         controller.close()
       },

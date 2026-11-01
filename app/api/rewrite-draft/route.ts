@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createReadonlyServerClient } from '@/lib/supabase-server'
 import { getGroqClient, GROQ_MODELS } from '@/lib/groq'
+import { rewriteMaxTokens } from '@/lib/draft-prompt'
 
 const INSTRUCTIONS = {
   emotional: '感情をより豊かに、心の動きを細やかに描写して書き直してください。',
@@ -38,7 +39,8 @@ export async function POST(req: NextRequest) {
     const completion = await groq.chat.completions.create({
       // 日本語の文体変換は品質重視モデルを使う
       model: GROQ_MODELS.quality,
-      max_tokens: 1024,
+      // 本文が長いほど広げる（以前の 1024 固定では、1,000 文字を超える本文の書き直しが途中で切れて JSON が壊れた）
+      max_tokens: rewriteMaxTokens(draft.length),
       // gpt-oss は reasoning が JSON モードを壊し 400 を起こすため抑制
       reasoning_effort: 'low',
       response_format: { type: 'json_object' },
@@ -58,6 +60,13 @@ export async function POST(req: NextRequest) {
       ],
     })
 
+    // 出力の上限で止まった書き直しは、途中で切れた文章なので返さない（理由を伝える。再試行しても同じになる）
+    if (completion.choices[0]?.finish_reason === 'length') {
+      return NextResponse.json(
+        { error: '文章が長いため、書き直しが途中で切れました。短くしてからお試しください。' },
+        { status: 413 }
+      )
+    }
     const text = completion.choices[0].message.content ?? ''
     const parsed = JSON.parse(text) as { draft?: string }
     if (!parsed.draft) throw new Error('draft field missing')

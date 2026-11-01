@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createReadonlyServerClient } from '@/lib/supabase-server'
 import { getGroqClient, GROQ_MODELS } from '@/lib/groq'
+import { REFLECTION_NONE_OPTION as NONE_OPTION } from '@/lib/freeform'
 import type { CheckinInput } from '@/stores/checkin'
 
 // チェックイン入力を読み、本人の内省を1つだけ促す質問（3〜4択）を返す。
@@ -16,7 +17,7 @@ const SKIP = { skip: true as const }
 
 // 入力テキストの合計が短すぎる/長すぎる場合の早期判定用
 const MIN_TEXT_FOR_QUESTION = 4 // これ未満なら材料が無く質問しない
-const NONE_OPTION = 'どれも近くない'
+// 「どれも近くない」は lib/freeform.ts と共通（選ばれても答えの言葉にはしない）
 
 function collectText(input: CheckinInput): string {
   return [input.events, input.challenges, input.gratitude, input.freeform]

@@ -51,6 +51,29 @@ export function splitFreeformMemo(raw: string | null | undefined): { memo: strin
   return { memo: s.slice(0, first), rest: s.slice(first) }
 }
 
+/** 内省の問いに必ず付ける「どれも近くない」（候補を断るための選択肢。本人の答えの言葉としては扱わない） */
+export const REFLECTION_NONE_OPTION = 'どれも近くない'
+
+/**
+ * 選んだ選択肢と一言から、清書・保存に使う答え（「選択肢 — 一言」）を作る。
+ * 「どれも近くない」は答えに入れない（一言があれば一言だけ。一言も無ければ空＝答えなし）。
+ * 入れてしまうと、本人が書いていない「どれも近くない」が日記の本文やふりかえりに残る
+ */
+export function composeReflectionAnswer(selected: string | null, note: string): string {
+  const parts: string[] = []
+  if (selected && selected !== REFLECTION_NONE_OPTION) parts.push(selected)
+  if (note.trim()) parts.push(note.trim())
+  return parts.join(' — ')
+}
+
+/** 保存されている答えから「どれも近くない」を除く（以前の版で保存された答えのため。何も残らなければ空） */
+export function cleanReflectionAnswer(answer: string): string {
+  const a = answer.trim()
+  if (a === REFLECTION_NONE_OPTION) return ''
+  const prefix = `${REFLECTION_NONE_OPTION} — `
+  return a.startsWith(prefix) ? a.slice(prefix.length).trim() : a
+}
+
 /** 自由メモに、AI 内省ガイドの問いと答えを畳んだ文字列を作る（保存用。メモは書いたまま残す） */
 export function withReflection(memo: string, question: string, answer: string): string {
   if (!answer.trim()) return memo

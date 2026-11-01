@@ -1,5 +1,15 @@
 import { describe, expect, it } from 'vitest'
-import { appendLaterNote, parseFreeform, splitFreeformMemo, withReflection, type FreeformParts } from '@/lib/freeform'
+import {
+  appendLaterNote,
+  cleanReflectionAnswer,
+  composeReflectionAnswer,
+  parseFreeform,
+  REFLECTION_NONE_OPTION,
+  splitFreeformMemo,
+  withReflection,
+  type FreeformParts,
+} from '@/lib/freeform'
+import { composeRaw } from '@/lib/draft-compose'
 
 const FULL = [
   '朝ジム。夜はラーメン',
@@ -201,5 +211,38 @@ describe('appendLaterNote', () => {
         { date: '2026-10-20', text: '二つ目' },
       ],
     })
+  })
+})
+
+describe('composeReflectionAnswer（内省の問いの答え）', () => {
+  it('選んだ選択肢と一言を「 — 」でつなぐ', () => {
+    expect(composeReflectionAnswer('前提を確認されなかったこと', '')).toBe('前提を確認されなかったこと')
+    expect(composeReflectionAnswer('前提を確認されなかったこと', ' 嫌だった ')).toBe('前提を確認されなかったこと — 嫌だった')
+    expect(composeReflectionAnswer(null, '自分で書いた理由')).toBe('自分で書いた理由')
+  })
+
+  it('「どれも近くない」は答えの言葉にしない（一言だけが答え。一言も無ければ答えなし）', () => {
+    expect(composeReflectionAnswer(REFLECTION_NONE_OPTION, '')).toBe('')
+    expect(composeReflectionAnswer(REFLECTION_NONE_OPTION, '  ')).toBe('')
+    expect(composeReflectionAnswer(REFLECTION_NONE_OPTION, '実は時間が足りなかった')).toBe('実は時間が足りなかった')
+  })
+
+  it('答えなしなら、日記の本文にも自由メモにも何も足さない', () => {
+    const answer = composeReflectionAnswer(REFLECTION_NONE_OPTION, '')
+    const input = { mood: 3, energy: 3, events: '会議', challenges: '', gratitude: '', freeform: '', reflectionQ: '一番引っかかったのは？', reflectionA: answer }
+    expect(composeRaw(input)).toBe('会議')
+    expect(withReflection('メモ', '一番引っかかったのは？', answer)).toBe('メモ')
+  })
+})
+
+describe('cleanReflectionAnswer（以前の版で保存された答え）', () => {
+  it('「どれも近くない」だけの答えは空、一言つきなら一言だけを残す', () => {
+    expect(cleanReflectionAnswer(REFLECTION_NONE_OPTION)).toBe('')
+    expect(cleanReflectionAnswer(`${REFLECTION_NONE_OPTION} — 時間が足りなかった`)).toBe('時間が足りなかった')
+  })
+
+  it('ほかの答えはそのまま', () => {
+    expect(cleanReflectionAnswer('同僚 — 手伝ってくれた')).toBe('同僚 — 手伝ってくれた')
+    expect(cleanReflectionAnswer(' 家族 ')).toBe('家族')
   })
 })

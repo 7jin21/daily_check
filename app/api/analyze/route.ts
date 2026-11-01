@@ -3,7 +3,7 @@ import { createReadonlyServerClient } from '@/lib/supabase-server'
 import { getGroqClient, GROQ_MODELS } from '@/lib/groq'
 import { parseFreeform } from '@/lib/freeform'
 import { daysBetween, todayJST } from '@/lib/jst'
-import { formatEntriesForPrompt } from '@/lib/prompt-context'
+import { formatEntriesForPrompt, ownBodyText, PROMPT_ENTRY_LEGEND } from '@/lib/prompt-context'
 
 const MIN_ENTRIES_FOR_ANALYSIS = 5
 
@@ -16,6 +16,8 @@ interface AnalyzeEntry {
   gratitude: string | null
   freeform: string | null
   dominant_emotion: string | null
+  edited_draft: string | null
+  ai_draft: string | null
 }
 
 // AI 応答の形状検証（欠けた項目や型違いで画面を落とさない）
@@ -28,9 +30,14 @@ const strArr = (v: unknown, n: number, max = 80) =>
         .slice(0, n)
     : []
 
-/** 根拠として見せる「その日の本人の言葉」（出来事 → メモ → 感謝 → 困ったこと の順に最初のもの） */
+/**
+ * 根拠として見せる「その日の本人の言葉」（出来事 → メモ → 感謝 → 困ったこと の順に最初のもの）。
+ * メモ欄が空で、日記の画面で本文にだけ書いた日は、その本文
+ */
 function quoteOf(e: AnalyzeEntry): string {
-  const text = (e.events || parseFreeform(e.freeform).memo || e.gratitude || e.challenges || '').replace(/\s+/g, ' ').trim()
+  const text = (e.events || parseFreeform(e.freeform).memo || e.gratitude || e.challenges || ownBodyText(e))
+    .replace(/\s+/g, ' ')
+    .trim()
   return text.length > 34 ? `${text.slice(0, 34)}…` : text
 }
 
@@ -45,10 +52,11 @@ export async function POST() {
   }
 
   // freeform には AI 内省ガイドの回答（【ふりかえり】行）が畳まれている。
-  // 価値観・感情の理由を読み取る最重要素材なので必ず含める
+  // 価値観・感情の理由を読み取る最重要素材なので必ず含める（prompt-context がメモとは別枠で渡す）。
+  // 本文の列は、メモ欄が空で本文にだけ言葉を書いた日（気分だけ → あとから書き足し）のために読む
   const { data: entries, error } = await supabase
     .from('diary_entries')
-    .select('entry_date, mood, energy, events, challenges, gratitude, freeform, tags, dominant_emotion')
+    .select('entry_date, mood, energy, events, challenges, gratitude, freeform, tags, dominant_emotion, edited_draft, ai_draft')
     .eq('user_id', user.id)
     .order('entry_date', { ascending: false })
     .limit(30)
@@ -93,7 +101,15 @@ export async function POST() {
   try {
     const groq = getGroqClient()
 
-    const summary = formatEntriesForPrompt(rows.slice(0, 20), { events: 100, challenges: 80, gratitude: 60, freeform: 160 })
+    const forPrompt = rows.slice(0, 20)
+    const summary = formatEntriesForPrompt(forPrompt, {
+      events: 100,
+      challenges: 80,
+      gratitude: 60,
+      freeform: 160,
+      reflection: 120,
+      body: 200,
+    })
 
     const completion = await groq.chat.completions.create({
       model: GROQ_MODELS.quality,
@@ -106,13 +122,13 @@ export async function POST() {
           role: 'system',
           content: `あなたは心理的洞察を提供するコーチです。
 ユーザーの日記データを分析して、パーソナリティの特徴・成長ヒント・感情トリガーを日本語で提供してください。
-「メモ・ふりかえり」内の【ふりかえり】で始まる部分は、AIの問いに本人が答えた内省の記録です。
-感情の理由・価値観・判断基準を読み取る最も重要な材料として重視してください。
+${PROMPT_ENTRY_LEGEND}
+【ふりかえり】は、感情の理由・価値観・判断基準を読み取る最も重要な材料として重視してください。
 必ず JSON 形式で返してください。`,
         },
         {
           role: 'user',
-          content: `以下の日記データ（直近${entries.length}件）を分析してください：\n\n${summary}\n\n以下の JSON 形式で返してください：
+          content: `以下の日記データ（直近${forPrompt.length}件）を分析してください：\n\n${summary}\n\n以下の JSON 形式で返してください：
 {
   "personalityType": "タイプ名（例: 思慮深いリフレクター）",
   "description": "100文字程度の説明",

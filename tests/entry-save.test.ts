@@ -1,8 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { apiPost } from '@/lib/api-client'
 import { META_INPUT_LIMIT, metaExcerpt, type StoredEntryText } from '@/lib/entry-merge'
-import { hasEntryWithWords, refreshEntryMeta, saveFullEntry, type FullEntry } from '@/lib/entry-save'
+import { hasEntryWithWords, refreshEntryMeta, saveFullEntry, saveMoodOnly, type FullEntry } from '@/lib/entry-save'
 import { withReflection } from '@/lib/freeform'
+import { NetworkError } from '@/lib/network-error'
 
 // Supabase のクライアントは、呼ばれた操作を記録するだけの偽物に差し替える。
 // 保存の中身（追記したか・どの列に何を書いたか）を、実際の DB なしで確かめるため
@@ -10,6 +11,8 @@ const fake = vi.hoisted(() => {
   type Row = Record<string, unknown>
   const state = {
     user: { id: 'user-1' } as { id: string } | null,
+    /** getUser() が user と一緒に返すエラー（通信の失敗なら AuthRetryableFetchError） */
+    authError: null as { name: string; message: string; status?: number } | null,
     /** maybeSingle() が返す、その日の既存の行 */
     existing: null as Row | null,
     readError: null as { message: string } | null,
@@ -26,7 +29,7 @@ const fake = vi.hoisted(() => {
   function client() {
     return {
       auth: {
-        getUser: async () => ({ data: { user: state.user } }),
+        getUser: async () => ({ data: { user: state.user }, error: state.authError }),
       },
       from(table: string) {
         state.tables.push(table)
@@ -69,6 +72,7 @@ const fake = vi.hoisted(() => {
 
   function reset() {
     state.user = { id: 'user-1' }
+    state.authError = null
     state.existing = null
     state.readError = null
     state.upsertError = null
@@ -277,6 +281,53 @@ describe('saveFullEntry', () => {
     db.user = null
     await expect(saveFullEntry(entry)).rejects.toThrow('Unauthorized')
     expect(db.upserts).toHaveLength(0)
+
+    // セッションが無いときのエラーも「未ログイン」
+    db.authError = { name: 'AuthSessionMissingError', message: 'Auth session missing!' }
+    await expect(saveFullEntry(entry)).rejects.toThrow('Unauthorized')
+  })
+
+  it('電波が無くてユーザーを確かめられないときは、未ログインではなく通信の失敗にする', async () => {
+    // getUser は通信に失敗しても user: null を返す（中身は AuthRetryableFetchError）
+    db.user = null
+    db.authError = { name: 'AuthRetryableFetchError', message: 'Load failed', status: 0 }
+    const err = await saveFullEntry(entry).catch((e: unknown) => e)
+    expect(err).toBeInstanceOf(NetworkError)
+    expect((err as Error).message).not.toBe('Unauthorized')
+    expect(db.upserts).toHaveLength(0)
+  })
+
+  it('DB への読み書きが通信で失敗したときも、通信の失敗として投げる', async () => {
+    db.readError = { message: 'TypeError: Load failed' }
+    await expect(saveFullEntry(entry)).rejects.toBeInstanceOf(NetworkError)
+    expect(db.upserts).toHaveLength(0)
+
+    fake.reset()
+    db.upsertError = { message: 'TypeError: Failed to fetch' }
+    await expect(saveFullEntry(entry)).rejects.toBeInstanceOf(NetworkError)
+
+    // 通信以外の失敗は、これまでどおり中身の文言のまま
+    fake.reset()
+    db.upsertError = { message: 'write failed' }
+    const other = await saveFullEntry(entry).catch((e: unknown) => e)
+    expect(other).not.toBeInstanceOf(NetworkError)
+    expect((other as Error).message).toBe('write failed')
+  })
+})
+
+describe('saveMoodOnly', () => {
+  it('電波が無いときは通信の失敗として投げる（ログイン画面へ飛ばさない）', async () => {
+    db.user = null
+    db.authError = { name: 'AuthRetryableFetchError', message: 'Load failed', status: 0 }
+    await expect(saveMoodOnly(DATE, 3, 2)).rejects.toBeInstanceOf(NetworkError)
+    expect(db.upserts).toHaveLength(0)
+  })
+
+  it('気分とエネルギーだけを書く（本文の列は渡さないので消さない）', async () => {
+    db.upsertError = null
+    await saveMoodOnly(DATE, 3, 2)
+    expect(db.upserts[0].payload).toEqual({ user_id: 'user-1', entry_date: DATE, mood: 3, energy: 2 })
+    expect(db.upserts[0].opts).toEqual({ onConflict: 'user_id,entry_date' })
   })
 })
 
