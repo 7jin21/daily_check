@@ -1,8 +1,9 @@
 // テーマ管理（layout.tsx のフラッシュ防止インラインスクリプトと同じキー・同じロジックを共有する）
+import { DEVICE_KEYS } from '@/lib/constants'
 
 export type Theme = 'light' | 'dark' | 'system'
 
-const THEME_KEY = 'inner-mirror-theme'
+const THEME_KEY = DEVICE_KEYS.THEME
 
 /** 保存されているテーマ設定を返す（未設定 = システム追従） */
 export function getStoredTheme(): Theme {

@@ -3,7 +3,7 @@ import { createReadonlyServerClient } from '@/lib/supabase-server'
 import { decryptSecret } from '@/lib/crypto'
 import { subtractDays, todayJST } from '@/lib/jst'
 
-interface CalendarEvent {
+export interface CalendarEvent {
   id: string
   title: string
   startTime: string | null

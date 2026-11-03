@@ -8,7 +8,6 @@ import { STORAGE_KEYS } from '@/lib/constants'
 
 export interface ClientSettings {
   notificationsEnabled: boolean
-  googleCalendarEnabled: boolean
 }
 
 interface SettingsState {
@@ -19,7 +18,6 @@ interface SettingsState {
 
 const defaultSettings: ClientSettings = {
   notificationsEnabled: false,
-  googleCalendarEnabled: false,
 }
 
 export const useSettingsStore = create<SettingsState>()(

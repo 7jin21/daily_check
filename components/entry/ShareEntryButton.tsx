@@ -16,8 +16,13 @@ interface Props {
 }
 
 // 共有用の画像は、テーマ（ライト／ダーク）に関係なくいつも和紙の上に刷る。
-// そのため紙と墨の色はここに置く（app/globals.css の :root と同じ値）。気分の色だけは CSS 変数から読む。
-const PAPER = { top: '#fbf9f3', bottom: '#f1ecdf', ink: '#24271f', muted: '#615e50', faint: '#a19c86', hairline: 'rgba(36,39,31,0.14)', gold: '#7d6431', tag: '#536c44' }
+// そのため紙と墨の色はここに置く（app/globals.css の :root のライトの値から: 紙 --surface・墨 --foreground・
+// --muted・--faint・タグ --primary とその 10%）。罫だけは、縮小された画像でも見えるよう --hairline（0.12）より少し濃い。
+// 気分の色だけは CSS 変数から読む。
+const PAPER = {
+  top: '#fbf9f3', bottom: '#f1ecdf', ink: '#24271f', muted: '#615e50', faint: '#a19c86',
+  hairline: 'rgba(36,39,31,0.14)', tag: '#536c44', tagBg: 'rgba(83,108,68,0.1)',
+}
 
 const MINCHO = '"Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif'
 const GARAMOND = '"Cormorant Garamond", Georgia, serif'
@@ -153,7 +158,7 @@ async function buildCardBlob(props: Props): Promise<Blob | null> {
     const label = `#${tag}`
     const w = ctx.measureText(label).width + 48
     if (tx + w > W - 96) return
-    ctx.fillStyle = 'rgba(83,108,68,0.1)'
+    ctx.fillStyle = PAPER.tagBg
     roundRect(ctx, tx, ty, w, 60, 30)
     ctx.fill()
     ctx.fillStyle = PAPER.tag

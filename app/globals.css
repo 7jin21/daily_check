@@ -18,10 +18,8 @@
   --primary: #536c44;          /* セージ（リンク・アクセント文字） */
   --primary-foreground: #fbf9f3;
   --accent: #6b8756;           /* セージ（面・メーター） */
-  --accent-hover: #7a9464;
   --gold: #a88746;             /* 金（飾り・AI が足した言葉の印）。文字色には使わない */
   --gold-ink: #7d6431;         /* 文字に使える深い金（4.5:1 以上） */
-  --blue: #8ba3b5;             /* ダスティブルー */
   --muted: #615e50;            /* 補助テキスト（すべての紙の上で 5.2:1 以上） */
   --muted-2: #6b6857;          /* さらに控えめな補助テキスト（4.5:1 以上） */
   --faint: #a19c86;            /* 装飾専用（点・飾り数字・山括弧）。情報を持つ文字には使わない */
@@ -35,7 +33,6 @@
   --mood-5: #6f8a5f;
   /* 水（エネルギー）。器の水位の図形に使う */
   --water: #7d98ab;
-  --water-soft: #c9d4da;
 
   /* 主ボタン（生成りの文字が 5.7:1 になる深いセージ） */
   --btn-bg: #4f673f;
@@ -57,11 +54,6 @@
 
   --focus-ring: rgba(83, 108, 68, 0.55);
 
-  /* Safe area insets (iPhone対応) */
-  --safe-area-top: env(safe-area-inset-top);
-  --safe-area-bottom: env(safe-area-inset-bottom);
-  --safe-area-left: env(safe-area-inset-left);
-  --safe-area-right: env(safe-area-inset-right);
   /* BottomNavの高さ */
   --bottom-nav-height: 64px;
 }
@@ -83,17 +75,14 @@
   --primary: #a9c08f;
   --primary-foreground: #141612;
   --accent: #7a9464;
-  --accent-hover: #8aa673;
   --gold: #cfae6e;
   --gold-ink: #d8b878;
-  --blue: #93aabb;
   --muted: #a7a393;
   --muted-2: #959282;
   --faint: #55534a;
   --hairline: rgba(236, 231, 218, 0.12);
 
   --water: #8fa8ba;
-  --water-soft: #3a4750;
 
   /* ダークでは明るいセージの面に墨の文字（9.2:1） */
   --btn-bg: #a9c08f;
@@ -190,15 +179,6 @@ h3,
   border: 0;
 }
 
-/* Safe area 対応 */
-.safe-top {
-  padding-top: env(safe-area-inset-top);
-}
-
-.safe-bottom {
-  padding-bottom: env(safe-area-inset-bottom);
-}
-
 /* ページコンテンツ（浮いた BottomNav の高さ＋下余白の分をあける） */
 .page-content {
   padding-bottom: calc(var(--bottom-nav-height) + 20px + env(safe-area-inset-bottom));
@@ -287,15 +267,6 @@ input,
 textarea,
 select {
   font-size: max(16px, 1rem);
-}
-
-/* スクロールバー非表示（iOS風） */
-.hide-scrollbar {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
-}
-.hide-scrollbar::-webkit-scrollbar {
-  display: none;
 }
 
 /* ───────── ボタン（全画面で共通。色は変数から） ───────── */
@@ -402,6 +373,12 @@ select {
 }
 .icon-btn:active {
   transform: scale(0.94);
+}
+/* その画面でいちばん主な操作（一覧の「＋ 記録する」など） */
+.icon-btn[data-tone='primary'] {
+  background: var(--btn-bg);
+  color: var(--btn-fg);
+  border-color: transparent;
 }
 
 /* 小さな選択肢・タグ */
@@ -529,12 +506,28 @@ select {
 }
 
 /* セクションヘッダー（細罫で区切る見出し行） */
+/* 記録の流れ（チェックイン・内省の問い・清書）の画面: 画面の高さいっぱいに縦に並べ、下の操作を親指の届くところへ */
+.screen {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  padding: 12px 16px 0;
+}
+/* その画面の見出しの帯（戻る・いまの段・日付） */
+.screen-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+/* タブ画面（一覧・インサイト・設定）の見出しの帯 */
 .section-head {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
   padding-bottom: 16px;
-  border-bottom: 1px solid var(--divider);
+  border-bottom: 1px solid var(--divider-strong);
 }
 
 /* 小さな UI 文字の見出し（カードの中の「AIが足した言葉」など） */
@@ -567,6 +560,7 @@ select {
   animation: enter-from-left 0.28s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
 }
 
+/* 下から浮かび上がる（保存画面の言葉など。components/draft/draft.css が使う） */
 @keyframes slide-up {
   from {
     opacity: 0;
@@ -576,10 +570,6 @@ select {
     opacity: 1;
     transform: translateY(0);
   }
-}
-
-.animate-slide-up {
-  animation: slide-up 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) both;
 }
 
 @keyframes fade-in {
@@ -852,7 +842,6 @@ mark.ai-joint {
 @media (prefers-reduced-motion: reduce) {
   .animate-enter-right,
   .animate-enter-left,
-  .animate-slide-up,
   .animate-fade-in {
     animation: none !important;
   }

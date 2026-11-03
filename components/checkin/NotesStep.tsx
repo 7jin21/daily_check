@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useCheckinStore } from '@/stores/checkin'
+import { NOTE_MAX_CHARS, useCheckinStore } from '@/stores/checkin'
 import { todaysMemos, useMemoStore } from '@/stores/memos'
 import TextStep from './TextStep'
 import PickList, { type PickItem } from './PickList'
@@ -11,20 +11,11 @@ import { jstTimeHM, todayJST } from '@/lib/jst'
 import { prefetchReflection } from '@/lib/reflection-prefetch'
 import { appendLinesWithin } from '@/lib/memo-insert'
 import { ChevronDownIcon } from '@/components/ui/icons'
+import type { CalendarEvent } from '@/app/api/calendar/today/route'
 
 // チェックイン2画面目: テキスト4欄を1画面に集約。
 // 「出来事」は常時表示、残り3欄は折りたたみ（値があれば自動で開く）。
 // 日中に残した「ひとこと」と Google Calendar の当日予定は、残したいものだけ選んで「出来事」に入れられる。
-
-interface CalendarEvent {
-  id: string
-  title: string
-  startTime: string | null
-  endTime: string | null
-  isAllDay: boolean
-}
-
-const MAX_CHARS = 500
 
 // 手が止まってからこれだけ待って、清書の前に出す問いを裏で作りはじめる（打つたびに作り直さないため）
 const PREFETCH_DELAY_MS = 2000
@@ -105,7 +96,7 @@ export default function NotesStep() {
    */
   const insertLines = (picked: PickItem[]): number => {
     const lines = picked.map((p) => `・${p.meta ? `${p.meta} ` : ''}${p.label}`)
-    const { text, added } = appendLinesWithin(events, lines, MAX_CHARS)
+    const { text, added } = appendLinesWithin(events, lines, NOTE_MAX_CHARS)
     if (added) setEvents(text)
     return added
   }
@@ -135,7 +126,7 @@ export default function NotesStep() {
               key={`memo-${memos.length}`}
               title="今日のひとこと"
               items={memos.map((m) => ({ id: m.id, label: m.text, meta: m.time }))}
-              maxChars={MAX_CHARS}
+              maxChars={NOTE_MAX_CHARS}
               skippedNote="入らなかったメモは消えずに残ります。"
               onInsert={insertLines}
             />
@@ -143,7 +134,7 @@ export default function NotesStep() {
               key={`cal-${calendarItems.length}`}
               title="今日の予定"
               items={calendarItems}
-              maxChars={MAX_CHARS}
+              maxChars={NOTE_MAX_CHARS}
               onInsert={insertLines}
             />
           </div>

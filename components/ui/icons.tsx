@@ -203,6 +203,33 @@ export const TrendDownIcon = (p: IconProps) => (
   </Icon>
 )
 
+/** 重なった頁（ナビの「一覧」） */
+export const PagesIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <rect x="6" y="3.5" width="12.5" height="16" rx="1.8" />
+    <path d="M3.5 7v12.2a1.8 1.8 0 0 0 1.8 1.8H15" />
+    <path d="M9.5 8.5h5.5M9.5 12h5.5M9.5 15.5h3" />
+  </Icon>
+)
+
+/** 気分の波（ナビの「インサイト」） */
+export const WaveIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M3 15.5c2.2-6 4.6-6 6.4-1.6 1.6 4 4 4 5.6-.6 1.4-4 3.6-5 6-2.3" />
+    <path d="M3 20.5h18" opacity="0.45" />
+  </Icon>
+)
+
+/** 調整つまみ（ナビの「設定」） */
+export const DialIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M4 7.5h9M17 7.5h3" />
+    <circle cx="15" cy="7.5" r="2" />
+    <path d="M4 16.5h3M11 16.5h9" />
+    <circle cx="9" cy="16.5" r="2" />
+  </Icon>
+)
+
 /** このアプリの印: 水平線に映る月（ナビの「ホーム」と同じ形）。空の状態・ログイン・エラーで使う */
 export const MirrorMark = ({ size = 40, ...p }: IconProps) => (
   <Icon size={size} strokeWidth={1.2} {...p}>

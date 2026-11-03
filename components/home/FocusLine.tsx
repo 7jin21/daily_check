@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { doneInLastWeek, isFocusActive, loadFocus, saveFocus, toggleDone, type Focus } from '@/lib/focus'
-import { subtractDays } from '@/lib/home-model'
+import { subtractDays } from '@/lib/jst'
 import { hapticTap } from '@/lib/haptics'
 import Reveal from './Reveal'
 import { CheckIcon } from '@/components/ui/icons'

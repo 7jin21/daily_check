@@ -14,7 +14,8 @@ export interface ComposeInput extends CheckinInput {
   reflectionA?: string
 }
 
-const FIELDS = ['events', 'challenges', 'gratitude', 'freeform'] as const
+/** メモの4欄（出来事・困ったこと・感謝・自由メモ）。この順で並べる */
+export const NOTE_FIELDS = ['events', 'challenges', 'gratitude', 'freeform'] as const
 
 /** 内省の答え（「選択肢 — 一言」）を、本人の文として読める形にする */
 function reflectionText(a?: string): string {
@@ -22,7 +23,7 @@ function reflectionText(a?: string): string {
 }
 
 function blocks(input: ComposeInput): string[] {
-  return [...FIELDS.map((f) => (input[f] ?? '').trim()), reflectionText(input.reflectionA)].filter(Boolean)
+  return [...NOTE_FIELDS.map((f) => (input[f] ?? '').trim()), reflectionText(input.reflectionA)].filter(Boolean)
 }
 
 /** 原文のまま: 書いたメモを段落で並べるだけ */
@@ -48,7 +49,7 @@ export function composeBullets(input: ComposeInput): string {
 /** 入力が変わったかを判定するためのキー（気分だけの変更では清書し直さない） */
 export function inputKey(input: ComposeInput): string {
   return JSON.stringify([
-    ...FIELDS.map((f) => (input[f] ?? '').trim()),
+    ...NOTE_FIELDS.map((f) => (input[f] ?? '').trim()),
     (input.reflectionQ ?? '').trim(),
     (input.reflectionA ?? '').trim(),
   ])

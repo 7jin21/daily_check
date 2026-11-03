@@ -3,12 +3,12 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { getSupabaseClient } from '@/lib/supabase'
-import { moodLabel } from '@/lib/constants'
+import { moodColor, moodLabel } from '@/lib/constants'
 import { MoodGlyph } from '@/components/ui/StateGlyphs'
 import { ChevronRightIcon } from '@/components/ui/icons'
 import { dayOfWeek, formatJSTDate, subtractDays, todayJST } from '@/lib/jst'
-import { hasWords, type StoredEntryText } from '@/lib/entry-merge'
-import { MOOD_COLOR } from './shared'
+import { WEEKDAY_KANJI } from '@/lib/almanac'
+import { hasWords, TEXT_COLUMNS, type StoredEntryText } from '@/lib/entry-merge'
 import { useInsightsSession } from './InsightsSessionBoundary'
 
 interface LocalStats {
@@ -31,11 +31,9 @@ type StatsRow = Partial<StoredEntryText> & {
   dominant_emotion: string | null
 }
 
-const WEEKDAY_LABELS = ['日', '月', '火', '水', '木', '金', '土']
-
+/** 平均（小数）を、いちばん近い気分の色にする */
 function moodColorFor(avg: number): string {
-  const idx = Math.min(5, Math.max(1, Math.round(avg)))
-  return MOOD_COLOR[idx]
+  return moodColor(Math.min(5, Math.max(1, Math.round(avg))))
 }
 
 /** 過去30日の記録（新しい順）から、画面に出す集計を作る */
@@ -76,7 +74,7 @@ function buildLocalStats(data: StatsRow[]): LocalStats {
   const weekdayMoods = [1, 2, 3, 4, 5, 6, 0]
     .filter((dow) => weekdayAgg[dow])
     .map((dow) => ({
-      label: WEEKDAY_LABELS[dow],
+      label: WEEKDAY_KANJI[dow],
       avg: Math.round((weekdayAgg[dow].sum / weekdayAgg[dow].count) * 10) / 10,
       count: weekdayAgg[dow].count,
     }))
@@ -121,7 +119,7 @@ async function fetchLocalStats(userId: string, signal: AbortSignal): Promise<Loc
   // 言葉の列は「言葉つきの日」を数えるため。保存側（entry-save）と同じ列を見て、判定をそろえる
   const { data } = await supabase
     .from('diary_entries')
-    .select('entry_date, mood, dominant_emotion, tags, events, challenges, gratitude, freeform, ai_draft, edited_draft')
+    .select(`entry_date, mood, dominant_emotion, tags, ${TEXT_COLUMNS.join(', ')}`)
     .eq('user_id', userId)
     .gte('entry_date', from)
     .order('entry_date', { ascending: false })
@@ -202,7 +200,7 @@ export default function LocalStatsSection() {
                 <div className="flex-1 h-5 bg-[var(--surface-secondary)] rounded-full overflow-hidden">
                   <div
                     className="h-full rounded-full transition-all duration-500"
-                    style={{ width: `${pct}%`, backgroundColor: MOOD_COLOR[level] }}
+                    style={{ width: `${pct}%`, backgroundColor: moodColor(level) }}
                   />
                 </div>
                 <span className="text-sm text-[var(--muted)] w-6 text-right flex-shrink-0">{count}</span>
@@ -276,7 +274,7 @@ export default function LocalStatsSection() {
                   className="w-full rounded-t-sm transition-all"
                   style={{
                     height: `${(e.mood / 5) * 56}px`,
-                    backgroundColor: MOOD_COLOR[e.mood],
+                    backgroundColor: moodColor(e.mood),
                     borderRadius: 4,
                   }}
                 />

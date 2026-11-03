@@ -11,6 +11,8 @@ import {
   type DraftPromptInput,
 } from '@/lib/draft-prompt'
 import type { DraftStreamFrame } from '@/lib/draft-stream'
+import { isISODate } from '@/lib/jst'
+import { NOTE_FIELDS } from '@/lib/draft-compose'
 
 // 新クライアントには NDJSON で本文と完了通知を分け、通信が終わっただけでは完成品にしない。
 // Accept を指定しない旧クライアントには従来の text/plain + DRAFT_CUT_MARK を返す。
@@ -19,7 +21,6 @@ import type { DraftStreamFrame } from '@/lib/draft-stream'
 // 清書が途中で止まった（出力の上限・途中の失敗）ときは、本文の末尾に DRAFT_CUT_MARK を付ける。
 
 const MAX_TEXT_LENGTH = 1000
-const TEXT_FIELDS = ['events', 'challenges', 'gratitude', 'freeform'] as const
 
 const PLAIN_HEADERS = { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-cache' }
 
@@ -44,10 +45,7 @@ export async function POST(req: NextRequest) {
   }
 
   // 対象日（過去日付の書き忘れ救済）。不正な形式なら無視して今日扱い
-  const entryDate =
-    typeof input.entryDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(input.entryDate)
-      ? input.entryDate
-      : null
+  const entryDate = isISODate(input.entryDate) ? input.entryDate : null
 
   const { mood, energy } = input
   if (
@@ -57,7 +55,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'mood, energy は 1〜5 の整数で指定してください' }, { status: 400 })
   }
 
-  for (const field of TEXT_FIELDS) {
+  for (const field of NOTE_FIELDS) {
     const value = input[field]
     if (value != null && typeof value !== 'string') {
       return NextResponse.json({ error: `${field} は文字列で指定してください` }, { status: 400 })

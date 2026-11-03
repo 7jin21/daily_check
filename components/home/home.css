@@ -16,7 +16,6 @@
   --ink-soft: rgba(239, 231, 212, 0.66);
   --ink-faint: rgba(239, 231, 212, 0.32);
   --moon: #f4ead0;
-  --moon-glow: rgba(244, 234, 208, 0.22);
   --star-opacity: 0.9;
   --cta-bg: #f3ecdc;
   --cta-fg: #121827;
@@ -31,7 +30,6 @@
   --ink-soft: rgba(255, 244, 230, 0.74);
   --ink-faint: rgba(255, 244, 230, 0.36);
   --moon: #fff0d8;
-  --moon-glow: rgba(255, 228, 196, 0.26);
   --star-opacity: 0.35;
   --cta-bg: #fff4e6;
   --cta-fg: #2a2238;
@@ -46,7 +44,6 @@
   --ink-soft: rgba(255, 250, 242, 0.76);
   --ink-faint: rgba(255, 250, 242, 0.38);
   --moon: #fffaf0;
-  --moon-glow: rgba(255, 244, 230, 0.24);
   --star-opacity: 0.45;
   --cta-bg: #fffaf2;
   --cta-fg: #2c3756;
@@ -61,7 +58,6 @@
   --ink-soft: rgba(23, 36, 44, 0.68);
   --ink-faint: rgba(23, 36, 44, 0.3);
   --moon: #ffffff;
-  --moon-glow: rgba(255, 255, 255, 0.35);
   --star-opacity: 0;
   --cta-bg: #17242c;
   --cta-fg: #f3efe6;
@@ -511,25 +507,6 @@ a.im-sec-meta {
   color: var(--muted);
 }
 
-/* 昨日の書き忘れ */
-.im-missed {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 14px 18px;
-  border-radius: 16px;
-  border: 1px dashed var(--border);
-  font-family: 'Zen Kaku Gothic New', system-ui, sans-serif;
-  font-size: 0.8125rem;
-  color: var(--muted);
-  margin-bottom: 34px;
-}
-.im-missed b {
-  color: var(--primary);
-  font-weight: 700;
-}
-
 /* ───────── この一週間 ───────── */
 .im-week {
   display: grid;
@@ -894,6 +871,7 @@ a.im-stat {
   color: var(--foreground);
   margin-top: 4px;
   text-wrap: balance;
+  display: block;
 }
 .im-chevron {
   align-self: center;
@@ -1070,6 +1048,7 @@ a.im-stat {
   font-weight: 400;
   line-height: 1;
   color: var(--foreground);
+  display: block;
 }
 .im-row-wd {
   margin-top: 6px;
@@ -1103,6 +1082,25 @@ a.im-stat {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  display: block;
+}
+
+/* 初回の「使いかた」の手順（最近の記録の行の形を借りる） */
+.im-step-num {
+  text-align: center;
+}
+.im-step-title {
+  display: block;
+  font-size: 1rem;
+}
+.im-step-body {
+  display: block;
+  margin-top: 6px;
+  font-family: 'Zen Kaku Gothic New', system-ui, sans-serif;
+  font-size: 0.8125rem;
+  line-height: 1.8;
+  letter-spacing: 0.04em;
+  color: var(--muted);
 }
 
 /* ───────── 結び ───────── */
@@ -1125,7 +1123,6 @@ a.im-stat {
 }
 
 /* ───────── 動き ───────── */
-@keyframes im-fade { from { opacity: 0; } to { opacity: 1; } }
 @keyframes im-rise {
   from { opacity: 0; transform: translateY(0.5em); }
   to { opacity: 1; transform: translateY(0); }
@@ -1140,15 +1137,15 @@ a.im-stat {
   50% { opacity: calc(var(--star-opacity) * 0.35); }
 }
 
-.im-anim .im-sky { animation: im-fade 0.9s ease-out both; }
+.im-anim .im-sky { animation: fade-in 0.9s ease-out both; }
 .im-anim .im-moon { animation: im-moon-in 1.3s cubic-bezier(0.2, 0.7, 0.2, 1) 0.15s both; }
 .im-anim .im-date-main .im-ch { animation: im-rise 0.8s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
-.im-anim .im-date-sub { animation: im-fade 0.9s ease-out 0.5s both; }
+.im-anim .im-date-sub { animation: fade-in 0.9s ease-out 0.5s both; }
 .im-anim .im-horizon { animation: im-draw 1.1s cubic-bezier(0.6, 0, 0.2, 1) 0.25s both; }
 .im-anim .im-reflection { animation: im-reflect-in 1.4s ease-out 0.6s both; }
 @keyframes im-reflect-in { from { opacity: 0; } to { opacity: 0.5; } }
 .im-anim .im-cta { animation: im-rise 0.8s cubic-bezier(0.2, 0.7, 0.2, 1) 0.45s both; }
-.im-anim .im-topbar { animation: im-fade 0.8s ease-out 0.2s both; }
+.im-anim .im-topbar { animation: fade-in 0.8s ease-out 0.2s both; }
 .im-stars circle { animation: im-twinkle 5s ease-in-out infinite; }
 .im-stars circle:nth-child(3n) { animation-duration: 7s; animation-delay: -2s; }
 .im-stars circle:nth-child(4n) { animation-duration: 3.6s; animation-delay: -1s; }

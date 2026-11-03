@@ -3,22 +3,12 @@ import { createReadonlyServerClient } from '@/lib/supabase-server'
 import { getGroqClient, GROQ_MODELS } from '@/lib/groq'
 import { parseFreeform } from '@/lib/freeform'
 import { daysBetween, todayJST } from '@/lib/jst'
-import { formatEntriesForPrompt, ownBodyText, PROMPT_ENTRY_LEGEND } from '@/lib/prompt-context'
+import { formatEntriesForPrompt, ownBodyText, PROMPT_ENTRY_LEGEND, type PromptEntry } from '@/lib/prompt-context'
 
 const MIN_ENTRIES_FOR_ANALYSIS = 5
 
-interface AnalyzeEntry {
-  entry_date: string
-  mood: number | null
-  energy: number | null
-  events: string | null
-  challenges: string | null
-  gratitude: string | null
-  freeform: string | null
-  dominant_emotion: string | null
-  edited_draft: string | null
-  ai_draft: string | null
-}
+/** 読み込む列（select）は、AI に渡す日記データの全項目 */
+type AnalyzeEntry = Required<PromptEntry>
 
 // AI 応答の形状検証（欠けた項目や型違いで画面を落とさない）
 const str = (v: unknown, max: number) => (typeof v === 'string' ? v.trim().slice(0, max) : '')

@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect } from 'react'
+import { moodColor } from '@/lib/constants'
 import { takeSaveEcho } from '@/lib/save-echo'
 
 // 保存した直後にホームへ戻ってきたときの「余韻」。保存画面で水面に落ちた一滴の続き。
@@ -25,7 +26,7 @@ export default function SaveEcho({ today }: { today: string }) {
         ring.className = 'im-ripple im-ripple-echo'
         ring.style.left = '50%'
         ring.style.top = '34%'
-        ring.style.borderColor = `var(--mood-${echo.mood})`
+        ring.style.borderColor = moodColor(echo.mood)
         ring.addEventListener('animationend', () => ring.remove())
         host.appendChild(ring)
       }, 650 + delay)

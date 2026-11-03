@@ -4,6 +4,9 @@ import { STORAGE_KEYS } from '@/lib/constants'
 import type { DraftResult } from '@/lib/offline-draft'
 import type { DraftMode } from '@/lib/draft-compose'
 
+/** メモ欄（出来事・困ったこと・感謝・自由メモ）1つあたりの上限 */
+export const NOTE_MAX_CHARS = 500
+
 export interface CheckinInput {
   mood: number | null
   energy: number | null
@@ -13,7 +16,7 @@ export interface CheckinInput {
   freeform: string
 }
 
-interface CheckinState extends CheckinInput {
+interface CheckinData extends CheckinInput {
   currentStep: number
   checkinDate: string | null   // "YYYY-MM-DD" (JST) — 入力を開始した日。日付が変わったら lib/checkin-rollover.ts で扱いを決める（言葉のある書きかけは消さない）
   targetDate: string | null    // 記録の対象日。null = 今日。過去日付の書き忘れ救済で使う
@@ -27,7 +30,9 @@ interface CheckinState extends CheckinInput {
   draftMode: DraftMode         // 清書の整え方（原文のまま / 整える / 箇条書き）
   draftInputKey: string        // ドラフトを作ったときの入力（入力が変わったら清書し直すため）
   aiText: string               // この下書きで AI が出した文章（清書・書き直し）。「あなたの言葉」の判定に使う
-  // Actions
+}
+
+interface CheckinActions {
   setMood: (mood: number) => void
   setEnergy: (energy: number) => void
   setEvents: (events: string) => void
@@ -47,19 +52,20 @@ interface CheckinState extends CheckinInput {
   setDraftMode: (mode: DraftMode) => void
   setDraftInputKey: (key: string) => void
   addAiText: (text: string) => void // AI が出した文章を覚えておく（下書き画面で本人が書き足した言葉と区別するため）
-  setAiText: (text: string) => void // 配信中のAI本文を累積重複させず更新する
+  /** 配信中の本文と、この下書きで AI が出した文章を一度に更新する（届くたびの端末への保存を1回にする） */
+  setStreamDraft: (editedDraft: string, aiText: string) => void
   clearDraft: () => void       // ドラフトだけ捨てる（入力は残す）
   reset: () => void
   // Derived
   getInput: () => CheckinInput
 }
 
-const initialState: Omit<CheckinState, keyof Pick<CheckinState,
-  'setMood' | 'setEnergy' | 'setEvents' | 'setChallenges' | 'setGratitude' |
-  'setFreeform' | 'setCurrentStep' | 'nextStep' | 'prevStep' |
-  'setCheckinDate' | 'setTargetDate' | 'setDraftResult' | 'setEditedDraft' | 'setIsGenerating' | 'setDraftIncomplete' |
-  'setReflection' | 'setDraftMode' | 'setDraftInputKey' | 'addAiText' | 'setAiText' | 'clearDraft' | 'reset' | 'getInput'
->> = {
+type CheckinState = CheckinData & CheckinActions
+
+/** 端末に残す項目。生成中かどうか・リセットの世代は、開き直したら必ず初期値から始める */
+type PersistedCheckin = Omit<CheckinData, 'isGenerating' | 'resetVersion'>
+
+const initialState: CheckinData = {
   mood: null,
   energy: null,
   events: '',
@@ -104,7 +110,7 @@ export const useCheckinStore = create<CheckinState>()(
       setReflection: (reflectionQ, reflectionA) => set({ reflectionQ, reflectionA }),
       setDraftMode: (draftMode) => set({ draftMode }),
       setDraftInputKey: (draftInputKey) => set({ draftInputKey }),
-      setAiText: (aiText) => set({ aiText }),
+      setStreamDraft: (editedDraft, aiText) => set({ editedDraft, aiText }),
       addAiText: (text) =>
         set((state) => (text.trim() && !state.aiText.includes(text) ? { aiText: state.aiText ? `${state.aiText}\n${text}` : text } : {})),
       clearDraft: () => set((state) => ({
@@ -115,21 +121,14 @@ export const useCheckinStore = create<CheckinState>()(
       reset: () => set((state) => ({ ...initialState, resetVersion: state.resetVersion + 1 })),
 
       getInput: () => {
-        const state = get()
-        return {
-          mood: state.mood,
-          energy: state.energy,
-          events: state.events,
-          challenges: state.challenges,
-          gratitude: state.gratitude,
-          freeform: state.freeform,
-        }
+        const { mood, energy, events, challenges, gratitude, freeform } = get()
+        return { mood, energy, events, challenges, gratitude, freeform }
       },
     }),
     {
       name: STORAGE_KEYS.CHECKIN_DRAFT,
       merge: (persisted, current) => {
-        const saved = (persisted ?? {}) as Partial<CheckinState>
+        const saved = (persisted ?? {}) as Partial<PersistedCheckin>
         return {
           ...current,
           ...saved,
@@ -138,7 +137,8 @@ export const useCheckinStore = create<CheckinState>()(
           draftIncomplete: saved.draftIncomplete ?? Boolean(saved.editedDraft && !saved.draftResult),
         }
       },
-      partialize: (state) => ({
+      // 戻り値の型で、項目を増やしたときに「端末に残すか」を決め忘れないようにする
+      partialize: (state): PersistedCheckin => ({
         mood: state.mood,
         energy: state.energy,
         events: state.events,

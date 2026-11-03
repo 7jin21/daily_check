@@ -26,9 +26,7 @@ export const STEPS = [
   { id: 'notes', title: '今日のことを少しだけ', description: '書けるところだけでOK（すべて任意）' },
 ] as const
 
-export type StepId = typeof STEPS[number]['id']
-
-// 毎日ローテーションするサブテキスト (曜日 or 日付ベース)
+// 毎日ローテーションするサブテキスト (曜日 or 日付ベース)。チェックインの2画面（STEPS の id）ぶん
 const STEP_DESCRIPTIONS: Record<string, string[]> = {
   state: [
     '気分とエネルギーをタップ',
@@ -47,60 +45,6 @@ const STEP_DESCRIPTIONS: Record<string, string[]> = {
     '今日の「ハイライト」は？',
     '全部スキップしてもOK',
     'ゆっくりでいいので、思い出してみて',
-  ],
-  mood: [
-    '直感で選んでください',
-    '今この瞬間の気持ちは？',
-    '正直に選んでみて',
-    '体の感覚に耳を傾けて',
-    '朝・昼・夜のどれで考えてもOK',
-    '自分に正直になって',
-    '今の気持ちをひと言で',
-  ],
-  energy: [
-    '今の体の状態を教えてください',
-    '充電具合はどのくらい？',
-    '体はどんな感じですか？',
-    '疲れ具合を正直に',
-    'みなぎってる？それとも疲れ気味？',
-    '体と相談してみて',
-    '今日動ける感じがする？',
-  ],
-  events: [
-    '出来事・行動・会話など',
-    '印象に残ったことは？',
-    '今日どこへ行って何をした？',
-    '誰かと話したこと、したことは？',
-    '今日の「ハイライト」は？',
-    '何があった？何をした？',
-    '気になったこと、気づいたことは？',
-  ],
-  challenges: [
-    '問題・悩み・不安など（任意）',
-    'もやもやしたことはある？',
-    '改善したいことはある？',
-    '難しかったことは？',
-    '心にひっかかっていることは？',
-    'うまくいかなかったことは？',
-    'しんどかったことは？',
-  ],
-  gratitude: [
-    '小さなことでも大丈夫',
-    '今日の「良かったこと」は？',
-    '感謝したいことを1つ',
-    'うれしかった瞬間は？',
-    '今日あってよかったことは？',
-    '誰かに感謝したいことは？',
-    '自分を褒めてあげることは？',
-  ],
-  freeform: [
-    '何でも書いてください（任意）',
-    '言いたいこと、何でも',
-    '今日の自分へのメッセージ',
-    '誰にも言えないことでもOK',
-    'ひとり言でも日記でも',
-    '明日の自分へ',
-    'ゆっくり書いてみて',
   ],
 }
 
@@ -124,6 +68,8 @@ export const moodLabel = (value: number | null | undefined) => MOODS.find((m) =>
 /** 気分の色（CSS 変数）。範囲外・未入力なら「普通」の色 */
 export const moodColor = (value: number | null | undefined) => MOODS.find((m) => m.value === value)?.color ?? 'var(--mood-3)'
 export const energyLabel = (value: number | null | undefined) => ENERGY.find((e) => e.value === value)?.label
+/** エネルギーの値（1〜5）の説明（例:「活発に動ける」）。範囲外なら undefined */
+export const energyDescription = (value: number | null | undefined) => ENERGY.find((e) => e.value === value)?.description
 
 // ローカルストレージのキー
 export const STORAGE_KEYS = {
@@ -136,9 +82,21 @@ export const STORAGE_KEYS = {
   FOCUS: 'inner-mirror-focus',
 } as const
 
+/** 端末の設定のキー（サインアウトしても残す）。layout.tsx のちらつき防止スクリプトも同じキーを読む */
+export const DEVICE_KEYS = {
+  THEME: 'inner-mirror-theme',
+  PWA_BANNER_DISMISSED: 'pwa-banner-dismissed',
+} as const
+
+/** アカウントごとに分けて保存するキー（例: AI 分析のキャッシュ）。サインアウトでは base の付いたものをまとめて消す */
+export function userScopedKey(base: string, userId: string): string {
+  return `${base}:${encodeURIComponent(userId)}`
+}
+const isUserScopedKey = (key: string, base: string) => key.startsWith(`${base}:`)
+
 /**
  * サインアウト時にユーザー固有のローカルデータを削除する（共有端末対策）。
- * テーマ・PWAバナーの非表示フラグは端末の設定なので残す。
+ * テーマ・PWAバナーの非表示フラグ（DEVICE_KEYS）は端末の設定なので残す。
  */
 export function clearUserLocalData() {
   try {
@@ -151,8 +109,8 @@ export function clearUserLocalData() {
     Object.keys(localStorage)
       .filter((key) =>
         key.startsWith(STORAGE_KEYS.MILESTONE_PREFIX) ||
-        key.startsWith(`${STORAGE_KEYS.INSIGHTS_CACHE}:`) ||
-        key.startsWith(`${STORAGE_KEYS.WEEKLY_REPORT_CACHE}:`)
+        isUserScopedKey(key, STORAGE_KEYS.INSIGHTS_CACHE) ||
+        isUserScopedKey(key, STORAGE_KEYS.WEEKLY_REPORT_CACHE)
       )
       .forEach((key) => localStorage.removeItem(key))
   } catch {

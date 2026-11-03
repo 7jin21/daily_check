@@ -1,6 +1,7 @@
 import type { CSSProperties, ReactNode } from 'react'
 import { moonAge, moonLitPath, moonName, toKanjiNumber, WEEKDAY_KANJI } from '@/lib/almanac'
-import { dayOfWeek, type DayPeriod } from '@/lib/home-model'
+import type { DayPeriod } from '@/lib/home-model'
+import { dayOfWeek } from '@/lib/jst'
 import RippleFilter from './RippleFilter'
 import WaterTouch from './WaterTouch'
 

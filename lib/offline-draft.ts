@@ -1,7 +1,7 @@
 // オフライン時・API失敗時のフォールバック日記生成
 import type { CheckinInput } from '@/stores/checkin'
 import { MOODS, ENERGY } from '@/lib/constants'
-import { formatJSTDate, todayJST } from '@/lib/jst'
+import { formatJSTDate, isISODate, todayJST } from '@/lib/jst'
 
 export interface DraftResult {
   draft: string
@@ -11,6 +11,14 @@ export interface DraftResult {
   fromAI?: boolean // AI の清書から作られたか（false ならテンプレート／本人のメモそのまま）
 }
 
+/** テンプレートの見出し（メモの4欄の順） */
+const SECTIONS = [
+  ['events', '【今日の出来事】'],
+  ['challenges', '【課題・困ったこと】'],
+  ['gratitude', '【感謝できること】'],
+  ['freeform', '【メモ】'],
+] as const
+
 // テンプレートベースで日記ドラフトを生成（AI不使用）
 // entryDate（YYYY-MM-DD）を渡すと、その日付の日記として生成する（過去日付の書き忘れ救済用）
 export function generateOfflineDraft(input: CheckinInput, entryDate?: string | null): DraftResult {
@@ -18,7 +26,7 @@ export function generateOfflineDraft(input: CheckinInput, entryDate?: string | n
   const energyInfo = ENERGY.find((e) => e.value === input.energy)
 
   // API ルートのフォールバックとしてサーバー(UTC)でも実行されるため、日付は必ず Asia/Tokyo で決める
-  const baseDate = entryDate && /^\d{4}-\d{2}-\d{2}$/.test(entryDate) ? entryDate : todayJST()
+  const baseDate = isISODate(entryDate) ? entryDate : todayJST()
   const today = formatJSTDate(baseDate, {
     year: 'numeric',
     month: 'long',
@@ -38,32 +46,10 @@ export function generateOfflineDraft(input: CheckinInput, entryDate?: string | n
     )
   }
 
-  // 出来事
-  if (input.events?.trim()) {
-    parts.push('')
-    parts.push('【今日の出来事】')
-    parts.push(input.events.trim())
-  }
-
-  // 課題・困ったこと
-  if (input.challenges?.trim()) {
-    parts.push('')
-    parts.push('【課題・困ったこと】')
-    parts.push(input.challenges.trim())
-  }
-
-  // 感謝
-  if (input.gratitude?.trim()) {
-    parts.push('')
-    parts.push('【感謝できること】')
-    parts.push(input.gratitude.trim())
-  }
-
-  // 自由記述
-  if (input.freeform?.trim()) {
-    parts.push('')
-    parts.push('【メモ】')
-    parts.push(input.freeform.trim())
+  // 書いた欄だけ、見出しをつけて並べる
+  for (const [field, heading] of SECTIONS) {
+    const text = input[field]?.trim()
+    if (text) parts.push('', heading, text)
   }
 
   const draft = parts.join('\n')

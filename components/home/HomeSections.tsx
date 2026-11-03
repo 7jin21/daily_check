@@ -1,7 +1,9 @@
 import type { CSSProperties, ReactNode } from 'react'
 import Link from 'next/link'
 import { MOODS, moodColor, moodLabel } from '@/lib/constants'
-import { dayOfWeek, subtractDays, type HomeEntry, type HomeStats } from '@/lib/home-model'
+import type { HomeEntry, HomeStats } from '@/lib/home-model'
+import { dayOfWeek, shortDate, subtractDays } from '@/lib/jst'
+import { isValidPastDate } from '@/lib/checkin-rollover'
 import { WEEKDAY_KANJI } from '@/lib/almanac'
 import Phrase from '@/components/ui/Phrase'
 import Reveal from './Reveal'
@@ -9,9 +11,6 @@ import Reveal from './Reveal'
 // ホームの和紙シートに並ぶセクション群（すべてサーバーで描画できる純粋な表示部品）
 
 const moodVar = (mood: number | null | undefined) => ({ '--mood': moodColor(mood) }) as CSSProperties
-
-/** "2026-10-04" → "10.4" */
-const shortDate = (d: string) => `${Number(d.slice(5, 7))}.${Number(d.slice(8, 10))}`
 
 export function Section({
   idx,
@@ -58,7 +57,6 @@ export function weekDates(today: string): string[] {
 export function WeekRipples({ today, entries }: { today: string; entries: HomeEntry[] }) {
   const byDate = new Map(entries.map((e) => [e.entry_date, e]))
   const dates = weekDates(today)
-  const oldestBackfill = subtractDays(today, 7)
 
   return (
     <div className="im-week">
@@ -71,7 +69,7 @@ export function WeekRipples({ today, entries }: { today: string; entries: HomeEn
           ? `/entries/${date}`
           : isToday
             ? '/checkin'
-            : !isFuture && date >= oldestBackfill
+            : isValidPastDate(date, today)
               ? `/checkin?date=${date}`
               : null
         const label = `${shortDate(date)}（${WEEKDAY_KANJI[dayOfWeek(date)]}）${
@@ -186,11 +184,11 @@ export function StatsLine({ stats, yesterday }: { stats: HomeStats; yesterday: s
 }
 
 // ───────── 記録の軌跡（13週 × 7日） ─────────
+const MONDAY_FIRST = [...WEEKDAY_KANJI.slice(1), WEEKDAY_KANJI[0]]
+
 export function MoodTrace({ today, entries }: { today: string; entries: HomeEntry[] }) {
   const byDate = new Map(entries.map((e) => [e.entry_date, e.mood]))
-  const dow = dayOfWeek(today)
-  const thisMonday = subtractDays(today, dow === 0 ? 6 : dow - 1)
-  const start = subtractDays(thisMonday, 12 * 7)
+  const start = subtractDays(weekDates(today)[0], 12 * 7)
   const weeks = Array.from({ length: 13 }, (_, w) =>
     Array.from({ length: 7 }, (_, d) => subtractDays(start, -(w * 7 + d)))
   )
@@ -210,7 +208,7 @@ export function MoodTrace({ today, entries }: { today: string; entries: HomeEntr
         {monthLabels.map((l, w) => (
           <span key={`m${w}`} className="im-trace-month">{l}</span>
         ))}
-        {['月', '火', '水', '木', '金', '土', '日'].map((wd, d) => (
+        {MONDAY_FIRST.map((wd, d) => (
           <TraceRow key={wd} wd={wd} d={d} weeks={weeks} byDate={byDate} today={today} />
         ))}
       </div>
@@ -277,7 +275,7 @@ export function Flashbacks({ items }: { items: { label: string; entry: HomeEntry
             <span className="im-label">
               {label}・{entry.entry_date.split('-').join('.')}
             </span>
-            <span className="im-flash-text" style={{ display: 'block' }}>
+            <span className="im-flash-text">
               <Phrase text={entry.summary || entry.dominant_emotion || 'この日の記録を読む'} />
             </span>
             {/* 当時の本文はそのままに、今の見方を書き足せる */}
@@ -297,7 +295,7 @@ export function RecentList({ entries }: { entries: HomeEntry[] }) {
       {entries.map((e) => (
         <Link key={e.id} href={`/entries/${e.entry_date}`} className="im-row" style={moodVar(e.mood)}>
           <span className="im-row-date">
-            <span className="im-row-day" style={{ display: 'block' }}>{Number(e.entry_date.slice(8, 10))}</span>
+            <span className="im-row-day">{Number(e.entry_date.slice(8, 10))}</span>
             <span className="im-row-wd im-label">
               <i />
               {WEEKDAY_KANJI[dayOfWeek(e.entry_date)]}
@@ -308,7 +306,7 @@ export function RecentList({ entries }: { entries: HomeEntry[] }) {
               <Phrase text={e.summary || e.dominant_emotion || `気分「${moodLabel(e.mood) ?? '—'}」だけの記録`} />
             </span>
             {e.tags?.length > 0 && (
-              <span className="im-row-tags" style={{ display: 'block' }}>
+              <span className="im-row-tags">
                 {e.tags.slice(0, 4).map((t) => `#${t}`).join('  ')}
               </span>
             )}

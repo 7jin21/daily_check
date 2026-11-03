@@ -8,7 +8,7 @@ import InsightsSessionBoundary from '@/components/insights/InsightsSessionBounda
 export default function InsightsPage() {
   return (
     <div className="px-5 pt-8 pb-8 space-y-6">
-      <div className="section-head" style={{ borderBottomColor: 'var(--divider-strong)' }}>
+      <div className="section-head">
         <div className="eyebrow">Insights</div>
         <h1 className="text-2xl font-bold text-[var(--foreground)]">インサイト</h1>
       </div>

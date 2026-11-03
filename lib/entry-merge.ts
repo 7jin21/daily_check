@@ -38,7 +38,8 @@ export interface MergedEntryText {
 
 export const MAX_MERGED_TAGS = 8
 
-const TEXT_COLUMNS = ['events', 'challenges', 'gratitude', 'freeform', 'ai_draft', 'edited_draft'] as const
+/** 日記の言葉の列。hasWords・追記の判定と、それを読み込む select でこの一覧を使う（列がずれないように） */
+export const TEXT_COLUMNS = ['events', 'challenges', 'gratitude', 'freeform', 'ai_draft', 'edited_draft'] as const
 
 /** その日の記録に本人の言葉があるか（気分だけの記録なら false） */
 export function hasWords(entry: Partial<StoredEntryText> | null | undefined): boolean {
@@ -95,7 +96,7 @@ function unionTags(before: string[] | null | undefined, after: string[]): string
   return out.slice(0, MAX_MERGED_TAGS)
 }
 
-/** /api/draft-meta が受け取れる本文の長さ（route 側の上限） */
+/** /api/draft-meta が受け取れる本文の長さ（route もこの値で判定する） */
 export const META_INPUT_LIMIT = 3000
 
 /**

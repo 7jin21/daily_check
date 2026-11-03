@@ -1,8 +1,7 @@
 'use client'
 
 import VoiceInputButton from '@/components/ui/VoiceInputButton'
-
-const MAX_CHARS = 500
+import { NOTE_MAX_CHARS } from '@/stores/checkin'
 
 interface TextStepProps {
   value: string
@@ -18,14 +17,14 @@ interface TextStepProps {
 export default function TextStep({ value, onChange, placeholder, rows = 6, showHint = true, labelledBy }: TextStepProps) {
   const handleVoiceResult = (transcript: string) => {
     const next = value ? `${value} ${transcript}` : transcript
-    onChange(next.slice(0, MAX_CHARS))
+    onChange(next.slice(0, NOTE_MAX_CHARS))
   }
 
   const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    onChange(e.target.value.slice(0, MAX_CHARS))
+    onChange(e.target.value.slice(0, NOTE_MAX_CHARS))
   }
 
-  const remaining = MAX_CHARS - value.length
+  const remaining = NOTE_MAX_CHARS - value.length
   const isNearLimit = remaining <= 50
 
   return (
@@ -41,13 +40,13 @@ export default function TextStep({ value, onChange, placeholder, rows = 6, showH
         />
         {/* 文字数（上限が近づいたら色を変えて知らせる） */}
         <span className="ck-counter" data-near={isNearLimit} aria-live={isNearLimit ? 'polite' : 'off'}>
-          {isNearLimit ? `あと${remaining}字` : `${value.length}/${MAX_CHARS}`}
+          {isNearLimit ? `あと${remaining}字` : `${value.length}/${NOTE_MAX_CHARS}`}
         </span>
         <div className="ck-voice">
           <VoiceInputButton onResult={handleVoiceResult} />
         </div>
       </div>
-      {showHint && <p className="ck-hint" style={{ textAlign: 'left', padding: '0 4px' }}>キーワードや短い文でも、日記になります</p>}
+      {showHint && <p className="ck-hint" data-align="start">キーワードや短い文でも、日記になります</p>}
     </div>
   )
 }

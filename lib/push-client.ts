@@ -107,13 +107,8 @@ export async function subscribeToPush(): Promise<PushSubscribeResult> {
   }
 }
 
-/** 通知トグルを OFF にしたときも、この端末だけを解除する。 */
-export async function unsubscribeFromPush(): Promise<{ ok: boolean }> {
-  return unsubscribeThisDevice()
-}
-
 /**
- * サインアウトの前に呼ぶ: この端末の購読だけを解除する（ほかの端末のリマインダーは残す）。
+ * サインアウトの前と、通知トグルを OFF にしたときに呼ぶ: この端末の購読だけを解除する（ほかの端末のリマインダーは残す）。
  * 残すと、サインアウトしたあとも前の人のリマインダー（前日の気分つき）がこの端末に届き続け、
  * 次にこの端末を使う人は通知を登録できない。
  * サーバーの行はログインしている間にしか消せないので、先に消す（電波が無くて消せなくても、

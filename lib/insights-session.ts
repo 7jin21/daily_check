@@ -1,4 +1,4 @@
-import { STORAGE_KEYS } from '@/lib/constants'
+import { STORAGE_KEYS, userScopedKey } from '@/lib/constants'
 
 export type InsightsCacheKind = 'analysis' | 'weekly'
 type RequestKind = InsightsCacheKind | 'ask' | 'stats'
@@ -25,7 +25,7 @@ export interface InsightsRequest {
 }
 
 export function insightsCacheKey(kind: InsightsCacheKind, userId: string): string {
-  return `${CACHE_BASES[kind]}:${encodeURIComponent(userId)}`
+  return userScopedKey(CACHE_BASES[kind], userId)
 }
 
 /** Older caches have no owner, so they cannot safely be assigned to the current user. */

@@ -1,6 +1,7 @@
 import { createServerSupabaseClient } from '@/lib/supabase-server'
 import { redirect } from 'next/navigation'
-import { buildHomeModel, subtractDays, toJSTDate, type HomeEntry } from '@/lib/home-model'
+import { buildHomeModel, type HomeEntry } from '@/lib/home-model'
+import { subtractDays, toJSTDate } from '@/lib/jst'
 import HomeView, { OnboardingView } from '@/components/home/HomeView'
 
 export default async function HomePage() {

@@ -2,16 +2,16 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useShallow } from 'zustand/react/shallow'
 import { useCheckinStore } from '@/stores/checkin'
 import { STEPS, getDailyDescription } from '@/lib/constants'
 import StateStep from '@/components/checkin/StateStep'
 import NotesStep from '@/components/checkin/NotesStep'
 import { hapticTap } from '@/lib/haptics'
-import { saveMoodOnly } from '@/lib/entry-save'
 import { markSaveEcho } from '@/lib/save-echo'
 import { prefetchReflection } from '@/lib/reflection-prefetch'
-import { dayOfWeek, formatJSTDate, todayJST } from '@/lib/jst'
-import { hasUnsavedWords, isValidPastDate, planDateRollover } from '@/lib/checkin-rollover'
+import { dayOfWeek, formatJSTDate, shortDate, todayJST } from '@/lib/jst'
+import { entryDateOf, hasUnsavedWords, isValidPastDate, planDateRollover } from '@/lib/checkin-rollover'
 import { ArrowRightIcon, ChevronLeftIcon, PenIcon } from '@/components/ui/icons'
 import { EnergyGlyph, MoodGlyph } from '@/components/ui/StateGlyphs'
 import { WEEKDAY_KANJI } from '@/lib/almanac'
@@ -20,13 +20,35 @@ import '@/components/checkin/checkin.css'
 
 export default function CheckinPage() {
   const router = useRouter()
-  const { currentStep, mood, energy, targetDate, checkinDate, events, challenges, gratitude, freeform, nextStep, prevStep } =
-    useCheckinStore()
+  // 入力のたびに画面全体を描き直さないよう、使う値だけを選んで受け取る（メモの中身は「書いたかどうか」だけ）
+  const { currentStep, mood, energy, targetDate, checkinDate, nextStep, prevStep } = useCheckinStore(
+    useShallow((s) => ({
+      currentStep: s.currentStep,
+      mood: s.mood,
+      energy: s.energy,
+      targetDate: s.targetDate,
+      checkinDate: s.checkinDate,
+      nextStep: s.nextStep,
+      prevStep: s.prevStep,
+    }))
+  )
+  const hasText = useCheckinStore((s) => [s.events, s.challenges, s.gratitude, s.freeform].some((v) => v.trim()))
 
   const [direction, setDirection] = useState<'forward' | 'back'>('forward')
   const [quickSaving, setQuickSaving] = useState(false)
   const [quickError, setQuickError] = useState<string | null>(null)
-  const hasText = [events, challenges, gratitude, freeform].some((v) => v.trim())
+
+  // 「気分だけで記録する」の保存処理は Supabase の部品ごと重いので、最初の画面には含めず、
+  // 画面が落ち着いてから読み込んでおく（押したときには、たいてい読み込み済み）
+  useEffect(() => {
+    const load = () => void import('@/lib/entry-save')
+    if ('requestIdleCallback' in window) {
+      const id = window.requestIdleCallback(load)
+      return () => window.cancelIdleCallback(id)
+    }
+    const timer = setTimeout(load, 1500)
+    return () => clearTimeout(timer)
+  }, [])
 
   // ステップの説明文は日替わり。/checkin はビルド時に静的生成されるので、描画中に今日の文を選ぶと
   // サーバーの HTML（ビルドした日の文）とブラウザの初回描画（今日の文）が食い違う。
@@ -64,7 +86,7 @@ export default function CheckinPage() {
       if (state.targetDate !== dateParam) {
         // 別の日の入力が残っていたら、混ざらないように消してから対象日を設定する。
         // ただし言葉のある書きかけは、黙って消さずに先に確かめる（やめたら書きかけの続きを出す）
-        const from = state.targetDate ?? state.checkinDate ?? today
+        const from = entryDateOf(state, today)
         const label = (d: string) => (d === today ? '今日' : formatJSTDate(d, { month: 'long', day: 'numeric' }))
         const keep =
           hasUnsavedWords(state) &&
@@ -107,8 +129,9 @@ export default function CheckinPage() {
     hapticTap()
     setQuickSaving(true)
     setQuickError(null)
-    const entryDate = state.targetDate ?? state.checkinDate ?? todayJST()
+    const entryDate = entryDateOf(state, todayJST())
     try {
+      const { saveMoodOnly } = await import('@/lib/entry-save')
       await saveMoodOnly(entryDate, state.mood, state.energy)
       // ホームに戻ったら、その日の丸に色が落ちる（保存したことが目で分かるように）
       markSaveEcho(entryDate, state.mood)
@@ -145,25 +168,19 @@ export default function CheckinPage() {
     router.replace('/checkin')
   }
 
-  const canProceed = () => {
-    switch (step?.id) {
-      case 'state': return mood !== null && energy !== null
-      default:      return true
-    }
-  }
-
   if (!step) return null
+
+  const canProceed = step.id !== 'state' || (mood !== null && energy !== null)
 
   // 何が足りないかを、押せないボタンの文字で伝える（押せない理由が分からないまま止まらないように）
   const missing = mood === null && energy === null ? '気分と|エネルギー' : mood === null ? '気分' : energy === null ? 'エネルギー' : null
   // 書いている日（過去の日付を書いているときはその日）。初回描画はサーバーと合わせるため、マウント後に出す
-  const entryDate = targetDate ?? checkinDate ?? null
-  const dateLabel = mounted && entryDate ? entryDate : mounted ? todayJST() : null
+  const dateLabel = mounted ? entryDateOf({ targetDate, checkinDate }, todayJST()) : null
 
   return (
-    <div className="ck-page">
+    <div className="screen">
       {/* 見出しの帯: 戻る ／ いまの段 ／ 日付 */}
-      <header className="ck-head">
+      <header className="screen-head ck-head">
         <button type="button" onClick={handleBack} className="icon-btn" aria-label={stepIndex === 0 ? 'ホームに戻る' : '前の画面に戻る'}>
           <ChevronLeftIcon />
         </button>
@@ -184,7 +201,7 @@ export default function CheckinPage() {
           )}
           {dateLabel && (
             <span className="ck-date">
-              {Number(dateLabel.slice(5, 7))}.{Number(dateLabel.slice(8, 10))}
+              {shortDate(dateLabel)}
               <small>{WEEKDAY_KANJI[dayOfWeek(dateLabel)]}</small>
             </span>
           )}
@@ -228,7 +245,7 @@ export default function CheckinPage() {
             {quickSaving ? '記録しています…' : '気分だけで記録する'}
           </button>
         ) : (
-          <button type="button" onClick={handleNext} disabled={!canProceed() || quickSaving} className="btn btn-primary btn-block">
+          <button type="button" onClick={handleNext} disabled={!canProceed || quickSaving} className="btn btn-primary btn-block">
             {step.id === 'state' ? (
               missing ? (
                 <Wbr text={`${missing}を|選んでください`} />
@@ -247,7 +264,7 @@ export default function CheckinPage() {
           </button>
         )}
         {step.id === 'state' && (
-          <button type="button" onClick={handleQuickSave} disabled={!canProceed() || quickSaving} className="btn-quiet">
+          <button type="button" onClick={handleQuickSave} disabled={!canProceed || quickSaving} className="btn-quiet">
             {quickSaving ? '記録しています…' : targetDate ? '気分だけで記録する' : '今日は気分だけで記録する'}
           </button>
         )}

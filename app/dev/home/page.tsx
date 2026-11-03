@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation'
-import { buildHomeModel, subtractDays, toJSTDate, type HomeEntry } from '@/lib/home-model'
+import { buildHomeModel, type HomeEntry } from '@/lib/home-model'
+import { isISODate, subtractDays, toJSTDate } from '@/lib/jst'
 import HomeView, { OnboardingView } from '@/components/home/HomeView'
 
 // 開発専用: モックデータでホームを表示する（デザイン確認用。本番では 404）
@@ -59,7 +60,7 @@ export default async function DevHomePreview({
 
   const now = new Date()
   if (h !== undefined || date) {
-    const day = date && /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : toJSTDate(now)
+    const day = isISODate(date) ? date : toJSTDate(now)
     const hour = h !== undefined ? Math.max(0, Math.min(23, Number(h))) : 21
     now.setTime(Date.parse(`${day}T${String(hour).padStart(2, '0')}:20:00+09:00`))
   }

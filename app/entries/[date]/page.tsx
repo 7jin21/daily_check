@@ -6,8 +6,8 @@ import DeleteEntryButton from '@/components/entry/DeleteEntryButton'
 import ShareEntryButton from '@/components/entry/ShareEntryButton'
 import LaterNote from '@/components/entry/LaterNote'
 import { parseFreeform } from '@/lib/freeform'
-import { APP_TIME_ZONE, formatJSTDate, todayJST } from '@/lib/jst'
-import { ENERGY, energyLabel, moodLabel } from '@/lib/constants'
+import { APP_TIME_ZONE, formatJSTDate, isISODate, todayJST } from '@/lib/jst'
+import { energyDescription, energyLabel, moodLabel } from '@/lib/constants'
 import { EnergyGlyph, MoodGlyph } from '@/components/ui/StateGlyphs'
 import { CheckIcon, ChevronLeftIcon } from '@/components/ui/icons'
 
@@ -22,7 +22,7 @@ export default async function EntryDetailPage({ params, searchParams }: Props) {
   const { write, now } = await searchParams
 
   // 日付フォーマット検証
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+  if (!isISODate(date)) {
     notFound()
   }
 
@@ -84,7 +84,7 @@ export default async function EntryDetailPage({ params, searchParams }: Props) {
             {energyLabel(entry.energy as number | null) ?? '—'}
           </p>
           <p className="text-[0.6875rem] font-ui text-[var(--muted)]">
-            {ENERGY.find((e) => e.value === entry.energy)?.description ?? ''}
+            {energyDescription(entry.energy as number | null) ?? ''}
           </p>
         </div>
       </div>
@@ -121,30 +121,17 @@ export default async function EntryDetailPage({ params, searchParams }: Props) {
 
       {/* 入力内容 */}
       <div className="space-y-4">
-        {entry.events && (
-          <div className="card">
-            <h3 className="eyebrow mb-2">今日の出来事</h3>
-            <p className="font-mincho text-base text-[var(--foreground)] whitespace-pre-wrap leading-loose prose-ja">{entry.events}</p>
+        {([
+          ['今日の出来事', entry.events as string | null],
+          ['課題・困ったこと', entry.challenges as string | null],
+          ['感謝できること', entry.gratitude as string | null],
+          ['メモ', ff.memo],
+        ] as const).map(([label, text]) => text && (
+          <div key={label} className="card">
+            <h3 className="eyebrow mb-2">{label}</h3>
+            <p className="font-mincho text-base text-[var(--foreground)] whitespace-pre-wrap leading-loose prose-ja">{text}</p>
           </div>
-        )}
-        {entry.challenges && (
-          <div className="card">
-            <h3 className="eyebrow mb-2">課題・困ったこと</h3>
-            <p className="font-mincho text-base text-[var(--foreground)] whitespace-pre-wrap leading-loose prose-ja">{entry.challenges}</p>
-          </div>
-        )}
-        {entry.gratitude && (
-          <div className="card">
-            <h3 className="eyebrow mb-2">感謝できること</h3>
-            <p className="font-mincho text-base text-[var(--foreground)] whitespace-pre-wrap leading-loose prose-ja">{entry.gratitude}</p>
-          </div>
-        )}
-        {ff.memo && (
-          <div className="card">
-            <h3 className="eyebrow mb-2">メモ</h3>
-            <p className="font-mincho text-base text-[var(--foreground)] whitespace-pre-wrap leading-loose prose-ja">{ff.memo}</p>
-          </div>
-        )}
+        ))}
         {ff.reflections.map((r, i) => (
           <div key={`r${i}`} className="card">
             <h3 className="eyebrow mb-2">ふりかえり</h3>

@@ -12,7 +12,7 @@ export interface ReflectionResult {
 
 const SKIP: ReflectionResult = { skip: true }
 
-/** これ未満の文字数なら問いを作らない（サーバー側 /api/checkin-question と同じ基準） */
+/** これ未満の文字数なら問いを作らない（サーバー側 /api/checkin-question も hasReflectionMaterial で同じ判定をする） */
 export const MIN_TEXT_FOR_REFLECTION = 4
 
 /** 下書き画面で問いを待つ最大時間。過ぎたら問いなしで清書へ進む（絶対にブロックしない） */

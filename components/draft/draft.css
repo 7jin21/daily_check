@@ -88,7 +88,7 @@
   background-repeat: no-repeat;
   background-position: 0 86%;
   background-size: 100% 0;
-  animation: dv-ink-in 0.55s ease-out both;
+  animation: fade-in 0.55s ease-out both; /* globals.css の fade-in を、ゆっくり */
   transition: color 0.6s ease, text-shadow 0.6s ease, background-size 0.6s ease;
 }
 /* 書かれたばかり（まだ乾いていない）。本人の言葉か AI の言葉かは、次の文字が届いてから決まる */
@@ -108,11 +108,6 @@
   text-decoration-thickness: 2px;
   text-underline-offset: 5px;
 }
-@keyframes dv-ink-in {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
 /* 凡例（墨＝あなたの言葉／金の下線＝AI が足した言葉） */
 .dv-legend {
   display: flex;
@@ -143,19 +138,7 @@
   padding: 12px 0 calc(16px + env(safe-area-inset-bottom));
 }
 
-/* ───────── 下書きの編集 ───────── */
-.dv-page {
-  min-height: 100dvh;
-  display: flex;
-  flex-direction: column;
-  padding: 12px 16px 0;
-}
-.dv-head {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 18px;
-}
+/* ───────── 下書きの編集（外枠と見出しの帯は globals.css の .screen / .screen-head） ───────── */
 .dv-head h1 {
   font-family: 'Shippori Mincho', serif;
   font-size: 1.25rem;

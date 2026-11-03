@@ -1,14 +1,14 @@
 // チェックインの書きかけが日付をまたいだときの扱い（純粋関数）。
 // 夜に書き始めて日付が変わってから戻ってきても、書いた言葉を消さない。
 // 言葉のある書きかけは「書き始めた日」の記録として続ける（過去日付の記録と同じ仕組み・同じ7日の範囲）。
-import { daysBetween } from '@/lib/jst'
+import { daysBetween, isISODate } from '@/lib/jst'
 
 /** 過去日付の記録（書き忘れ救済）は何日前まで書けるか */
 export const BACKFILL_DAYS = 7
 
 /** 過去日付の記録として書ける日か（昨日〜7日前） */
 export function isValidPastDate(date: string, today: string): boolean {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return false
+  if (!isISODate(date)) return false
   if (date >= today) return false
   return daysBetween(date, today) <= BACKFILL_DAYS
 }
@@ -30,6 +30,14 @@ export type RolloverPlan =
   | { kind: 'carry'; targetDate: string } // 言葉のある書きかけ: 書き始めた日の記録として続ける
   | { kind: 'reset' } // 言葉が無い（気分だけ）・7日より前: 消して今日の入力にする
 
+/**
+ * 記録を保存する日。過去の日付を書いているならその日、そうでなければ書き始めた日（それも無ければ today）。
+ * 「気分だけで記録する」と清書の保存は、必ずこの同じ日に書く
+ */
+export function entryDateOf(p: Pick<Partial<PendingCheckin>, 'targetDate' | 'checkinDate'>, today: string): string {
+  return p.targetDate ?? p.checkinDate ?? today
+}
+
 /** 書きかけに本人の言葉（メモ・清書）があるか */
 export function hasUnsavedWords(p: Partial<PendingCheckin>): boolean {
   return [p.events, p.challenges, p.gratitude, p.freeform, p.editedDraft].some(
@@ -40,7 +48,7 @@ export function hasUnsavedWords(p: Partial<PendingCheckin>): boolean {
 /** 日付が変わったとき、書きかけをどうするか */
 export function planDateRollover(p: Partial<PendingCheckin>, today: string): RolloverPlan {
   if (!p.checkinDate || p.checkinDate === today) return { kind: 'keep' }
-  const entryDate = p.targetDate || p.checkinDate
+  const entryDate = entryDateOf(p, today)
   if (hasUnsavedWords(p) && isValidPastDate(entryDate, today)) return { kind: 'carry', targetDate: entryDate }
   return { kind: 'reset' }
 }

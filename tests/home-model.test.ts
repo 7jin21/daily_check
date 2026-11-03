@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildHomeModel, dayOfWeek, periodOf, subtractDays, toJSTDate, type HomeEntry } from '@/lib/home-model'
-import * as jst from '@/lib/jst'
+import { buildHomeModel, periodOf, type HomeEntry } from '@/lib/home-model'
 import { withTZ } from './helpers'
 
 // 2026-10-10（土）の日本時間 12:00
@@ -14,14 +13,6 @@ function entry(date: string, mood = 3): HomeEntry {
 function entries(...dates: string[]): HomeEntry[] {
   return dates.map((d) => entry(d)).sort((a, b) => (a.entry_date < b.entry_date ? 1 : -1))
 }
-
-describe('日付の関数の再公開', () => {
-  it('lib/jst.ts と同じ関数', () => {
-    expect(toJSTDate).toBe(jst.toJSTDate)
-    expect(subtractDays).toBe(jst.subtractDays)
-    expect(dayOfWeek).toBe(jst.dayOfWeek)
-  })
-})
 
 describe('periodOf', () => {
   it.each([

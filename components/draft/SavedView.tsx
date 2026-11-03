@@ -4,6 +4,7 @@ import { useEffect, useRef, type CSSProperties } from 'react'
 import Link from 'next/link'
 import Wbr from '@/components/ui/Wbr'
 import { BellIcon } from '@/components/ui/icons'
+import { moodColor } from '@/lib/constants'
 import { formatJSTDate } from '@/lib/jst'
 import './draft.css'
 
@@ -41,7 +42,7 @@ export default function SavedView({ entryDate, mood, merged, isToday, showRemind
   }, [])
 
   const style = {
-    '--drop': `var(--mood-${mood ?? 3})`,
+    '--drop': moodColor(mood),
     '--fall': tone === 'low' ? '1.1s' : '0.75s',
     '--impact': tone === 'low' ? '1.25s' : '0.9s',
   } as CSSProperties

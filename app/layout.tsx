@@ -3,6 +3,7 @@ import './globals.css'
 import BottomNav from '@/components/ui/BottomNav'
 import AddToHomeScreenBanner from '@/components/ui/AddToHomeScreenBanner'
 import ServiceWorkerRegister from '@/components/ui/ServiceWorkerRegister'
+import { DEVICE_KEYS } from '@/lib/constants'
 
 export const metadata: Metadata = {
   title: 'Inner Mirror',
@@ -43,14 +44,12 @@ export default function RootLayout({
     <html lang="ja" suppressHydrationWarning>
       <head>
         {/* ダークモード初期化スクリプト（フラッシュ防止） */}
-        <script dangerouslySetInnerHTML={{ __html: `(function(){try{var d=document.documentElement,t=localStorage.getItem('inner-mirror-theme');if(t==='dark'||(t!=='light'&&window.matchMedia('(prefers-color-scheme:dark)').matches)){d.classList.add('dark')}else{d.classList.remove('dark')}}catch(e){}})()` }} />
+        <script dangerouslySetInnerHTML={{ __html: `(function(){try{var d=document.documentElement,t=localStorage.getItem(${JSON.stringify(DEVICE_KEYS.THEME)});if(t==='dark'||(t!=='light'&&window.matchMedia('(prefers-color-scheme:dark)').matches)){d.classList.add('dark')}else{d.classList.remove('dark')}}catch(e){}})()` }} />
         {/* 文字の大きさを iPhone の設定（Dynamic Type）に合わせる。描画の前に決めて、ちらつかせない */}
         <script dangerouslySetInnerHTML={{ __html: DYNAMIC_TYPE_SCRIPT }} />
-        {/* PWA / iPhone 対応 meta tags */}
+        {/* PWA / iPhone 対応。ステータスバー・アプリ名・アイコンは metadata（appleWebApp / icons）から Next.js が出す。
+            Next.js が出すのは mobile-web-app-capable なので、古い iOS 向けの apple- の名前だけここで足す */}
         <meta name="apple-mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-        <meta name="apple-mobile-web-app-title" content="Inner Mirror" />
-        <link rel="apple-touch-icon" href="/icon-192.png" />
         {/* 書体: 欧文・数字 Cormorant Garamond ／ 和文 Shippori Mincho（明朝）／ 小さな UI 文字 Zen Kaku Gothic New */}
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />

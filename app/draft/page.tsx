@@ -13,7 +13,7 @@ import { hasEntryWithWords, refreshEntryMeta, saveFullEntry } from '@/lib/entry-
 import { withReflection } from '@/lib/freeform'
 import { metaExcerpt } from '@/lib/entry-merge'
 import { todayJST } from '@/lib/jst'
-import { planDateRollover } from '@/lib/checkin-rollover'
+import { entryDateOf, planDateRollover } from '@/lib/checkin-rollover'
 import { clearReflectionCache, requestReflection } from '@/lib/reflection-prefetch'
 import { analyzeKept, composeBullets, composeRaw, inputKey, type ComposeInput, type DraftMode } from '@/lib/draft-compose'
 import ReflectionQuestion from '@/components/checkin/ReflectionQuestion'
@@ -26,7 +26,7 @@ import DraftTags from '@/components/draft/DraftTags'
 import { ComparePanel, OwnWordsMeter } from '@/components/draft/OwnWords'
 import RewriteButtons, { type RewriteInstruction } from '@/components/draft/RewriteButtons'
 import SaveActions from '@/components/draft/SaveActions'
-import { classifyError, rewriteErrorMessage } from '@/components/draft/classify-error'
+import { classifyError, rewriteErrorMessage, SAVE_CANCELLED, SESSION_EXPIRED_MESSAGE } from '@/components/draft/classify-error'
 import { splitCutMark } from '@/lib/draft-prompt'
 import { markSaveEcho } from '@/lib/save-echo'
 import { UndoIcon } from '@/components/ui/icons'
@@ -40,8 +40,7 @@ function currentComposeInput(): ComposeInput {
 
 /** 記録の対象日。「書き始めた日」で固定する（日付をまたいで開いたままでも、翌日の記録を上書きしない） */
 function currentEntryDate(): string {
-  const st = useCheckinStore.getState()
-  return st.targetDate ?? st.checkinDate ?? todayJST()
+  return entryDateOf(useCheckinStore.getState(), todayJST())
 }
 
 /** 保存待ちの間に対象日・入力・本文が変わったら、古い保存で消さない。 */
@@ -79,7 +78,7 @@ export default function DraftPage() {
     setDraftMode,
     setDraftInputKey,
     addAiText,
-    setAiText,
+    setStreamDraft,
     reset,
   } = useCheckinStore()
   const notificationsEnabled = useSettingsStore((s) => s.settings.notificationsEnabled)
@@ -91,8 +90,10 @@ export default function DraftPage() {
   const [notice, setNotice] = useState<DraftNoticeKind | null>(null)
   const [rewritingKey, setRewritingKey] = useState<RewriteInstruction | null>(null)
   const [rewriteError, setRewriteError] = useState<string | null>(null)
-  const [reflectPhase, setReflectPhase] = useState<'pending' | 'fetching' | 'asking' | 'done'>('pending')
-  const [reflectQuestion, setReflectQuestion] = useState<{ question: string; options: string[] } | null>(null)
+  // 清書の前の問い。問いを出している間だけ、問いと選択肢を持つ
+  const [reflect, setReflect] = useState<
+    { phase: 'pending' | 'fetching' | 'done' } | { phase: 'asking'; question: string; options: string[] }
+  >({ phase: 'pending' })
   const [history, setHistory] = useState<{ text: string; mode: DraftMode; incomplete: boolean }[]>([])
   const [compareOpen, setCompareOpen] = useState(false)
   // 配信中の表示。端末にも draftIncomplete と一緒に保存し、離脱後も途中の言葉を回復できる。
@@ -121,7 +122,11 @@ export default function DraftPage() {
     () => [aiText, draftResult?.fromAI ? draftResult.draft : ''].filter(Boolean).join('\n'),
     [aiText, draftResult]
   )
-  const kept = useMemo(() => analyzeKept(original, editedDraft, aiSource), [original, editedDraft, aiSource])
+  // 下書きの画面でだけ使う。生成中は届くたびに計算し直さない（生成中の画面は自分で遅らせて計算している）
+  const kept = useMemo(
+    () => (isGenerating ? null : analyzeKept(original, editedDraft, aiSource)),
+    [isGenerating, original, editedDraft, aiSource]
+  )
 
   useEffect(() => {
     const abort = abortRef
@@ -181,7 +186,7 @@ export default function DraftPage() {
           st.setEditedDraft(text)
           setNotice('partial')
         } else if (!st.editedDraft && st.draftResult) st.setEditedDraft(st.draftResult.draft)
-        setReflectPhase('done')
+        setReflect({ phase: 'done' })
         return
       }
       startReflectionThenGenerate()
@@ -226,7 +231,7 @@ export default function DraftPage() {
     // 枠線の分も足す（scrollHeight は枠線を含まないため、そのままだと最後の行が少し欠ける）
     el.style.height = `${el.scrollHeight + el.offsetHeight - el.clientHeight}px`
     // 生成が終わって本文の欄が現れたときにも高さを合わせる（本文が変わらないままだと長い清書が欄で切れて見える）
-  }, [editedDraft, isGenerating, reflectPhase])
+  }, [editedDraft, isGenerating, reflect.phase])
 
   /** AI が使えないとき: 本人のメモをそのまま使う（メモが空ならテンプレート） */
   const fallbackToOwnWords = (full: ComposeInput, entryTarget: string | null) => {
@@ -261,7 +266,7 @@ export default function DraftPage() {
     setStreamText('')
     setEditedDraft('')
     setDraftMode('tidy')
-    setDraftInputKey(inputKey(full))
+    setDraftInputKey(key)
 
     let text = ''
     // 途中まで届いた清書は捨てずに残し、途中で止まったことを伝える（続きは手で直すか「清書し直す」）
@@ -292,8 +297,7 @@ export default function DraftPage() {
         if (!isCurrent()) throw new DOMException('Obsolete draft', 'AbortError')
         text += delta
         setStreamText(text)
-        setEditedDraft(text)
-        setAiText([previousAiText, text].filter(Boolean).join('\n'))
+        setStreamDraft(text, [previousAiText, text].filter(Boolean).join('\n'))
       })
       if (!isCurrent()) return
       text = text.trim()
@@ -304,13 +308,7 @@ export default function DraftPage() {
       addAiText(text)
       // メタ情報（タグ・サマリー・感情）は本文確定後にバックグラウンドで取得。失敗時はローカル生成のメタ
       const offlineMeta = generateOfflineDraft(full, entryTarget)
-      setDraftResult({
-        draft: text,
-        tags: offlineMeta.tags,
-        summary: offlineMeta.summary,
-        dominantEmotion: offlineMeta.dominantEmotion,
-        fromAI: true,
-      })
+      setDraftResult({ ...offlineMeta, draft: text, fromAI: true })
       // draft-meta は 3000 字まで。長い清書は始まりと終わりから作る（超えると要約・タグが作れない）
       apiPost<{ tags: string[]; summary: string; dominantEmotion: string }>('/api/draft-meta', { draft: metaExcerpt(text) }, { retry: false })
         .then((meta) => {
@@ -355,27 +353,21 @@ export default function DraftPage() {
     const isCurrent = () => mountedRef.current && id === reflectionRef.current &&
       useCheckinStore.getState().resetVersion === version && inputKey(currentComposeInput()) === key
     // 先読み済みなら描画の前に届き、'fetching' は次の段階とまとめて描画されるので待ち画面は残らない
-    setReflectPhase('fetching')
+    setReflect({ phase: 'fetching' })
     const res = await requestReflection(useCheckinStore.getState().getInput())
     if (!isCurrent()) return
     if (!res.skip && res.question && Array.isArray(res.options) && res.options.length >= 2) {
-      setReflectQuestion({ question: res.question, options: res.options })
-      setReflectPhase('asking')
+      setReflect({ phase: 'asking', question: res.question, options: res.options })
       return
     }
-    setReflectPhase('done')
+    setReflect({ phase: 'done' })
     generateDraft()
   }
 
-  const handleReflectAnswer = (answer: string) => {
-    setReflection(reflectQuestion?.question ?? '', answer)
-    setReflectPhase('done')
-    generateDraft()
-  }
-
-  const handleReflectSkip = () => {
-    setReflection('', '')
-    setReflectPhase('done')
+  /** 問いに答えた・答えずに進んだ（答えなしは空文字）→ 清書へ */
+  const finishReflection = (question: string, answer: string) => {
+    setReflection(question, answer)
+    setReflect({ phase: 'done' })
     generateDraft()
   }
 
@@ -394,10 +386,15 @@ export default function DraftPage() {
     return draftResult?.draft ?? ''
   }
 
-  const pushHistory = () => setHistory((h) => [...h, { text: editedDraft, mode: draftMode, incomplete: draftIncomplete }].slice(-10))
+  /** 生成・書き直し・保存のどれかが進んでいる間は、本文を変える操作を受け付けない */
+  const locked = () => isGenerating || !!rewritingKey || savingRef.current
+
+  /** 「元に戻す」のために、いまの本文（書き直しなら書き直す前の本文）を覚えておく。最大10件 */
+  const pushHistory = (text: string = editedDraft) =>
+    setHistory((h) => [...h, { text, mode: draftMode, incomplete: draftIncomplete }].slice(-10))
 
   const switchMode = (next: DraftMode) => {
-    if (next === draftMode || isGenerating || rewritingKey || savingRef.current) return
+    if (next === draftMode || locked()) return
     const edited = editedDraft.trim() && editedDraft !== baseText(draftMode)
     if (edited && !window.confirm('手で直した内容は置き換わります（「元に戻す」で戻せます）。よろしいですか？')) return
     pushHistory()
@@ -419,7 +416,7 @@ export default function DraftPage() {
 
   const handleUndo = () => {
     const last = history[history.length - 1]
-    if (!last || isGenerating || rewritingKey || savingRef.current) return
+    if (!last || locked()) return
     setHistory((h) => h.slice(0, -1))
     setDraftMode(last.mode)
     setEditedDraft(last.text)
@@ -429,7 +426,7 @@ export default function DraftPage() {
 
   // ユーザーが手で編集した内容を無確認で破棄しない
   const handleRegenerate = () => {
-    if (savingRef.current || isGenerating || rewritingKey) return
+    if (locked()) return
     const hasEdits = draftResult && editedDraft.trim() && editedDraft !== draftResult.draft
     if (hasEdits && !window.confirm('編集した内容は置き換わります（「元に戻す」で戻せます）。清書し直しますか？')) {
       return
@@ -439,7 +436,7 @@ export default function DraftPage() {
   }
 
   const handleRewrite = async (instruction: RewriteInstruction) => {
-    if (!editedDraft.trim() || rewritingKey || isGenerating || savingRef.current) return
+    if (!editedDraft.trim() || locked()) return
     const rid = ++rewriteRef.current
     const before = editedDraft
     setRewritingKey(instruction)
@@ -448,7 +445,7 @@ export default function DraftPage() {
       // 自動で再試行しない（長すぎて切れるなど、何度やっても同じ失敗を AI に繰り返させないため）
       const result = await apiPost<{ draft: string }>('/api/rewrite-draft', { draft: before, instruction }, { retry: false })
       if (rid !== rewriteRef.current || savedRef.current) return
-      setHistory((h) => [...h, { text: before, mode: draftMode, incomplete: draftIncomplete }].slice(-10))
+      pushHistory(before)
       setEditedDraft(result.draft)
       // AI の言葉として覚えるのは、書き直しで新しく足された言葉だけ（書き直す前の本文には本人が書き足した言葉もある）
       addAiText(
@@ -534,8 +531,8 @@ export default function DraftPage() {
       console.error('保存エラー:', err)
       if (!canClearDraft()) return
       const classified = classifyError(err)
-      if (classified === 'cancelled') return
-      if (classified.includes('セッション')) {
+      if (classified === SAVE_CANCELLED) return
+      if (classified === SESSION_EXPIRED_MESSAGE) {
         router.push('/login')
         return
       }
@@ -553,19 +550,20 @@ export default function DraftPage() {
   }
 
   // 内省の問いを表示中
-  if (reflectPhase === 'asking' && reflectQuestion) {
+  if (reflect.phase === 'asking') {
+    const { question, options } = reflect
     return (
       <ReflectionQuestion
-        question={reflectQuestion.question}
-        options={reflectQuestion.options}
-        onSubmit={handleReflectAnswer}
-        onSkip={handleReflectSkip}
+        question={question}
+        options={options}
+        onSubmit={(answer) => finishReflection(question, answer)}
+        onSkip={() => finishReflection('', '')}
       />
     )
   }
 
   // 問いを待っている（最大7秒。失敗すれば自動で生成へ進む）
-  if (reflectPhase === 'fetching') return <ReadingView />
+  if (reflect.phase === 'fetching') return <ReadingView />
 
   if (isGenerating) return <GeneratingView text={streamText} original={original} onCancel={handleCancel} />
 
@@ -584,12 +582,12 @@ export default function DraftPage() {
   if (!editedDraft && !draftResult) return null
 
   const busy = isGenerating || !!rewritingKey || isSaving
+  // 本文が空のときは割合に意味がないので出さない
+  const ownWords = original && editedDraft.trim() ? kept : null
 
   return (
-    <div className="dv-page animate-fade-in">
-      <DraftHeader targetDate={targetDate} disabled={busy} onBack={() => {
-        if (!savingRef.current && !isGenerating && !rewritingKey) router.push('/checkin')
-      }} />
+    <div className="screen animate-fade-in">
+      <DraftHeader targetDate={targetDate} disabled={busy} onBack={() => { if (!locked()) router.push('/checkin') }} />
 
       {(notice || draftIncomplete) && <DraftNotice kind={draftIncomplete ? 'partial' : notice!} />}
 
@@ -610,9 +608,8 @@ export default function DraftPage() {
 
         {/* 自分の言葉が残っているかを確かめる */}
         <div className="mt-3 flex items-center gap-2 flex-wrap">
-          {/* 本文が空のときは割合に意味がないので出さない */}
-          {original && editedDraft.trim() && (
-            <OwnWordsMeter percent={Math.round(kept.own * 100)} open={compareOpen} onToggle={() => setCompareOpen((v) => !v)} />
+          {ownWords && (
+            <OwnWordsMeter percent={Math.round(ownWords.own * 100)} open={compareOpen} onToggle={() => setCompareOpen((v) => !v)} />
           )}
           {history.length > 0 && (
             <button type="button" onClick={handleUndo} disabled={busy} className="draft-undo">
@@ -622,12 +619,12 @@ export default function DraftPage() {
           )}
         </div>
 
-        {compareOpen && original && editedDraft.trim() && (
+        {compareOpen && ownWords && (
           <ComparePanel
-            segments={kept.segments}
+            segments={ownWords.segments}
             original={original}
-            keptPercent={Math.round(kept.kept * 100)}
-            addedChars={kept.addedChars}
+            keptPercent={Math.round(ownWords.kept * 100)}
+            addedChars={ownWords.addedChars}
             showUseRaw={draftMode !== 'raw'}
             disabled={busy}
             onUseRaw={() => switchMode('raw')}

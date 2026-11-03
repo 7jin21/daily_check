@@ -1,4 +1,4 @@
-import { Fragment } from 'react'
+import { PhraseSpan } from './Wbr'
 
 // 画面の部品（ブラウザ）で使う、軽い文節分け。
 // BudouX（components/ui/Phrase.tsx）は全言語のモデルごとブラウザに入って読み込みが約 120KB 増えるため、
@@ -47,15 +47,6 @@ export function phrasesLite(text: string): string[] {
   return out
 }
 
-export default function PhraseLite({ text, className = '' }: { text: string; className?: string }) {
-  return (
-    <span className={`phrase ${className}`.trim()}>
-      {phrasesLite(text).map((c, i) => (
-        <Fragment key={i}>
-          {i > 0 && <wbr />}
-          {c}
-        </Fragment>
-      ))}
-    </span>
-  )
+export default function PhraseLite({ text, className }: { text: string; className?: string }) {
+  return <PhraseSpan parts={phrasesLite(text)} className={className} />
 }

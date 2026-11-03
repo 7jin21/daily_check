@@ -4,6 +4,7 @@ import { useEffect, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { STORAGE_KEYS } from '@/lib/constants'
 import { hasPendingCheckin, type PendingCheckin } from '@/lib/checkin-rollover'
+import Pill from './Pill'
 
 // 水面の上の呼びかけ。状態は3つ:
 // 記録済み → 今日の一文と「日記を読む」／書きかけ（localStorage に入力途中。日付をまたいだ言葉のある書きかけも）→「続きを書く」／未記録 →「今日を記録する」
@@ -17,14 +18,6 @@ interface Props {
   hasTodayEntry: boolean
   moodOnly?: boolean // 今日の記録が気分だけ（言葉はまだ）
   missedYesterday: string | null // 昨日の日付（書き忘れのときだけ）
-}
-
-function Arrow() {
-  return (
-    <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-      <path d="M3 8h9.5M8.5 3.5 13 8l-4.5 4.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  )
 }
 
 export default function MirrorCTA({ today, greeting, todayQuote, hasTodayEntry, moodOnly = false, missedYesterday }: Props) {
@@ -60,10 +53,7 @@ export default function MirrorCTA({ today, greeting, todayQuote, hasTodayEntry, 
           残しました。
         </p>
         <div className="im-cta-row">
-          <Link href={`/entries/${today}?write=1`} className="im-pill">
-            言葉を書き足す
-            <span className="im-pill-arrow"><Arrow /></span>
-          </Link>
+          <Pill href={`/entries/${today}?write=1`}>言葉を書き足す</Pill>
           {yesterdayLink}
         </div>
       </>
@@ -76,10 +66,7 @@ export default function MirrorCTA({ today, greeting, todayQuote, hasTodayEntry, 
         <p className="im-cta-eyebrow">今日の記録</p>
         <p className="im-cta-quote">{todayQuote ?? '今日の記録は、ちゃんと残っています。'}</p>
         <div className="im-cta-row">
-          <Link href={`/entries/${today}`} className="im-pill">
-            日記を読む
-            <span className="im-pill-arrow"><Arrow /></span>
-          </Link>
+          <Pill href={`/entries/${today}`}>日記を読む</Pill>
           {yesterdayLink}
         </div>
       </>
@@ -97,10 +84,7 @@ export default function MirrorCTA({ today, greeting, todayQuote, hasTodayEntry, 
         )}
       </p>
       <div className="im-cta-row">
-        <Link href="/checkin" className="im-pill">
-          {hasDraft ? '続きを書く' : '今日を記録する'}
-          <span className="im-pill-arrow"><Arrow /></span>
-        </Link>
+        <Pill href="/checkin">{hasDraft ? '続きを書く' : '今日を記録する'}</Pill>
         {yesterdayLink}
       </div>
     </>

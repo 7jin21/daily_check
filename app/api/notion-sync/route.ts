@@ -3,7 +3,7 @@ import { createReadonlyServerClient } from '@/lib/supabase-server'
 import { createServerSupabaseClient } from '@/lib/supabase-server'
 import { decryptSecret } from '@/lib/crypto'
 import { moodEmoji } from '@/lib/constants'
-import { formatJSTDate } from '@/lib/jst'
+import { formatJSTDate, isISODate } from '@/lib/jst'
 import { notionBodyBatches, type NotionBodyBlock } from '@/lib/notion-content'
 import { resolveNotionSettings } from '@/lib/notion-settings'
 import { NotionLease } from '@/lib/notion-sync-lease'
@@ -18,12 +18,11 @@ interface NotionSyncBody {
 }
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
 
 function validateBody(body: Partial<NotionSyncBody>): string | null {
   if (!body || typeof body !== 'object') return 'Invalid request body'
   if (typeof body.entryId !== 'string' || !UUID_RE.test(body.entryId)) return 'entryId が不正です'
-  if (typeof body.entryDate !== 'string' || !DATE_RE.test(body.entryDate)) return 'entryDate が不正です'
+  if (!isISODate(body.entryDate)) return 'entryDate が不正です'
   if (typeof body.draft !== 'string' || !body.draft.trim()) return 'draft は必須です'
   if (body.tags != null && (!Array.isArray(body.tags) || body.tags.some((t) => typeof t !== 'string'))) {
     return 'tags は文字列の配列で指定してください'

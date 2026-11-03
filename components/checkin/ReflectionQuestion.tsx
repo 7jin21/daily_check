@@ -35,7 +35,7 @@ export default function ReflectionQuestion({
   }
 
   return (
-    <div className="ck-page animate-fade-in" style={{ paddingTop: 24 }}>
+    <div className="screen animate-fade-in" style={{ paddingTop: 24 }}>
       <p className="label-ui mb-3">清書の前に、ひとつだけ</p>
       <h1 className="font-mincho text-[1.375rem] font-semibold leading-relaxed tracking-wide text-[var(--foreground)]">
         <PhraseLite text={question} />

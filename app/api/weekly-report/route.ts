@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createReadonlyServerClient } from '@/lib/supabase-server'
 import { getGroqClient, GROQ_MODELS } from '@/lib/groq'
 import { subtractDays, todayJST } from '@/lib/jst'
-import { formatEntriesForPrompt, PROMPT_ENTRY_LEGEND } from '@/lib/prompt-context'
+import { formatEntriesForPrompt, PROMPT_ENTRY_LEGEND, type PromptEntry } from '@/lib/prompt-context'
 
 export interface WeeklyReport {
   narrative: string
@@ -16,18 +16,8 @@ export interface WeeklyReport {
   isFallback?: boolean
 }
 
-interface WeeklyEntry {
-  entry_date: string
-  mood: number | null
-  energy: number | null
-  events: string | null
-  challenges: string | null
-  gratitude: string | null
-  freeform: string | null
-  dominant_emotion: string | null
-  edited_draft: string | null
-  ai_draft: string | null
-}
+/** 読み込む列（select）は、AI に渡す日記データの全項目 */
+type WeeklyEntry = Required<PromptEntry>
 
 export async function POST(req: NextRequest) {
   const supabase = await createReadonlyServerClient()

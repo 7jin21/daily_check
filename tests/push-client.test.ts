@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { subscribeToPush, unsubscribeFromPush, unsubscribeThisDevice } from '@/lib/push-client'
+import { subscribeToPush, unsubscribeThisDevice } from '@/lib/push-client'
 
 // ブラウザの Push まわり（Service Worker・PushManager・fetch）を、呼ばれた順に記録する偽物に差し替える
 const log: string[] = []
@@ -106,7 +106,7 @@ describe('unsubscribeThisDevice（サインアウトの前）', () => {
 
   it('通知OFFでも未登録の端末から他端末の購読を削除しない', async () => {
     stubBrowser(async () => undefined)
-    await expect(unsubscribeFromPush()).resolves.toEqual({ ok: true })
+    await expect(unsubscribeThisDevice()).resolves.toEqual({ ok: true })
     expect(log).toEqual([])
   })
 

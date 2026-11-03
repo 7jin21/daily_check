@@ -6,9 +6,9 @@ import { readInsightsCache, writeInsightsCache } from '@/lib/insights-session'
 import { useInsightsSession } from './InsightsSessionBoundary'
 import { todayJST } from '@/lib/jst'
 import { doneInLastWeek, FOCUS_MAX_CHARS, isFocusActive, loadFocus, saveFocus, type Focus } from '@/lib/focus'
-import { formatAge } from './shared'
-import InkRings from '@/components/ui/InkRings'
+import { ReadingBlock, requestError, SectionHeader } from './shared'
 import { AlertIcon, CheckIcon, MirrorMark } from '@/components/ui/icons'
+import type { WeeklyReport } from '@/app/api/weekly-report/route'
 
 /** ふり返りの小さなカード。色は気分のトークンから（ハイライト＝晴れ、乗り越えたこと＝沈みかけ、など） */
 function ReportCard({ label, tone, children }: { label: string; tone: string; children: React.ReactNode }) {
@@ -27,18 +27,6 @@ function ReportCard({ label, tone, children }: { label: string; tone: string; ch
       {children}
     </div>
   )
-}
-
-interface WeeklyReport {
-  narrative: string
-  highlight: string
-  challenge: string
-  nextFocus: string
-  weekMood: string
-  focusReview?: string
-  entryCount: number
-  avgMood: number
-  isFallback?: boolean
 }
 
 const WEEKLY_CACHE_TTL = 6 * 60 * 60 * 1000
@@ -111,7 +99,7 @@ export default function WeeklyReportSection() {
         setWeeklyCachedAt(now)
       }
     } catch (err) {
-      if (request.isActive()) setWeeklyError(request.signal.aborted ? '時間がかかっています。もう一度お試しください' : err instanceof Error ? err.message : '取得に失敗しました')
+      if (request.isActive()) setWeeklyError(requestError(request, err, '取得に失敗しました'))
     } finally {
       if (request.isActive()) setIsWeeklyLoading(false)
       request.finish()
@@ -120,30 +108,15 @@ export default function WeeklyReportSection() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="font-mincho text-lg font-semibold tracking-wide text-[var(--foreground)]">今週の振り返り</h2>
-        <div className="flex flex-col items-end gap-0.5">
-          <button
-            type="button"
-            onClick={loadWeeklyReport}
-            disabled={isWeeklyLoading}
-            className="btn-quiet"
-            style={{ minHeight: 32, color: 'var(--primary)', fontWeight: 700 }}
-          >
-            {isWeeklyLoading ? '書いています…' : weeklyReport ? '更新する' : 'レポートを作る'}
-          </button>
-          {weeklyCachedAt && !isWeeklyLoading && (
-            <span className="text-xs text-[var(--muted-2)]">{formatAge(weeklyCachedAt)}</span>
-          )}
-        </div>
-      </div>
+      <SectionHeader
+        title="今週の振り返り"
+        actionLabel={isWeeklyLoading ? '書いています…' : weeklyReport ? '更新する' : 'レポートを作る'}
+        busy={isWeeklyLoading}
+        cachedAt={weeklyCachedAt}
+        onAction={loadWeeklyReport}
+      />
 
-      {isWeeklyLoading && (
-        <div className="flex flex-col items-center justify-center py-10 gap-5" role="status">
-          <InkRings size="md" />
-          <p className="font-mincho text-[var(--muted)] text-sm tracking-wide">今週の日記を、ふり返っています</p>
-        </div>
-      )}
+      {isWeeklyLoading && <ReadingBlock message="今週の日記を、ふり返っています" className="py-10" />}
 
       {!isWeeklyLoading && weeklyError && (
         <div className="card text-center py-6">

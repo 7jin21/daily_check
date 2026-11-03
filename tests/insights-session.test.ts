@@ -58,6 +58,8 @@ function hooksFixture() {
 function find(node: any, predicate: (node: any) => boolean): any {
   if (!node || typeof node !== 'object') return null
   if (predicate(node)) return node
+  // 見出し・アイコンなどの表示用の部品（hooks を使わない）は、中まで展開して探す
+  if (typeof node.type === 'function') return find(node.type(node.props), predicate)
   for (const child of [node.props?.children].flat(Infinity)) {
     const result = find(child, predicate)
     if (result) return result

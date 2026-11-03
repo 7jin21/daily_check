@@ -1,5 +1,5 @@
-import Link from 'next/link'
-import type { HomeModel } from '@/lib/home-model'
+import { CURVE_POINTS, type HomeModel } from '@/lib/home-model'
+import { shortDate } from '@/lib/jst'
 import MirrorHero from './MirrorHero'
 import MirrorCTA from './MirrorCTA'
 import StreakCelebration from './StreakCelebration'
@@ -9,14 +9,13 @@ import MoodCurve from './MoodCurve'
 import QuickMemo from './QuickMemo'
 import FocusLine from './FocusLine'
 import SaveEcho from './SaveEcho'
+import Pill from './Pill'
 import Phrase from '@/components/ui/Phrase'
 import './home.css'
 
 // ホーム画面の描画（データは app/page.tsx か開発用プレビューから受け取る）
 
 const GREETING = { dawn: 'おはようございます', day: 'こんにちは', dusk: 'おつかれさまです', night: 'こんばんは' } as const
-
-const short = (d: string) => `${Number(d.slice(5, 7))}.${Number(d.slice(8, 10))}`
 
 function Colophon() {
   return (
@@ -67,7 +66,7 @@ export default function HomeView({ model, now }: { model: HomeModel; now: Date }
           </Section>
         )}
 
-        <Section idx={idx()} title="この一週間" meta={`${short(week[0])} — ${short(week[6])}`}>
+        <Section idx={idx()} title="この一週間" meta={`${shortDate(week[0])} — ${shortDate(week[6])}`}>
           <WeekRipples today={today} entries={entries} />
         </Section>
 
@@ -80,8 +79,9 @@ export default function HomeView({ model, now }: { model: HomeModel; now: Date }
         )}
 
         {entries.length > 1 && (
-          <Section idx={idx()} title="気分の波" meta={`直近${Math.min(14, entries.length)}回`}>
-            <MoodCurve entries={entries} />
+          <Section idx={idx()} title="気分の波" meta={`直近${Math.min(CURVE_POINTS, entries.length)}回`}>
+            {/* 波に使う分（直近の日付・気分・エネルギー）だけを渡す。365日分を丸ごとブラウザへ送らない */}
+            <MoodCurve points={entries.slice(0, CURVE_POINTS).map(({ entry_date, mood, energy }) => ({ entry_date, mood, energy }))} />
           </Section>
         )}
 
@@ -118,14 +118,7 @@ export function OnboardingView({ model, now }: { model: HomeModel; now: Date }) 
           今日を映す、<br />三十秒の日記。
         </p>
         <div className="im-cta-row">
-          <Link href="/checkin" className="im-pill">
-            最初の記録をする
-            <span className="im-pill-arrow">
-              <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                <path d="M3 8h9.5M8.5 3.5 13 8l-4.5 4.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </span>
-          </Link>
+          <Pill href="/checkin">最初の記録をする</Pill>
         </div>
       </MirrorHero>
       <div className="im-sheet">
@@ -137,13 +130,11 @@ export function OnboardingView({ model, now }: { model: HomeModel; now: Date }) 
           </header>
           <ol>
             {steps.map((s, i) => (
-              <li key={s.title} className="im-row" style={{ gridTemplateColumns: '46px 1fr' }}>
-                <span className="im-row-day" style={{ textAlign: 'center' }}>{i + 1}</span>
+              <li key={s.title} className="im-row">
+                <span className="im-row-day im-step-num">{i + 1}</span>
                 <span>
-                  <span className="im-sec-title" style={{ fontSize: '1rem', display: 'block' }}>{s.title}</span>
-                  <span className="im-row-tags" style={{ display: 'block', whiteSpace: 'normal', fontSize: '0.8125rem', lineHeight: 1.8 }}>
-                    {s.body}
-                  </span>
+                  <span className="im-sec-title im-step-title">{s.title}</span>
+                  <span className="im-step-body">{s.body}</span>
                 </span>
               </li>
             ))}

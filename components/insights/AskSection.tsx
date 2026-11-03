@@ -4,13 +4,14 @@ import { useState, useEffect } from 'react'
 import { apiPost } from '@/lib/api-client'
 import InkRings from '@/components/ui/InkRings'
 import { useInsightsSession } from './InsightsSessionBoundary'
+import { requestError } from './shared'
 
 // 「AIに聞いてみる」: 直近の日記をもとに、本人の質問に答える
 export default function AskSection() {
   const { userId, session } = useInsightsSession()
   const [question, setQuestion] = useState('')
-  const [answer, setAnswer] = useState<string | null>(null)
-  const [askedQuestion, setAskedQuestion] = useState<string | null>(null)
+  // 聞いたことと、その答え（いつも一緒に出す）
+  const [qa, setQa] = useState<{ q: string; answer: string } | null>(null)
   const [isAsking, setIsAsking] = useState(false)
   const [askError, setAskError] = useState<string | null>(null)
 
@@ -23,15 +24,14 @@ export default function AskSection() {
     if (!request) return
     setIsAsking(true)
     setAskError(null)
-    setAnswer(null)
+    setQa(null)
     try {
       const result = await apiPost<{ answer: string }>('/api/ask', { question: q }, { signal: request.signal })
       if (!request.isCurrent()) return
-      setAnswer(result.answer)
-      setAskedQuestion(q)
+      setQa({ q, answer: result.answer })
       setQuestion('')
     } catch (err) {
-      if (request.isActive()) setAskError(request.signal.aborted ? '時間がかかっています。もう一度お試しください' : err instanceof Error ? err.message : '回答の生成に失敗しました')
+      if (request.isActive()) setAskError(requestError(request, err, '回答の生成に失敗しました'))
     } finally {
       if (request.isActive()) setIsAsking(false)
       request.finish()
@@ -76,12 +76,10 @@ export default function AskSection() {
           </p>
         )}
 
-        {answer && !isAsking && (
+        {qa?.answer && !isAsking && (
           <div className="mt-4 p-4 rounded-2xl bg-[var(--surface-secondary)] animate-fade-in">
-            {askedQuestion && (
-              <p className="text-xs text-[var(--muted-2)] mb-2">Q. {askedQuestion}</p>
-            )}
-            <p className="font-mincho text-[0.9375rem] text-[var(--foreground)] leading-loose whitespace-pre-wrap prose-ja">{answer}</p>
+            <p className="text-xs text-[var(--muted-2)] mb-2">Q. {qa.q}</p>
+            <p className="font-mincho text-[0.9375rem] text-[var(--foreground)] leading-loose whitespace-pre-wrap prose-ja">{qa.answer}</p>
           </div>
         )}
       </div>

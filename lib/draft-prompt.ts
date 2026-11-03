@@ -1,4 +1,4 @@
-import type { CheckinInput } from '@/stores/checkin'
+import type { ComposeInput } from '@/lib/draft-compose'
 import { energyLabel, moodLabel } from '@/lib/constants'
 import { formatJSTDate } from '@/lib/jst'
 
@@ -7,10 +7,8 @@ import { formatJSTDate } from '@/lib/jst'
 // つなぎ・誤字の修正・並べ替えだけを行う。書かれていない出来事・感情・気づきは足さない。
 // （以前は「500文字程度・気持ちや内省を添えてよい」だったため、短い入力ほど AI の文章に置き換わっていた）
 
-export interface DraftPromptInput extends CheckinInput {
-  reflectionQ?: string
-  reflectionA?: string
-}
+/** 清書の材料（メモ＋内省の答え）。下書き画面が組み立てる ComposeInput と同じもの */
+export type DraftPromptInput = ComposeInput
 
 /**
  * 清書の生成パラメータ（/api/generate-draft と評価スクリプト scripts/eval-draft.ts で共有する）。

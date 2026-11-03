@@ -1,7 +1,7 @@
 'use client'
 
 import { useRef, type KeyboardEvent, type ReactNode } from 'react'
-import { MOODS, ENERGY } from '@/lib/constants'
+import { ENERGY, energyDescription, MOODS, moodLabel } from '@/lib/constants'
 import { useCheckinStore } from '@/stores/checkin'
 import { hapticTap } from '@/lib/haptics'
 import { EnergyGlyph, MoodGlyph } from '@/components/ui/StateGlyphs'
@@ -91,8 +91,8 @@ export default function StateStep() {
     setEnergy(v)
   }
 
-  const moodText = MOODS.find((m) => m.value === mood)?.label
-  const energyText = ENERGY.find((e) => e.value === energy)?.description
+  const moodText = moodLabel(mood)
+  const energyText = energyDescription(energy)
 
   return (
     <div className="ck-state">

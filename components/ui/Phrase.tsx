@@ -1,6 +1,6 @@
 import 'server-only'
-import { Fragment } from 'react'
 import { Parser, jaModel } from 'budoux'
+import { PhraseSpan } from './Wbr'
 
 // 文節の切れ目でだけ改行する（Google の BudouX で文節に分け、切れ目に <wbr> を入れる）。
 // 「前提を／確認してほしかった」のように、ことばの途中で行が折れるのを防ぐ。
@@ -21,16 +21,6 @@ export function phrases(text: string): string[] {
   }
 }
 
-export default function Phrase({ text, className = '' }: { text: string; className?: string }) {
-  const chunks = phrases(text)
-  return (
-    <span className={`phrase ${className}`.trim()}>
-      {chunks.map((c, i) => (
-        <Fragment key={i}>
-          {i > 0 && <wbr />}
-          {c}
-        </Fragment>
-      ))}
-    </span>
-  )
+export default function Phrase({ text, className }: { text: string; className?: string }) {
+  return <PhraseSpan parts={phrases(text)} className={className} />
 }

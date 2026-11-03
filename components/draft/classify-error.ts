@@ -2,16 +2,20 @@ import { ApiError } from '@/lib/api-client'
 import { isNetworkFailure } from '@/lib/network-error'
 
 export const NETWORK_ERROR_MESSAGE = 'ネットワークに接続できません。Wi-Fiやモバイルデータ通信を確認してください。'
+/** 取り消された保存（何も見せない） */
+export const SAVE_CANCELLED = 'cancelled'
+/** ログインし直してもらう（この言葉が返ったらログイン画面へ） */
+export const SESSION_EXPIRED_MESSAGE = 'セッションが切れました。再ログインしてください。'
 
-// 保存の失敗を、利用者に見せる言葉に置き換える（'cancelled' は何も見せない、「セッション」を含むならログインへ）
+// 保存の失敗を、利用者に見せる言葉に置き換える（SAVE_CANCELLED は何も見せない、SESSION_EXPIRED_MESSAGE ならログインへ）
 export function classifyError(err: unknown): string {
-  if (err instanceof DOMException && err.name === 'AbortError') return 'cancelled'
+  if (err instanceof DOMException && err.name === 'AbortError') return SAVE_CANCELLED
   // 通信の失敗は「未ログイン」より先に見分ける（Safari の「Load failed」なども含む）。
   // ここで拾わないと、電波が弱いだけでログイン画面へ飛ばしたり、英語のエラーをそのまま見せたりする
   if (isNetworkFailure(err)) return NETWORK_ERROR_MESSAGE
   if (err instanceof Error) {
     if (err.message.includes('401') || err.message.includes('Unauthorized')) {
-      return 'セッションが切れました。再ログインしてください。'
+      return SESSION_EXPIRED_MESSAGE
     }
     if (err.message.includes('500') || err.message.includes('Server error')) {
       return 'サーバーで問題が発生しました。時間をおいて再試行してください。'

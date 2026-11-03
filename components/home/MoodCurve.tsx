@@ -2,8 +2,9 @@
 
 import { useRef, useState, type KeyboardEvent, type PointerEvent } from 'react'
 import Link from 'next/link'
-import { ENERGY, MOODS, moodColor } from '@/lib/constants'
-import { dayOfWeek, type HomeEntry } from '@/lib/home-model'
+import { energyLabel, moodColor, moodLabel } from '@/lib/constants'
+import { dayOfWeek, shortDate } from '@/lib/jst'
+import { CURVE_POINTS, type CurvePoint } from '@/lib/home-model'
 import { WEEKDAY_KANJI } from '@/lib/almanac'
 import { EnergyGlyph, MoodGlyph } from '@/components/ui/StateGlyphs'
 
@@ -17,8 +18,6 @@ const MOOD_TOP = 12
 const MOOD_BOTTOM = 118
 const ENERGY_TOP = 138
 const ENERGY_BOTTOM = 166
-
-const shortDate = (d: string) => `${Number(d.slice(5, 7))}.${Number(d.slice(8, 10))}`
 
 /** Catmull-Rom を 3 次ベジェに変換した滑らかな線。制御点は描画範囲内に収めて行き過ぎを防ぐ */
 function smoothPath(pts: { x: number; y: number }[], minY: number, maxY: number): string {
@@ -40,8 +39,8 @@ function smoothPath(pts: { x: number; y: number }[], minY: number, maxY: number)
   return d
 }
 
-export default function MoodCurve({ entries }: { entries: HomeEntry[] }) {
-  const data = entries.slice(0, 14).reverse()
+export default function MoodCurve({ points }: { points: CurvePoint[] }) {
+  const data = points.slice(0, CURVE_POINTS).reverse()
   const [sel, setSel] = useState(data.length - 1)
   const svgRef = useRef<SVGSVGElement>(null)
   const dragging = useRef(false)
@@ -83,8 +82,6 @@ export default function MoodCurve({ entries }: { entries: HomeEntry[] }) {
 
   const cur = data[sel] ?? data[data.length - 1]
   if (!cur) return null
-  const curMood = MOODS.find((m) => m.value === cur.mood)
-  const curEnergy = ENERGY.find((e) => e.value === cur.energy)
 
   return (
     <>
@@ -97,11 +94,11 @@ export default function MoodCurve({ entries }: { entries: HomeEntry[] }) {
         <span className="im-curve-readout-vals">
           <span>
             <MoodGlyph mood={cur.mood} size={15} />
-            気分 {curMood?.label ?? '—'}
+            気分 {moodLabel(cur.mood) ?? '—'}
           </span>
           <span>
             <EnergyGlyph energy={cur.energy} size={15} />
-            エネルギー {curEnergy?.label ?? '—'}
+            エネルギー {energyLabel(cur.energy) ?? '—'}
           </span>
         </span>
         <Link href={`/entries/${cur.entry_date}`} className="im-curve-open">
@@ -119,7 +116,7 @@ export default function MoodCurve({ entries }: { entries: HomeEntry[] }) {
         aria-valuemin={1}
         aria-valuemax={data.length}
         aria-valuenow={sel + 1}
-        aria-valuetext={`${shortDate(cur.entry_date)} 気分 ${curMood?.label ?? ''}`}
+        aria-valuetext={`${shortDate(cur.entry_date)} 気分 ${moodLabel(cur.mood) ?? ''}`}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={() => (dragging.current = false)}

@@ -1,6 +1,8 @@
 // 保存した直後にホームへ戻ったとき、その日の丸に色が落ちる演出（「水面に一滴」の続き）のための目印。
 // 保存した画面で残し、ホームで一度だけ読んで消す。タブを閉じれば消える sessionStorage に置く。
 
+import { isISODate } from '@/lib/jst'
+
 const KEY = 'inner-mirror-save-echo'
 /** これより前の保存の目印は使わない（あとで開いたホームで、急に演出が出ないように） */
 const TTL_MS = 10 * 60 * 1000
@@ -44,7 +46,7 @@ export function takeSaveEcho(now = Date.now(), store: Store | null = defaultStor
   if (!raw) return null
   try {
     const v = JSON.parse(raw) as Partial<SaveEchoMark>
-    if (typeof v.date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(v.date)) return null
+    if (!isISODate(v.date)) return null
     if (typeof v.mood !== 'number' || !Number.isInteger(v.mood) || v.mood < 1 || v.mood > 5) return null
     if (typeof v.at !== 'number' || now - v.at < 0 || now - v.at > TTL_MS) return null
     return { date: v.date, mood: v.mood, at: v.at }

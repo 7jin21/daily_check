@@ -1,6 +1,8 @@
 import Link from 'next/link'
-import { daysBetween } from '@/lib/jst'
+import { dayOfWeek, formatJSTDate } from '@/lib/jst'
 import { MOODS, moodColor, moodLabel } from '@/lib/constants'
+import { WEEKDAY_KANJI } from '@/lib/almanac'
+import { isValidPastDate } from '@/lib/checkin-rollover'
 import { ChevronLeftIcon, ChevronRightIcon, PlusIcon } from '@/components/ui/icons'
 
 interface DayEntry {
@@ -19,8 +21,6 @@ interface Props {
   todayHref: string | null // null = 既に今月を表示中
 }
 
-const WEEKDAY_LABELS = ['日', '月', '火', '水', '木', '金', '土']
-
 function pad2(n: number): string {
   return String(n).padStart(2, '0')
 }
@@ -29,11 +29,12 @@ export default function MonthCalendar({ year, month, entries, todayJST, prevHref
   const entryMap = new Map(entries.map((e) => [e.entry_date, e]))
   const recordedCount = entries.length
 
-  const leadingBlanks = new Date(year, month - 1, 1).getDay() // 0=日
+  const firstDay = `${year}-${pad2(month)}-01`
+  const leadingBlanks = dayOfWeek(firstDay) // 0=日
   const daysInMonth = new Date(year, month, 0).getDate()
   const weeksCount = Math.ceil((leadingBlanks + daysInMonth) / 7)
 
-  const monthLabel = new Date(year, month - 1, 1).toLocaleDateString('ja-JP', { year: 'numeric', month: 'long' })
+  const monthLabel = formatJSTDate(firstDay, { year: 'numeric', month: 'long' })
 
   return (
     <div>
@@ -63,7 +64,7 @@ export default function MonthCalendar({ year, month, entries, todayJST, prevHref
 
       {/* 曜日ヘッダー */}
       <div className="grid grid-cols-7 gap-1 mb-1">
-        {WEEKDAY_LABELS.map((label) => (
+        {WEEKDAY_KANJI.map((label) => (
           <div key={label} className="text-center text-[0.6875rem] font-ui text-[var(--muted-2)] py-1">
             {label}
           </div>
@@ -82,9 +83,8 @@ export default function MonthCalendar({ year, month, entries, todayJST, prevHref
           const entry = entryMap.get(dateStr)
           const isToday = dateStr === todayJST
           const isFuture = dateStr > todayJST
-          // today からの経過日数（正の値 = 過去）
-          const diffDays = daysBetween(dateStr, todayJST)
-          const backfillable = !entry && !isFuture && !isToday && diffDays > 0 && diffDays <= 7
+          // 書き忘れた日は、チェックインと同じ範囲（昨日〜7日前）だけ「あとから書く」にする
+          const backfillable = !entry && isValidPastDate(dateStr, todayJST)
 
           let href: string | null = null
           if (entry) href = `/entries/${dateStr}`

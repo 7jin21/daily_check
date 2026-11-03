@@ -3,7 +3,7 @@
 // 日記の保存（ブラウザから Supabase へ。RLS で自分の行しか書けない）
 import { getSupabaseClient } from '@/lib/supabase'
 import { apiPost } from '@/lib/api-client'
-import { hasWords, mergeEntryText, metaExcerpt, type MergedEntryText, type StoredEntryText } from '@/lib/entry-merge'
+import { hasWords, mergeEntryText, metaExcerpt, TEXT_COLUMNS, type MergedEntryText, type StoredEntryText } from '@/lib/entry-merge'
 import { isNetworkFailure, NetworkError } from '@/lib/network-error'
 
 /**
@@ -44,7 +44,7 @@ export async function hasEntryWithWords(entryDate: string): Promise<boolean> {
   const userId = await currentUserId()
   const { data, error } = await getSupabaseClient()
     .from('diary_entries')
-    .select('events, challenges, gratitude, freeform, ai_draft, edited_draft')
+    .select(TEXT_COLUMNS.join(', '))
     .eq('user_id', userId)
     .eq('entry_date', entryDate)
     .maybeSingle()
@@ -88,7 +88,7 @@ export async function saveFullEntry(e: FullEntry): Promise<SaveResult> {
 
   const { data: existing, error: readError } = await supabase
     .from('diary_entries')
-    .select('events, challenges, gratitude, freeform, ai_draft, edited_draft, tags, summary, dominant_emotion')
+    .select(`${TEXT_COLUMNS.join(', ')}, tags, summary, dominant_emotion`)
     .eq('user_id', userId)
     .eq('entry_date', e.entryDate)
     .maybeSingle()
@@ -129,7 +129,7 @@ export async function saveFullEntry(e: FullEntry): Promise<SaveResult> {
   if (error) throw toError(error)
   const appended =
     merged &&
-    (['events', 'challenges', 'gratitude', 'freeform', 'ai_draft', 'edited_draft'] as const).some(
+    TEXT_COLUMNS.some(
       // 末尾の空白・改行の違いは「足された」に数えない（つなぐときに末尾だけ整えるため）
       (col) => (text[col] ?? '').trimEnd() !== (((existing as Partial<StoredEntryText>)[col] as string | null) ?? '').trimEnd()
     )

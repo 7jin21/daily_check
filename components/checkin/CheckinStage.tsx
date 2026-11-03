@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useId, useRef, type CSSProperties } from 'react'
+import { moodColor } from '@/lib/constants'
 import { moodLight, moonPhasePath } from '@/lib/state-glyph'
 
 // チェックイン1画面目の小さな「水鏡」。
@@ -57,7 +58,7 @@ export default function CheckinStage({ mood, energy }: { mood: number | null; en
   // まだ選んでいないときは浅い水たまり（CSS で薄く見せる）
   const level = energy ? STAGE_LEVEL[energy - 1] : 0.07
   const style = {
-    ...(mood ? { '--ck-tint': `var(--mood-${mood})` } : {}),
+    ...(mood ? { '--ck-tint': moodColor(mood) } : {}),
     '--ck-level': level,
     '--ck-lit': target,
   } as CSSProperties

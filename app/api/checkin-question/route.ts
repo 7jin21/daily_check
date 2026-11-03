@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createReadonlyServerClient } from '@/lib/supabase-server'
 import { getGroqClient, GROQ_MODELS } from '@/lib/groq'
 import { REFLECTION_NONE_OPTION as NONE_OPTION } from '@/lib/freeform'
+import { hasReflectionMaterial } from '@/lib/reflection-prefetch'
 import type { CheckinInput } from '@/stores/checkin'
 
 // チェックイン入力を読み、本人の内省を1つだけ促す質問（3〜4択）を返す。
@@ -14,17 +15,7 @@ import type { CheckinInput } from '@/stores/checkin'
 export const runtime = 'nodejs'
 
 const SKIP = { skip: true as const }
-
-// 入力テキストの合計が短すぎる/長すぎる場合の早期判定用
-const MIN_TEXT_FOR_QUESTION = 4 // これ未満なら材料が無く質問しない
 // 「どれも近くない」は lib/freeform.ts と共通（選ばれても答えの言葉にはしない）
-
-function collectText(input: CheckinInput): string {
-  return [input.events, input.challenges, input.gratitude, input.freeform]
-    .map((s) => (typeof s === 'string' ? s.trim() : ''))
-    .filter(Boolean)
-    .join('\n')
-}
 
 function buildUserPrompt(input: CheckinInput): string {
   const parts: string[] = []
@@ -77,8 +68,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(SKIP)
   }
 
-  // 4. 材料が無ければ AI を呼ばずに skip
-  if (collectText(input).length < MIN_TEXT_FOR_QUESTION) {
+  // 4. 材料が無ければ AI を呼ばずに skip（先読みする側と同じ基準。lib/reflection-prefetch.ts）
+  if (!hasReflectionMaterial(input)) {
     return NextResponse.json(SKIP)
   }
 
@@ -97,7 +88,7 @@ export async function POST(req: NextRequest) {
         { role: 'system', content: SYSTEM_PROMPT },
         { role: 'user', content: buildUserPrompt(input) },
       ],
-    })
+    }, { signal: req.signal }) // 画面を離れた・待ちきれずに切られた問いは、AI の生成も止める
 
     const text = completion.choices[0]?.message?.content ?? ''
     const parsed = JSON.parse(text) as {
@@ -124,7 +115,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ skip: false, question, options })
   } catch (err) {
-    console.error('GROQ checkin-question error:', err)
+    if (!req.signal.aborted) console.error('GROQ checkin-question error:', err)
     return NextResponse.json(SKIP)
   }
 }

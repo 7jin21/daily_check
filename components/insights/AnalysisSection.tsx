@@ -3,11 +3,11 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { apiPost } from '@/lib/api-client'
+import { moodColor } from '@/lib/constants'
 import { readInsightsCache, writeInsightsCache } from '@/lib/insights-session'
 import { useInsightsSession } from './InsightsSessionBoundary'
 import PersonalityCard from './PersonalityCard'
-import { formatAge, MOOD_COLOR } from './shared'
-import InkRings from '@/components/ui/InkRings'
+import { ReadingBlock, requestError, SectionHeader } from './shared'
 import { AlertIcon, ChevronRightIcon, MirrorMark, TrendDownIcon, TrendFlatIcon, TrendUpIcon } from '@/components/ui/icons'
 
 interface EmotionTrigger {
@@ -18,7 +18,7 @@ interface EmotionTrigger {
   evidence?: { date: string; mood: number | null; quote: string }[]
 }
 
-interface AnalysisResult {
+export interface AnalysisResult {
   personalityType: string
   description: string
   strengths: string[]
@@ -35,9 +35,12 @@ interface AnalysisResult {
 
 const CACHE_TTL = 24 * 60 * 60 * 1000
 
-const TREND_ICON = { improving: TrendUpIcon, stable: TrendFlatIcon, declining: TrendDownIcon }
-const TREND_LABEL = { improving: '改善傾向', stable: '安定', declining: '要注意' }
-const TREND_COLOR = { improving: 'var(--positive)', stable: 'var(--muted)', declining: 'var(--notice)' }
+/** 気分の傾向ごとの印・言葉・色 */
+const TREND: Record<AnalysisResult['moodTrend'], { Icon: typeof TrendFlatIcon; label: string; color: string }> = {
+  improving: { Icon: TrendUpIcon, label: '改善傾向', color: 'var(--positive)' },
+  stable: { Icon: TrendFlatIcon, label: '安定', color: 'var(--muted)' },
+  declining: { Icon: TrendDownIcon, label: '要注意', color: 'var(--notice)' },
+}
 
 /** キャッシュや API の分析結果が、画面で使う形をしているか（欠けていると表示が落ちる） */
 function isValidAnalysis(r: unknown): r is AnalysisResult {
@@ -94,39 +97,28 @@ export default function AnalysisSection() {
         setCachedAt(now)
       }
     } catch (err) {
-      if (request.isActive()) setError(request.signal.aborted ? '時間がかかっています。もう一度お試しください' : err instanceof Error ? err.message : 'データの取得に失敗しました')
+      if (request.isActive()) setError(requestError(request, err, 'データの取得に失敗しました'))
     } finally {
       if (request.isActive()) setIsLoading(false)
       request.finish()
     }
   }
 
+  // 傾向が分からない値なら、平らな印・控えめな色・言葉なし
+  const trend = analysis ? (TREND[analysis.moodTrend] as (typeof TREND)[keyof typeof TREND] | undefined) : undefined
+  const TrendIcon = trend?.Icon ?? TrendFlatIcon
+
   return (
     <div>
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="font-mincho text-lg font-semibold tracking-wide text-[var(--foreground)]">AI パーソナル分析</h2>
-        <div className="flex flex-col items-end gap-0.5">
-          <button
-            type="button"
-            onClick={loadAnalysis}
-            disabled={isLoading}
-            className="btn-quiet"
-            style={{ minHeight: 32, color: 'var(--primary)', fontWeight: 700 }}
-          >
-            {isLoading ? '分析しています…' : analysis ? '更新する' : '分析する'}
-          </button>
-          {cachedAt && !isLoading && (
-            <span className="text-xs text-[var(--muted-2)]">{formatAge(cachedAt)}</span>
-          )}
-        </div>
-      </div>
+      <SectionHeader
+        title="AI パーソナル分析"
+        actionLabel={isLoading ? '分析しています…' : analysis ? '更新する' : '分析する'}
+        busy={isLoading}
+        cachedAt={cachedAt}
+        onAction={loadAnalysis}
+      />
 
-      {isLoading && (
-        <div className="flex flex-col items-center justify-center py-14 gap-5" role="status">
-          <InkRings size="md" />
-          <p className="font-mincho text-[var(--muted)] text-sm tracking-wide">過去の日記を、読み返しています</p>
-        </div>
-      )}
+      {isLoading && <ReadingBlock message="過去の日記を、読み返しています" className="py-14" />}
 
       {!isLoading && !hasEnoughData && (
         <div className="card text-center py-10">
@@ -177,11 +169,8 @@ export default function AnalysisSection() {
               <p className="text-xs text-[var(--muted)] mt-1">平均気分</p>
             </div>
             <div className="card flex flex-col items-center justify-center text-center">
-              {(() => {
-                const Trend = TREND_ICON[analysis.moodTrend] ?? TrendFlatIcon
-                return <Trend size={28} style={{ color: TREND_COLOR[analysis.moodTrend] ?? 'var(--muted)' }} />
-              })()}
-              <p className="text-xs text-[var(--muted)] mt-1">{TREND_LABEL[analysis.moodTrend]}</p>
+              <TrendIcon size={28} style={{ color: trend?.color ?? 'var(--muted)' }} />
+              <p className="text-xs text-[var(--muted)] mt-1">{trend?.label}</p>
             </div>
           </div>
 
@@ -234,7 +223,7 @@ export default function AnalysisSection() {
                               key={ev.date}
                               href={`/entries/${ev.date}`}
                               className="evidence-chip"
-                              style={{ borderLeftColor: ev.mood ? MOOD_COLOR[ev.mood] : 'var(--border)' }}
+                              style={{ borderLeftColor: ev.mood ? moodColor(ev.mood) : 'var(--border)' }}
                             >
                               <span className="evidence-date">
                                 {Number(ev.date.slice(5, 7))}/{Number(ev.date.slice(8, 10))}

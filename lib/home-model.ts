@@ -1,9 +1,6 @@
 // ホーム画面の表示用モデル（データ取得と描画の間の純粋な計算）。
 // app/page.tsx（本番）と開発用プレビューの両方から使う。日付はすべて Asia/Tokyo 基準。
-import { dayOfWeek, jstHour, subtractDays, toJSTDate } from '@/lib/jst'
-
-// 日付の関数は lib/jst.ts にまとめた（既存の import 先を変えずに済むよう再公開する）
-export { dayOfWeek, subtractDays, toJSTDate }
+import { jstHour, subtractDays, toJSTDate } from '@/lib/jst'
 
 export interface HomeEntry {
   id: string
@@ -14,6 +11,15 @@ export interface HomeEntry {
   dominant_emotion: string | null
   tags: string[]
 }
+
+/**
+ * 「気分の波」に描く回数。サーバー（HomeView）が新しい順にこの件数だけを切り出して、ブラウザ（MoodCurve）へ送る。
+ * 両方から読むので、'use client' の部品ではなくここに置く
+ * （サーバーの部品が 'use client' のファイルから読む値は、数ではなくクライアント部品への参照になる）
+ */
+export const CURVE_POINTS = 14
+/** 波に使う1回分 */
+export type CurvePoint = Pick<HomeEntry, 'entry_date' | 'mood' | 'energy'>
 
 export type DayPeriod = 'dawn' | 'day' | 'dusk' | 'night'
 

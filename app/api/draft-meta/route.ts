@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createReadonlyServerClient } from '@/lib/supabase-server'
 import { getGroqClient, GROQ_MODELS } from '@/lib/groq'
+import { META_INPUT_LIMIT } from '@/lib/entry-merge'
 
 // ストリーミング生成された日記本文から、タグ・サマリー・主要感情を抽出する。
 // 高速モデルを使うため体感遅延はほぼない。
@@ -23,7 +24,8 @@ export async function POST(req: NextRequest) {
   if (typeof draft !== 'string' || !draft.trim()) {
     return NextResponse.json({ error: 'draft は必須です' }, { status: 400 })
   }
-  if (draft.length > 3000) {
+  // 長い日の本文は、クライアントが metaExcerpt でこの上限に収めてから送る
+  if (draft.length > META_INPUT_LIMIT) {
     return NextResponse.json({ error: 'draft が長すぎます' }, { status: 400 })
   }
 

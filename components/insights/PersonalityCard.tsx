@@ -1,15 +1,9 @@
 'use client'
 
-interface AnalysisResult {
-  personalityType: string
-  description: string
-  strengths: string[]
-  growthAreas: string[]
-  emotionalPatterns: string[]
-}
+import type { AnalysisResult } from './AnalysisSection'
 
 interface PersonalityCardProps {
-  analysis: AnalysisResult
+  analysis: Pick<AnalysisResult, 'personalityType' | 'description' | 'strengths' | 'growthAreas' | 'emotionalPatterns'>
 }
 
 // 分析の4つの見出し。絵文字の代わりに、ホームのセクションと同じ番号と細罫で組む

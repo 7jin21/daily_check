@@ -12,7 +12,6 @@ import {
   isPushSupported,
   isPushConfigured,
   subscribeToPush,
-  unsubscribeFromPush,
   unsubscribeThisDevice,
 } from '@/lib/push-client'
 import ThemeToggle from '@/components/ui/ThemeToggle'
@@ -112,7 +111,7 @@ export default function SettingsPage() {
     // OFF にする
     if (settings.notificationsEnabled) {
       setIsTogglingPush(true)
-      const result = await unsubscribeFromPush()
+      const result = await unsubscribeThisDevice() // この端末の購読だけを解除する（ほかの端末のリマインダーは残す）
       if (result.ok) {
         updateSettings({ notificationsEnabled: false })
         setPushMessage('リマインダーをオフにしました')
@@ -175,7 +174,7 @@ export default function SettingsPage() {
 
   return (
     <div className="px-5 pt-8 pb-8 space-y-6">
-      <div className="section-head" style={{ borderBottomColor: 'var(--divider-strong)' }}>
+      <div className="section-head">
         <div className="eyebrow">Settings</div>
         <h1 className="text-2xl font-bold text-[var(--foreground)]">設定</h1>
       </div>

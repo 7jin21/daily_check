@@ -55,12 +55,12 @@ function ViewToggle({ view }: { view: 'list' | 'calendar' }) {
 /** 見出しの帯（一覧・カレンダー共通） */
 function EntriesHeader() {
   return (
-    <div className="section-head mb-5" style={{ borderBottomColor: 'var(--divider-strong)' }}>
+    <div className="section-head mb-5">
       <div className="flex items-baseline gap-4">
         <div className="eyebrow">All entries</div>
         <h1 className="text-2xl font-bold text-[var(--foreground)]">日記一覧</h1>
       </div>
-      <Link href="/checkin" className="icon-btn" style={{ background: 'var(--btn-bg)', color: 'var(--btn-fg)', borderColor: 'transparent' }} aria-label="今日の記録をする">
+      <Link href="/checkin" className="icon-btn" data-tone="primary" aria-label="今日の記録をする">
         <PlusIcon size={20} />
       </Link>
     </div>

@@ -3,7 +3,7 @@ import { clearUserLocalData, energyLabel, getDailyDescription, moodEmoji, moodLa
 import { subtractDays } from '@/lib/jst'
 import { TIME_ZONES, withTZ } from './helpers'
 
-const STEP_IDS = ['state', 'notes', 'mood', 'energy', 'events', 'challenges', 'gratitude', 'freeform']
+const STEP_IDS = ['state', 'notes']
 
 describe('clearUserLocalData', () => {
   afterEach(() => vi.unstubAllGlobals())

@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from 'react'
 import { CloseIcon, MirrorMark, ShareIcon } from '@/components/ui/icons'
+import { DEVICE_KEYS } from '@/lib/constants'
 
-const DISMISSED_KEY = 'pwa-banner-dismissed'
+const DISMISSED_KEY = DEVICE_KEYS.PWA_BANNER_DISMISSED
 
 export default function AddToHomeScreenBanner() {
   const [show, setShow] = useState(false)
